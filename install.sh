@@ -33,7 +33,7 @@ done
 
 : "${INSTALL_PREFIX:="/usr/local"}"
 
-: "${INSTALL_FEATURES:="sudo"}"
+: "${INSTALL_FEATURES:="sudo docker"}"
 
 # stable or insiders
 : "${INSTALL_CODE_BUILD:="stable"}"
@@ -61,32 +61,6 @@ done
 # Initialize
 log_init INSTALL
 
-create_user() {
-  NEW_USER=$(printf %s\\n "$INSTALL_USER" | cut -d: -f1)
-  NEW_GROUP=$(printf %s\\n "$INSTALL_USER" | cut -d: -f2)
-  if grep -q "^$NEW_USER" /etc/passwd; then
-    error "%s already exists!" "$NEW_USER"
-  else
-    addgroup "$NEW_GROUP"
-    adduser \
-      --disabled-password \
-      --gecos "" \
-      --shell "/bin/bash" \
-      --ingroup "$NEW_GROUP" \
-      "$NEW_USER"
-  fi
-}
-
-
-install_docker() {
-  verbose "installing docker"
-  if ! check_command "docker"; then
-    install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
-  fi
-  addgroup "docker" || warn "docker group already exists"
-  NEW_USER=$(printf %s\\n "$INSTALL_USER" | cut -d: -f1)
-  addgroup "$NEW_USER" "docker"
-}
 
 install_code() {
   verbose "Installing code CLI"
@@ -131,13 +105,26 @@ git-lfs
 bash
 EOF
 
-create_user
-install_docker
+create_user "$INSTALL_USER"
+mkdir -p "$INSTALL_PREFIX"/log
+chown -R "$INSTALL_USER" "$INSTALL_PREFIX"/log
+
 install_code
 
+# Export all variables that start with INSTALL_ so that they are available
+# to the features that are installed.
+while IFS= read -r varset; do
+  export "$(printf %s\\n "$varset" | cut -d= -f1)"
+done <<EOF
+$(set | grep '^INSTALL_')
+EOF
+
 for feature in $INSTALL_FEATURES; do
-  if [ -x "${INSTALL_PREFIX}/install-${feature}.sh" ]; then
-    verbose "Installing feature: $feature"
-    $INSTALL_OPTIMIZE "${INSTALL_PREFIX}/install-${feature}.sh"
-  fi
+  for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features"; do
+    if [ -d "$d" ] && [ -x "${d}/install-${feature}.sh" ]; then
+      verbose "Installing feature: $feature"
+      $INSTALL_OPTIMIZE "${d}/install-${feature}.sh"
+      break
+    fi
+  done
 done

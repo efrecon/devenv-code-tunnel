@@ -28,6 +28,31 @@ done
 
 : "${TUNNEL_NAME:="coder"}"
 
+: "${TUNNEL_PREFIX:="/usr/local"}"
+
+: "${TUNNEL_SERVICES:="${TUNNEL_PREFIX}/etc/init.d"}"
+
+CODER_DESCR="tunnelled environment starter"
+while getopts "l:n:vh" opt; do
+  case "$opt" in
+    n) # Name of the tunnel
+      TUNNEL_NAME="$OPTARG";;
+    l) # Where to send logs
+      TUNNEL_LOG="$OPTARG";;
+    v) # Increase verbosity, repeat to increase
+      TUNNEL_VERBOSE=$((TUNNEL_VERBOSE + 1));;
+    h) # Show help
+      usage 0 TUNNEL
+      ;;
+    *)  # Unknown option
+      usage 1
+      ;;
+  esac
+done
+
+# Initialize
+log_init TUNNEL
+
 VSCODE_CLI_DATA_DIR=$TUNNEL_STORAGE
 export VSCODE_CLI_DATA_DIR
 
@@ -49,10 +74,17 @@ tunnel() {
   fi
 }
 
-(
-  set -m
-  nohup "dockerd" </dev/null >/dev/null 2>&1 &
-)
+for svc in "${TUNNEL_SERVICES%/}"/*.sh; do
+  if [ -f "$svc" ]; then
+    if ! [ -x "$svc" ]; then
+      verbose "Making $svc executable"
+      chmod a+x "$svc"
+    fi
+    verbose "Starting $svc"
+    "$svc"
+  fi
+done
+
 
 if is_logged_in; then
   tunnel

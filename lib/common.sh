@@ -242,3 +242,27 @@ install_packages() {
   verbose "Installing packages: $*"
   $INSTALL_OPTIMIZE apk add --no-cache "$@"
 }
+
+
+create_user() {
+  NEW_USER=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
+  if [ -n "${2:-}" ]; then
+    NEW_GROUP=$2
+  else
+    # If no group is provided, use the second part of the INSTALL_USER. This
+    # will be the same as the username when no colon is present.
+    NEW_GROUP=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f2)
+  fi
+
+  if grep -q "^$NEW_USER" /etc/passwd; then
+    error "%s already exists!" "$NEW_USER"
+  else
+    addgroup "$NEW_GROUP"
+    adduser \
+      --disabled-password \
+      --gecos "" \
+      --shell "/bin/bash" \
+      --ingroup "$NEW_GROUP" \
+      "$NEW_USER"
+  fi
+}
