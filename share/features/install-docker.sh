@@ -15,7 +15,6 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
-CODER_DESCR="docker installer"
 log_init INSTALL
 
 
