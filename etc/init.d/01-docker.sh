@@ -28,6 +28,9 @@ done
 # Prevent detaching in the background (RESERVED for use by the daemon)
 : "${DOCKERD_PREVENT_DAEMONIZATION:=0}"
 
+: "${DOCKERD_PREFIX:="/usr/local"}"
+
+
 
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
@@ -58,4 +61,4 @@ if ! is_true "$DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; t
   daemonize DOCKERD "$@"
 fi
 
-as_root dockerd 2>&1 | tee -a /usr/local/log/dockerd.log > /dev/null &
+as_root dockerd 2>&1 | tee -a "${DOCKERD_PREFIX}/log/dockerd.log" > /dev/null &
