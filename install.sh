@@ -135,7 +135,7 @@ create_user
 install_docker
 install_code
 
-for feature in "$INSTALL_FEATURES"; do
+for feature in $INSTALL_FEATURES; do
   if [ -x "${INSTALL_PREFIX}/install-${feature}.sh" ]; then
     verbose "Installing feature: $feature"
     $INSTALL_OPTIMIZE "${INSTALL_PREFIX}/install-${feature}.sh"
