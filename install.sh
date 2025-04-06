@@ -33,6 +33,8 @@ done
 
 : "${INSTALL_PREFIX:="/usr/local"}"
 
+: "${INSTALL_FEATURES:="sudo"}"
+
 # stable or insiders
 : "${INSTALL_CODE_BUILD:="stable"}"
 
@@ -75,25 +77,11 @@ create_user() {
   fi
 }
 
-install_packages() {
-  verbose "Installing packages: $*"
-  $INSTALL_OPTIMIZE apk add --no-cache "$@"
-}
-
-# Install sudo and ensure that the coder user can sudo without password.
-install_sudo() {
-  verbose "Installing sudo"
-  if ! check_command "sudo"; then
-    install_packages sudo
-  fi
-  verbose "Ensure $INSTALL_USER can sudo without password"
-  printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$INSTALL_USER" > "/etc/sudoers.d/$INSTALL_USER"
-}
 
 install_docker() {
   verbose "installing docker"
   if ! check_command "docker"; then
-    install_packages docker docker-cli-buildx docker-cli-compose
+    install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
   fi
   addgroup "docker" || warn "docker group already exists"
   NEW_USER=$(printf %s\\n "$INSTALL_USER" | cut -d: -f1)
@@ -145,5 +133,11 @@ EOF
 
 create_user
 install_docker
-install_sudo
 install_code
+
+for feature in "$INSTALL_FEATURES"; do
+  if [ -x "${INSTALL_PREFIX}/install-${feature}.sh" ]; then
+    verbose "Installing feature: $feature"
+    $INSTALL_OPTIMIZE "${INSTALL_PREFIX}/install-${feature}.sh"
+  fi
+done

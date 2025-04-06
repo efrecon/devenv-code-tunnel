@@ -238,3 +238,7 @@ internet_install() {
 }
 
 
+install_packages() {
+  verbose "Installing packages: $*"
+  $INSTALL_OPTIMIZE apk add --no-cache "$@"
+}
