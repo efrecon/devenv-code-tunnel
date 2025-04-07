@@ -100,7 +100,6 @@ if ! check_command "node"; then
   as_root corepack enable
   as_root corepack prepare yarn@stable --activate
   as_root corepack prepare pnpm@latest --activate
-  as_root corepack prepare npx@latest --activate
 
   # Install the node-based apps
   for app in $INSTALL_NODE_APPS; do
