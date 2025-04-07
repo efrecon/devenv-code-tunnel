@@ -243,6 +243,19 @@ install_packages() {
   $INSTALL_OPTIMIZE apk add --no-cache "$@"
 }
 
+install_ondemand() {
+  while read -r bin pkg; do
+    [ -z "$pkg" ] && pkg=$bin
+    if [ "${bin:-}" != "-" ] && ! check_command "${bin:-}"; then
+      verbose "$bin not found, installing $pkg"
+      install_packages "$pkg"
+    elif [ "${bin:-}" = "-" ] && [ -n "${pkg:-}" ]; then
+      verbose "Installing $pkg"
+      install_packages "$pkg"
+    fi
+  done
+}
+
 
 create_user() {
   NEW_USER=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
