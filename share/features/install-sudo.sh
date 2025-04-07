@@ -18,10 +18,9 @@ done
 log_init INSTALL
 
 
-verbose "Installing sudo"
-if ! check_command "sudo"; then
-  install_packages sudo
-fi
+install_ondemand<<EOF
+sudo
+EOF
 
 if [ -n "$INSTALL_USER" ]; then
   USR=$(printf %s\\n "$INSTALL_USER" | cut -d: -f1)
