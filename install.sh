@@ -26,19 +26,25 @@ done
 # sudo without password.
 : "${INSTALL_USER:="coder"}"
 
-# When dash, do not try to optimize disk access, when empty will download,
-# install and use eatmydata. When anything else, will prefix installation calls
-# with this var.
+# When a dash, do not try to optimize disk access. When empty (the default) will
+# download, install and use eatmydata. When anything else, will prefix
+# installation calls with the content of this var.
 : "${INSTALL_OPTIMIZE:=""}"
 
+# Prefix where to install binaries and libraries.
 : "${INSTALL_PREFIX:="/usr/local"}"
 
-: "${INSTALL_FEATURES:="sudo docker node awscli"}"
+# Features to install. For each feature, there must be a install-<feature>.sh
+# script in the share/features directory. The script will be called to install
+# the feature, it will automatically inherit all INSTALL_ variables.
+: "${INSTALL_FEATURES:="sudo docker node aws"}"
 
-# stable or insiders
+# Build of vscode to install: only stable or insiders are available.
 : "${INSTALL_CODE_BUILD:="stable"}"
 
+# URL to download the code CLI from.
 : "${INSTALL_CODE_URL:="https://code.visualstudio.com/sha/download?build=${INSTALL_CODE_BUILD}&os=cli-alpine-x64"}"
+
 
 CODER_DESCR="code container installer"
 while getopts "l:u:vh" opt; do
@@ -89,21 +95,16 @@ elif [ -z "$INSTALL_OPTIMIZE" ]; then
 fi
 
 # Install package that we need ourselves. Trigger installation based on the
-# presence of the (main/some) command that they install.
-while read -r bin pkg; do
-  [ -z "$pkg" ] && pkg=$bin
-  if [ -n "${bin:-}" ] && ! check_command "$bin"; then
-    verbose "$bin not found, installing $pkg"
-    install_packages "$pkg"
-  fi
-done <<EOF
+# presence of the (main/some) command that they install in most cases.
+install_ondemand<<EOF
 curl
 zip
 jq
 git
 git-lfs
 bash
-gcompat
+less
+- gcompat
 EOF
 
 create_user "$INSTALL_USER"
