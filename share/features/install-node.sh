@@ -27,7 +27,7 @@ done
 : "${INSTALL_NODE_TYPE:="release"}"
 
 # node-based apps to install. This is a space separated list of apps to install.
-: "${INSTALL_NODE_APPS:="cdk bun"}"
+: "${INSTALL_NODE_APPS:="bun"}"
 
 # Prefix where to install Node.js. We have a default here, but the main prefix
 # comes from the calling install.sh.
