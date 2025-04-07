@@ -266,3 +266,11 @@ create_user() {
       "$NEW_USER"
   fi
 }
+
+assert_version() {
+  if printf %s\\n "$1" | grep -qE '^[0-9]+(\.[0-9]+){0,}$'; then
+    return 0
+  else
+    error "Version $1 is not a valid version number"
+  fi
+}

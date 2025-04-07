@@ -33,7 +33,7 @@ done
 
 : "${INSTALL_PREFIX:="/usr/local"}"
 
-: "${INSTALL_FEATURES:="sudo docker"}"
+: "${INSTALL_FEATURES:="sudo docker node awscli"}"
 
 # stable or insiders
 : "${INSTALL_CODE_BUILD:="stable"}"
@@ -98,11 +98,12 @@ while read -r bin pkg; do
   fi
 done <<EOF
 curl
-unzip
+zip
 jq
 git
 git-lfs
 bash
+gcompat
 EOF
 
 create_user "$INSTALL_USER"
