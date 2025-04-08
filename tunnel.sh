@@ -22,23 +22,29 @@ done
 # Where to send logs
 : "${TUNNEL_LOG:=2}"
 
+# Where to store tunnel data
 : "${TUNNEL_STORAGE:="${HOME}/.vscode-tunnel"}"
 
+# Default tunnel provider
 : "${TUNNEL_PROVIDER:="github"}"
 
-: "${TUNNEL_NAME:="coder"}"
+# Name of the tunnel, when empty a random name is generated. Each time the
+# random name changes, you will have to reauthorize the tunnel with -f
+: "${TUNNEL_NAME:=""}"
 
-: "${TUNNEL_PREFIX:="/usr/local"}"
+: "${TUNNEL_FORCE:="0"}"
 
-: "${TUNNEL_SERVICES:="${TUNNEL_PREFIX}/etc/init.d"}"
-
-CODER_DESCR="tunnelled environment starter"
-while getopts "l:n:vh" opt; do
+CODER_DESCR="tunnel starter"
+while getopts "fl:n:p:vh" opt; do
   case "$opt" in
-    n) # Name of the tunnel
-      TUNNEL_NAME="$OPTARG";;
     l) # Where to send logs
       TUNNEL_LOG="$OPTARG";;
+    n) # Name of the tunnel, empty for random name
+      TUNNEL_NAME="$OPTARG";;
+    p) # Tunnel provider
+      TUNNEL_PROVIDER="$OPTARG";;
+    f) # Force device authorization again
+      TUNNEL_FORCE="1";;
     v) # Increase verbosity, repeat to increase
       TUNNEL_VERBOSE=$((TUNNEL_VERBOSE + 1));;
     h) # Show help
@@ -66,29 +72,39 @@ is_logged_in() {
   return 1
 }
 
-tunnel() {
-  if [ -z "$TUNNEL_NAME" ]; then
-    code tunnel --accept-server-license-terms --random-name
-  else
-    code tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
-  fi
-}
 
-for svc in "${TUNNEL_SERVICES%/}"/*.sh; do
-  if [ -f "$svc" ]; then
-    if ! [ -x "$svc" ]; then
-      verbose "Making $svc executable"
-      chmod a+x "$svc"
-    fi
-    verbose "Starting $svc"
-    "$svc"
-  fi
-done
+# Check if the tunnel provider is set
+if [ -z "$TUNNEL_PROVIDER" ]; then
+  error "No tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
+fi
+if [ "$TUNNEL_PROVIDER" != "github" ] && [ "$TUNNEL_PROVIDER" != "azure" ]; then
+  error "Invalid tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
+fi
 
+# Generate a name
+if [ -z "$TUNNEL_NAME" ]; then
+  TUNNEL_NAME=$(generate_random)
+elif [ "$TUNNEL_NAME" = "-" ]; then
+  TUNNEL_NAME=
+fi
 
-if is_logged_in; then
-  tunnel
-else
+# If the hostname is generated, override it with the tunnel name
+if hostname | grep -qE '[a-f0-9]{12}'; then
+  verbose "Overriding hostname with tunnel name: %s" "$TUNNEL_NAME"
+  as_root hostname "$TUNNEL_NAME"
+fi
+
+# Authorize device. This will print out a URL to the console. Open it in a
+# browser and authorize the device.
+if is_true "$TUNNEL_FORCE"; then
   code tunnel user login --provider "$TUNNEL_PROVIDER"
-  tunnel
+elif ! is_logged_in; then
+  code tunnel user login --provider "$TUNNEL_PROVIDER"
+fi
+
+# Start the tunnel
+if [ -z "$TUNNEL_NAME" ]; then
+  code tunnel --accept-server-license-terms --random-name
+else
+  code tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
 fi

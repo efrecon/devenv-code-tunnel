@@ -18,5 +18,5 @@ RUN chmod a+x ${INSTALL_PREFIX}/bin/*.sh && \
     ${INSTALL_PREFIX}/bin/hotfix.sh -vv
 
 USER coder
-ENTRYPOINT [ "tunnel.sh" ]
-
+WORKDIR /home/coder
+ENTRYPOINT [ "entrypoint.sh" ]
