@@ -287,3 +287,7 @@ assert_version() {
     error "Version $1 is not a valid version number"
   fi
 }
+
+generate_random() {
+  LC_ALL=C tr -dc "${2:-'a-zA-Z0-9'}" < /dev/urandom | head -c "${1:-16}"
+}
