@@ -66,7 +66,7 @@ on:
         description: 'Bake definition file with labels'
         value: ${{ jobs.merge.outputs.bake-file-labels }}
       bake-file-annotations:
-        description: 'Bake definiton file with annotations'
+        description: 'Bake definition file with annotations'
         value: ${{ jobs.merge.outputs.bake-file-annotations }}
       bake-file:
         description: 'Bake definition file with tags and labels'
