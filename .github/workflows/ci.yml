@@ -8,6 +8,7 @@ on:
 jobs:
   repository:
     runs-on: ubuntu-24.04
+    permissions: {}
     outputs:
       repository: ${{ steps.extract.outputs.repository }}
     steps:
@@ -21,6 +22,9 @@ jobs:
   build:
     uses: ./.github/workflows/_build.yml
     needs: repository
+    permissions:
+      contents: read
+      packages: write
     strategy:
       matrix:
         os: [alpine]
