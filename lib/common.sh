@@ -220,7 +220,7 @@ checksum() {
 # Defaults to stdout if no file.
 download() {
   debug "Downloading $1"
-  $INSTALL_OPTIMIZE curl -sSL "$1" --output "${2:-"-"}"
+  ${INSTALL_OPTIMIZE:-} curl -sSL "$1" --output "${2:-"-"}"
 }
 
 
@@ -234,7 +234,7 @@ internet_install() {
   fi
   verbose "Running downloaded script $_tmp"
   shift 3
-  $INSTALL_OPTIMIZE bash -- "$_tmp" "$@"
+  ${INSTALL_OPTIMIZE:-} bash -- "$_tmp" "$@"
   rm -f "$_tmp"
 }
 
@@ -248,7 +248,7 @@ install_packages() {
   fi
   verbose "Installing packages: $*"
   # shellcheck disable=SC2086 # We want to expand the arguments
-  as_root $INSTALL_OPTIMIZE apk add "$@"
+  as_root ${INSTALL_OPTIMIZE:-} apk add "$@"
 }
 
 

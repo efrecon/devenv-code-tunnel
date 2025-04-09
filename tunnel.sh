@@ -32,19 +32,26 @@ done
 # random name changes, you will have to reauthorize the tunnel with -f
 : "${TUNNEL_NAME:=""}"
 
+# Hook to run before starting the tunnel. This is useful for setting up
+# environment variables or running commands that need to be run before the
+# tunnel starts. The hook is run as the tunnel user.
+: "${TUNNEL_HOOK:=""}"
+
 : "${TUNNEL_FORCE:="0"}"
 
 CODER_DESCR="tunnel starter"
-while getopts "fl:n:p:vh" opt; do
+while getopts "fk:l:n:p:vh" opt; do
   case "$opt" in
+    f) # Force device authorization again
+      TUNNEL_FORCE="1";;
+    k) # Internet hook to run before starting the tunnel
+      TUNNEL_HOOK="$OPTARG";;
     l) # Where to send logs
       TUNNEL_LOG="$OPTARG";;
     n) # Name of the tunnel, empty for random name
       TUNNEL_NAME="$OPTARG";;
     p) # Tunnel provider
       TUNNEL_PROVIDER="$OPTARG";;
-    f) # Force device authorization again
-      TUNNEL_FORCE="1";;
     v) # Increase verbosity, repeat to increase
       TUNNEL_VERBOSE=$((TUNNEL_VERBOSE + 1));;
     h) # Show help
@@ -73,7 +80,7 @@ is_logged_in() {
 }
 
 
-# Check if the tunnel provider is set
+# Check if the tunnel provider is set and valid.
 if [ -z "$TUNNEL_PROVIDER" ]; then
   error "No tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
 fi
@@ -92,6 +99,11 @@ fi
 if hostname | grep -qE '[a-f0-9]{12}'; then
   verbose "Overriding hostname with tunnel name: %s" "$TUNNEL_NAME"
   as_root hostname "$TUNNEL_NAME"
+fi
+
+if [ -n "$TUNNEL_HOOK" ]; then
+  verbose "Running hook: %s" "$TUNNEL_HOOK"
+  internet_install "$TUNNEL_HOOK" hook ""
 fi
 
 # Authorize device. This will print out a URL to the console. Open it in a
