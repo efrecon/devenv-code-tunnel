@@ -6,7 +6,7 @@ on:
       - feature/*
 
 jobs:
-  metadata:
+  repository:
     runs-on: ubuntu-24.04
     permissions: {}
     outputs:
@@ -18,14 +18,11 @@ jobs:
         id: extract
         run: |
           repository=$(printf %s\\n "${{ github.repository }}" | cut -d'/' -f2)
-          tag=${GITHUB_REF#refs/heads/}
-          tag=${tag//\//-}
           printf 'repository=%s\n' "$repository" >> $GITHUB_OUTPUT
-          printf 'tag=%s\n' "$tag" >> $GITHUB_OUTPUT
 
   build:
     uses: ./.github/workflows/_build.yml
-    needs: metadata
+    needs: repository
     permissions:
       contents: read
       packages: write
@@ -33,7 +30,7 @@ jobs:
       matrix:
         os: [alpine]
     with:
-      image: ${{ github.actor }}/${{ needs.metadata.outputs.repository }}-${{ matrix.os }}
+      image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
       platforms: linux/amd64
     secrets:
       username: ${{ github.actor }}
