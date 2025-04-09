@@ -33,8 +33,7 @@ jobs:
       matrix:
         os: [alpine]
     with:
-      image: ${{ github.actor }}/${{ needs.metadata.outputs.repository }}-${{ matrix.os }}:${{ needs.metadata.outputs.tag }}
-      file: Dockerfile.${{ matrix.os }}
+      image: ${{ github.actor }}/${{ needs.metadata.outputs.repository }}-${{ matrix.os }}
       platforms: linux/amd64
     secrets:
       username: ${{ github.actor }}
