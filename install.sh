@@ -76,7 +76,7 @@ install_code() {
   download "$INSTALL_CODE_URL" /tmp/code.tar.gz
   tmp=$(mktemp -d)
   tar -C "$tmp" -zxvf /tmp/code.tar.gz
-  find "$tmp" -name 'code*' -exec mv -f \{\} /usr/local/bin/code \;
+  find "$tmp" -name 'code*' -exec mv -f \{\} "${INSTALL_PREFIX}/bin/code" \;
   rm -rf "$tmp"
   install_packages "libstdc++"
 }
