@@ -300,3 +300,7 @@ assert_version() {
 generate_random() {
   LC_ALL=C tr -dc "${2:-'a-zA-Z0-9'}" < /dev/urandom | head -c "${1:-16}"
 }
+
+is_musl_os() {
+  (ldd --version 2>&1 || true) | grep -q musl
+}
