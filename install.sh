@@ -36,8 +36,9 @@ done
 
 # Features to install. For each feature, there must be a install-<feature>.sh
 # script in the share/features directory. The script will be called to install
-# the feature, it will automatically inherit all INSTALL_ variables.
-: "${INSTALL_FEATURES:="sudo docker node aws"}"
+# the feature, it will automatically inherit all INSTALL_ variables. When empty,
+# all features will be installed. When a dash, no feature will be installed.
+: "${INSTALL_FEATURES:=""}"
 
 # Build of vscode to install: only stable or insiders are available.
 : "${INSTALL_CODE_BUILD:="stable"}"
@@ -45,6 +46,8 @@ done
 # URL to download the code CLI from.
 : "${INSTALL_CODE_URL:="https://code.visualstudio.com/sha/download?build=${INSTALL_CODE_BUILD}&os=cli-alpine-x64"}"
 
+# Declared here, used in common.sh library.
+INSTALL_REPOS_SHA256=
 
 CODER_DESCR="code container installer"
 while getopts "l:u:vh" opt; do
@@ -76,6 +79,19 @@ install_code() {
   find "$tmp" -name 'code*' -exec mv -f \{\} /usr/local/bin/code \;
   rm -rf "$tmp"
   install_packages "libstdc++"
+}
+
+
+list_features() {
+  find "$1" -name '*install-*.sh' |
+    sort |
+    sed -e 's|.*/.*install-\(.*\)\.sh|\1|' |
+    tr '\n' ' '
+}
+
+
+get_feature() {
+  find "$1" -name "*install-$2.sh"
 }
 
 
@@ -121,12 +137,37 @@ done <<EOF
 $(set | grep '^INSTALL_')
 EOF
 
-for feature in $INSTALL_FEATURES; do
-  for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features"; do
-    if [ -d "$d" ] && [ -x "${d}/install-${feature}.sh" ]; then
+
+# Find out where the features directory is.
+for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features"; do
+  if [ -d "$d" ]; then
+    FEATURES_DIR=$d
+    break
+  fi
+done
+
+# Look for all features to install
+if [ -z "$INSTALL_FEATURES" ]; then
+  INSTALL_FEATURES=$(list_features "$FEATURES_DIR")
+  verbose "Installing all features: %s" "$INSTALL_FEATURES"
+fi
+
+# Install all required features, unless told not to.
+if [ "$INSTALL_FEATURES" != "-" ]; then
+  for feature in $INSTALL_FEATURES; do
+    script=$(get_feature "$FEATURES_DIR" "$feature")
+    if [ -z "$script" ]; then
+      warn "Feature %s not found in %s" "$feature" "$FEATURES_DIR"
+      continue
+    fi
+    if [ -x "$script" ]; then
       verbose "Installing feature: $feature"
-      $INSTALL_OPTIMIZE "${d}/install-${feature}.sh"
-      break
+      $INSTALL_OPTIMIZE "$script"
     fi
   done
-done
+fi
+
+
+# Clean repository cache
+apk cache clean
+rm -rf /var/cache/apk/*

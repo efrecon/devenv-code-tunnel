@@ -91,7 +91,7 @@ if ! check_command "node"; then
 
   verbose "Downloading Node.js from: $INSTALL_TGZURL"
   # TODO: Verify sha256 sums through file SHASUMS256.txt from same URL.
-  download "$INSTALL_TGZURL" | tar -C /usr/local -xzf - --strip-components 1 --exclude='*.md' --exclude='LICENSE'
+  download "$INSTALL_TGZURL" | as_root tar -C "$INSTALL_PREFIX" -xzf - --strip-components 1 --exclude='*.md' --exclude='LICENSE'
   verbose "Installed Node: $(node --version)"
 
   # Upgrade and prepare package managers

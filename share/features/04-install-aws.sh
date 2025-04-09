@@ -22,7 +22,7 @@ log_init INSTALL
 if ! check_command "aws"; then
   # Install the AWS CLI. This will bring a large number of python
   # dependencies...
-  as_root apk add --no-cache aws-cli
+  install_packages aws-cli
   verbose "Installed aws CLI: $(aws --version)"
   install_ondemand<<EOF
 mandoc

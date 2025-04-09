@@ -26,7 +26,7 @@ fi
 # Create the docker group if it does not exist
 if ! getent group "docker" > /dev/null; then
   verbose "Creating docker group"
-  addgroup "docker" || warn "Cannot create docker group"
+  as_root addgroup "docker" || warn "Cannot create docker group"
 else
   verbose "Docker group already exists"
 fi
@@ -34,7 +34,7 @@ fi
 # Add the user to the docker group
 if [ -n "$INSTALL_USER" ]; then
   USR=$(printf %s\\n "$INSTALL_USER" | cut -d: -f1)
-  addgroup "$USR" "docker"
+  as_root addgroup "$USR" "docker"
 else
   warn "No user specified, docker will not be configured"
 fi

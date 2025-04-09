@@ -14,7 +14,7 @@
 cleanname() {
   _clean_name=$(basename "$1")
   _clean_name=${_clean_name%%.*}
-  _clean_name=${_clean_name#*-}
+  _clean_name=${_clean_name##*-}
   printf %s\\n "$_clean_name"
 }
 
@@ -233,15 +233,24 @@ internet_install() {
     checksum "$_tmp" "$3" "$2"
   fi
   verbose "Running downloaded script $_tmp"
-  $INSTALL_OPTIMIZE bash -- "$_tmp"
+  shift 3
+  $INSTALL_OPTIMIZE bash -- "$_tmp" "$@"
   rm -f "$_tmp"
 }
 
 
 install_packages() {
+  state=$(sha256sum "/etc/apk/repositories" | head -c 64)
+  if [ "$state" != "$INSTALL_REPOS_SHA256" ]; then
+    verbose "Updating packages cache"
+    as_root apk update
+    INSTALL_REPOS_SHA256=$state
+  fi
   verbose "Installing packages: $*"
-  $INSTALL_OPTIMIZE apk add --no-cache "$@"
+  # shellcheck disable=SC2086 # We want to expand the arguments
+  as_root $INSTALL_OPTIMIZE apk add "$@"
 }
+
 
 install_ondemand() {
   while read -r bin pkg; do
