@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  repository:
+    runs-on: ubuntu-24.04
+    permissions: {}
+    outputs:
+      repository: ${{ steps.extract.outputs.repository }}
+    steps:
+      -
+        name: extract
+        id: extract
+        run: |
+          repository=$(printf %s\\n "${{ github.repository }}" | cut -d'/' -f2)
+          printf 'repository=%s\n' "$repository" >> $GITHUB_OUTPUT
+
+  build:
+    uses: ./.github/workflows/_build.yml
+    needs: repository
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        os: [alpine]
+    with:
+      image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
+      file: Dockerfile.${{ matrix.os }}
+      platforms: linux/amd64
+    secrets:
+      username: ${{ github.actor }}
+      password: ${{ secrets.GITHUB_TOKEN }}
