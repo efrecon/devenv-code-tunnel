@@ -15,6 +15,13 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
+# Level of verbosity, the higher the more verbose. All messages are sent to the
+# file at INSTALL_LOG.
+: "${INSTALL_VERBOSE:=0}"
+
+# Where to send logs
+: "${INSTALL_LOG:=2}"
+
 # Version of Node.js to install. Empty to disable. This will match as much as
 # you want, e.g. 10 or 10.12, etc.
 : "${INSTALL_NODE_VERSION:=22}"
@@ -37,10 +44,6 @@ done
 log_init INSTALL
 
 
-is_musl_os() {
-  (ldd --version 2>&1 || true) | grep -q musl
-}
-
 
 node_version() {
   download "${INSTALL_ROOTURL}/index.tab" |
@@ -49,12 +52,12 @@ node_version() {
 }
 
 
-if ! check_command "node"; then
+if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # Convert the local architecture to the one used by Node.js. Note: some of
   # these do not use musl.
   arch=$(uname -m)
   [ "$arch" = "x86_64" ] && arch="x64"
-  [ "$arch" = "x686" ] && arch="x32"
+  [ "$arch" = "x686" ] && arch="x86"
   [ "$arch" = "aarch64" ] && arch="arm64"
 
   # OS name. This really has only been tested on linux...

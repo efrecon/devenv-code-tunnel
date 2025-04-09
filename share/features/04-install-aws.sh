@@ -15,6 +15,13 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
+# Level of verbosity, the higher the more verbose. All messages are sent to the
+# file at INSTALL_LOG.
+: "${INSTALL_VERBOSE:=0}"
+
+# Where to send logs
+: "${INSTALL_LOG:=2}"
+
 
 log_init INSTALL
 

@@ -15,6 +15,13 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
+# Level of verbosity, the higher the more verbose. All messages are sent to the
+# file at INSTALL_LOG.
+: "${INSTALL_VERBOSE:=0}"
+
+# Where to send logs
+: "${INSTALL_LOG:=2}"
+
 # Version of .NET to install. Empty to disable. STS, LTS, 2-hand, 3-hand
 # versions
 : "${INSTALL_DOTNET_CHANNEL:="8.0"}"
@@ -35,7 +42,7 @@ done
 log_init INSTALL
 
 
-if ! check_command "dotnet"; then
+if ! check_command "dotnet" && [ -n "$INSTALL_DOTNET_CHANNEL" ]; then
   # Install dependencies as per
   # https://learn.microsoft.com/en-us/dotnet/core/install/linux-alpine?tabs=dotnet8#dependencies
   install_packages libgcc libssl3 libstdc++ zlib icu-libs icu-data-full
