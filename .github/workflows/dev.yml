@@ -1,0 +1,20 @@
+name: dev
+
+on:
+  push:
+    branches:
+      - feature/*
+
+jobs:
+  build:
+    uses: ./.github/workflows/_build.yml
+    strategy:
+      matrix:
+        os: [alpine]
+    with:
+      image: ${{ github.actor }}/code-tunnel-${{ matrix.os }}
+      file: Dockerfile.${{ matrix.os }}
+      platforms: linux/amd64
+    secrets:
+      username: ${{ github.actor }}
+      password: ${{ secrets.GITHUB_TOKEN }}
