@@ -6,22 +6,26 @@ on:
       - feature/*
 
 jobs:
-  repository:
+  metadata:
     runs-on: ubuntu-24.04
     permissions: {}
     outputs:
       repository: ${{ steps.extract.outputs.repository }}
+      tag: ${{ steps.extract.outputs.tag }}
     steps:
       -
         name: extract
         id: extract
         run: |
           repository=$(printf %s\\n "${{ github.repository }}" | cut -d'/' -f2)
+          tag=${GITHUB_REF#refs/heads/}
+          tag=${tag//\//-}
           printf 'repository=%s\n' "$repository" >> $GITHUB_OUTPUT
+          printf 'tag=%s\n' "$tag" >> $GITHUB_OUTPUT
 
   build:
     uses: ./.github/workflows/_build.yml
-    needs: repository
+    needs: metadata
     permissions:
       contents: read
       packages: write
@@ -29,7 +33,7 @@ jobs:
       matrix:
         os: [alpine]
     with:
-      image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}:${{ github.sha }}
+      image: ${{ github.actor }}/${{ needs.metadata.outputs.repository }}-${{ matrix.os }}:${{ needs.metadata.outputs.tag }}
       file: Dockerfile.${{ matrix.os }}
       platforms: linux/amd64
     secrets:
