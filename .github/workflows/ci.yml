@@ -6,13 +6,26 @@ on:
       - main
 
 jobs:
+  repository:
+    runs-on: ubuntu-24.04
+    outputs:
+      repository: ${{ steps.extract.outputs.repository }}
+    steps:
+      -
+        name: extract
+        id: extract
+        run: |
+          repository=$(printf %s\\n "${{ github.repository }}" | cut -d'/' -f2)
+          printf 'repository=%s\n' "$repository" >> $GITHUB_OUTPUT
+
   build:
     uses: ./.github/workflows/_build.yml
+    needs: repository
     strategy:
       matrix:
         os: [alpine]
     with:
-      image: ${{ github.actor }}/code-tunnel-${{ matrix.os }}
+      image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}:latest
       file: Dockerfile.${{ matrix.os }}
     secrets:
       username: ${{ github.actor }}
