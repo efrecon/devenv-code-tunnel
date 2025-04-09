@@ -22,8 +22,9 @@ done
 # Where to send logs
 : "${INSTALL_LOG:=2}"
 
-# User that the container will run as. Will be member of docker group and able to
-# sudo without password.
+# User that the container will run as. Will be member of docker group and able
+# to sudo without password. Specify this as user or user:group, when the group
+# is missing, it will be the same as the user.
 : "${INSTALL_USER:="coder"}"
 
 # When a dash, do not try to optimize disk access. When empty (the default) will
