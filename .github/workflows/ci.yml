@@ -31,6 +31,7 @@ jobs:
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
       file: Dockerfile.${{ matrix.os }}
+      platforms: linux/amd64
     secrets:
       username: ${{ github.actor }}
       password: ${{ secrets.GITHUB_TOKEN }}
