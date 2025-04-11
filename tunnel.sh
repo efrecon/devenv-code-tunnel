@@ -37,7 +37,13 @@ done
 # tunnel starts. The hook is run as the tunnel user.
 : "${TUNNEL_HOOK:=""}"
 
+# Force reauthorization of the device
 : "${TUNNEL_FORCE:="0"}"
+
+# Prefixes where things are installed.
+: "${INSTALL_PREFIX:="/usr/local"}"
+: "${INSTALL_USER_PREFIX:="${HOME}/.local"}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
@@ -69,6 +75,20 @@ log_init TUNNEL
 
 VSCODE_CLI_DATA_DIR=$TUNNEL_STORAGE
 export VSCODE_CLI_DATA_DIR
+
+find_code() {
+  code=$(command -v "code" 2>/dev/null || true)
+  if [ -z "$code" ]; then
+    if [ -x "${INSTALL_USER_PREFIX}/bin/code" ]; then
+      code="${INSTALL_USER_PREFIX}/bin/code"
+    elif [ -x "${INSTALL_PREFIX}/bin/code" ]; then
+      code="${INSTALL_PREFIX}/bin/code"
+    fi
+    error "VS Code CLI not found. Please install the VS Code CLI."
+  fi
+  printf "%s\n" "$code"
+}
+
 
 is_logged_in() {
   if [ -f "${TUNNEL_STORAGE%/}/token.json" ]; then
@@ -109,15 +129,16 @@ fi
 
 # Authorize device. This will print out a URL to the console. Open it in a
 # browser and authorize the device.
+CODEBIN=$(find_code)
 if is_true "$TUNNEL_FORCE"; then
-  code tunnel user login --provider "$TUNNEL_PROVIDER"
+  "$CODEBIN" tunnel user login --provider "$TUNNEL_PROVIDER"
 elif ! is_logged_in; then
-  code tunnel user login --provider "$TUNNEL_PROVIDER"
+  "$CODEBIN" tunnel user login --provider "$TUNNEL_PROVIDER"
 fi
 
 # Start the tunnel
 if [ -z "$TUNNEL_NAME" ]; then
-  code tunnel --accept-server-license-terms --random-name
+  "$CODEBIN" tunnel --accept-server-license-terms --random-name
 else
-  code tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
+  "$CODEBIN" tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
 fi
