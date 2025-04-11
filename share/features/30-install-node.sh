@@ -96,20 +96,55 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   download "$INSTALL_TGZURL" | as_root tar -C "$INSTALL_PREFIX" -xzf - --strip-components 1 --exclude='*.md' --exclude='LICENSE'
   verbose "Installed Node: $(node --version)"
 
-  # Upgrade and prepare package managers
-  as_root npm update -g npm
-  as_root npm install -g corepack
-  as_root corepack enable
-  as_root corepack prepare yarn@stable --activate
-  as_root corepack prepare pnpm@latest --activate
+  # Create user settings
+  HM=$(home_dir "$INSTALL_USER")
+  USR=$(printf %s\\n "$INSTALL_USER" | cut -d: -f1)
+  touch "${HM}/.config/npmrc"
+  ln -sf "${HM}/.config/npmrc" "${HM}/.npmrc"
+  as_root chown "$INSTALL_USER" "${HM}/.npmrc" "${HM}/.config/npmrc"
+  as_user "$USR" npm config set prefix "${INSTALL_USER_PREFIX}"
 
-  # Install the node-based apps
-  for app in $INSTALL_NODE_APPS; do
-    if ! check_command "$app"; then
-      verbose "Installing $app"
-      as_root npm install -g "$app"
-    else
-      verbose "$app already installed"
-    fi
-  done
+  # Create system settings
+  touch "${INSTALL_PREFIX}/etc/npmrc"
+  as_root npm config -g set prefix "$INSTALL_PREFIX"
+
+  # Arrange to get the latest version of npm
+  as_root npm update -g npm
+
+  if [ "$INSTALL_TARGET" = "user" ]; then
+    PATH="${INSTALL_USER_PREFIX}/bin:${PATH}"
+    export PATH
+
+    # Upgrade and prepare package managers
+    as_user "$USR" npm install -g corepack
+    as_user "$USR" corepack enable
+    as_user "$USR" corepack prepare yarn@stable --activate
+    as_user "$USR" corepack prepare pnpm@latest --activate
+
+    # Install the node-based apps
+    for app in $INSTALL_NODE_APPS; do
+      if ! check_command "$app"; then
+        verbose "Installing $app"
+        as_user "$USR" npm install -g "$app"
+      else
+        verbose "$app already installed"
+      fi
+    done
+  else
+    # Upgrade and prepare package managers
+    as_root npm install -g corepack
+    as_root corepack enable
+    as_root corepack prepare yarn@stable --activate
+    as_root corepack prepare pnpm@latest --activate
+
+    # Install the node-based apps
+    for app in $INSTALL_NODE_APPS; do
+      if ! check_command "$app"; then
+        verbose "Installing $app"
+        as_root npm install -g "$app"
+      else
+        verbose "$app already installed"
+      fi
+    done
+  fi
 fi
