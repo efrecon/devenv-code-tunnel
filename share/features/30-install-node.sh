@@ -36,7 +36,7 @@ done
 : "${INSTALL_NODE_TYPE:="release"}"
 
 # node-based apps to install. This is a space separated list of apps to install.
-: "${INSTALL_NODE_APPS:="bun"}"
+: "${INSTALL_NODE_APPS:="bun typescript ts-node tslint eslint prettier"}"
 
 
 
