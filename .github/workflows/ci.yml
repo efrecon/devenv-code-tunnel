@@ -32,6 +32,25 @@ jobs:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
       file: Dockerfile.${{ matrix.os }}
       platforms: linux/amd64
-    secrets:
       username: ${{ github.actor }}
+    secrets:
+      password: ${{ secrets.GITHUB_TOKEN }}
+
+  minimal:
+    uses: ./.github/workflows/_build.yml
+    needs: repository
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        os: [alpine]
+    with:
+      image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
+      file: Dockerfile.${{ matrix.os }}
+      platforms: linux/amd64
+      build-args: |
+        INSTALL_FEATURES=sudo codecli
+      username: ${{ github.actor }}
+    secrets:
       password: ${{ secrets.GITHUB_TOKEN }}

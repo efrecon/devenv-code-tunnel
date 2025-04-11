@@ -32,11 +32,12 @@ Notes:
 + `--privileged` is necessary so the environment will be able to easily run
   Docker in Docker.
 + When running with `--privileged`, the hostname inside the container can be
-  overridden with the name of the
-  tunnel. This is to ensure that you will be able to reuse device authentication
-  each time. Use the `-f` option to force re-authorization of the device.
-+ When not using `--privileged`, you can use the `--hostname` command-line option
-  when creating the container with `docker run`.
+  overridden with the name of the tunnel. This ensures that you will be able to
+  reuse device authentication each time.
++ When not using `--privileged`, you can use the `--hostname` command-line
+  option of `docker run`.
++ When you need to re-authenticate the device, run the container with the `-f`
+  option (see below).
 
 ### Quick Options run-down
 
