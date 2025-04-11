@@ -41,8 +41,8 @@ done
 : "${TUNNEL_FORCE:="0"}"
 
 # Prefixes where things are installed.
-: "${INSTALL_PREFIX:="/usr/local"}"
-: "${INSTALL_USER_PREFIX:="${HOME}/.local"}"
+: "${TUNNEL_PREFIX:="/usr/local"}"
+: "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -78,15 +78,18 @@ export VSCODE_CLI_DATA_DIR
 
 find_code() {
   code=$(command -v "code" 2>/dev/null || true)
-  if [ -z "$code" ]; then
-    if [ -x "${INSTALL_USER_PREFIX}/bin/code" ]; then
-      code="${INSTALL_USER_PREFIX}/bin/code"
-    elif [ -x "${INSTALL_PREFIX}/bin/code" ]; then
-      code="${INSTALL_PREFIX}/bin/code"
-    fi
-    error "VS Code CLI not found. Please install the VS Code CLI."
+  if [ -n "$code" ]; then
+    printf "%s\n" "$code"
+    return 0
+  else
+    for d in "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX"; do
+      if [ -x "${d}/bin/code" ]; then
+        printf "%s\n" "${d}/bin/code"
+        return 0
+      fi
+    done
   fi
-  printf "%s\n" "$code"
+  error "Cannot find code cli in PATH: %s or standard locations" "$PATH"
 }
 
 
@@ -114,12 +117,12 @@ if [ -z "$TUNNEL_NAME" ]; then
   TUNNEL_NAME=$(generate_random)
 elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
-fi
-
-# If the hostname is generated, override it with the tunnel name if possible.
-# This will only work if the container was run with --privileged.
-if hostname | grep -qE '[a-f0-9]{12}'; then
-  as_root hostname "$TUNNEL_NAME" || warn "Using a generated hostname: %s. You will have re-authorize your device next time with -f!" "$(hostname)"
+else
+  # If the hostname is generated, override it with the tunnel name if possible.
+  # This will only work if the container was run with --privileged.
+  if hostname | grep -qE '[a-f0-9]{12}'; then
+    as_root hostname "$TUNNEL_NAME" || warn "Using a generated hostname: %s. Force hostname of container to avoid having to re-authorize the device!" "$(hostname)"
+  fi
 fi
 
 if [ -n "$TUNNEL_HOOK" ]; then
