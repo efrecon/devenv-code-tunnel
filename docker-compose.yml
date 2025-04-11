@@ -1,0 +1,17 @@
+volumes:
+  home:
+
+services:
+  coder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - home:/home/coder
+    hostname: ${TUNNEL_NAME}
+    init: true
+    privileged: true
+    environment:
+      TUNNEL_VERBOSE: 2
+      TUNNEL_NAME: ${TUNNEL_NAME}
