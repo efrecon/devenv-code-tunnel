@@ -50,7 +50,7 @@ jobs:
       file: Dockerfile.${{ matrix.os }}
       platforms: linux/amd64
       build-args: |
-        TUNNEL_FEATURES=sudo codecli
+        INSTALL_FEATURES=sudo codecli
     secrets:
       username: ${{ github.actor }}
       password: ${{ secrets.GITHUB_TOKEN }}
