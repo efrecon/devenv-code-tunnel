@@ -21,31 +21,28 @@ docker run \
   -it \
   --rm \
   --privileged \
+  --hostname "coding-guru" \
   -v home:/home/coder:Z \
   code_tunnel \
-    -vv \
-    -n coding-guru
+    -vv
 ```
 
 Notes:
 
 + `--privileged` is necessary so the environment will be able to easily run
   Docker in Docker.
-+ When running with `--privileged`, the hostname inside the container can be
-  overridden with the name of the tunnel. This ensures that you will be able to
-  reuse device authentication each time.
-+ When not using `--privileged`, you can use the `--hostname` command-line
-  option of `docker run`.
-+ When you need to re-authenticate the device, run the container with the `-f`
-  option (see below).
++ `--hostname` is necessary in order to avoid to have to re-authorize the device
+  tunnel each time the container starts -- as long as you use the same hostname.
+  By default, the name of the tunnel will then be the same as the hostname.
 
 ### Quick Options run-down
 
 + `-vv` (repeat the `v`s) to increase verbosity
-+ `-n xx` to give a name to the tunnel, this will automatically set the hostname
-  inside the container to the same name -- unless you had set it from the
-  outside `docker run` command. This is to avoid that the tunnel will think that
-  it is running on a different device each time you run.
++ `-n xx` to give a name to the tunnel, this will automatically attempt to set
+  the hostname inside the container to the same name. Changing the hostname
+  **requires** `--privileged`, a warning will be printed out elsewise. Setting
+  the hostname is to avoid that the tunnel will think that it is running on a
+  different device each time it is run.
 + `-f` to force authorization of the device at the provider
 + `-p` to change the provider away from the `github` default.
 + `-k` to specify a hook that will automatically be downloaded and executed

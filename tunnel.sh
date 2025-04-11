@@ -28,8 +28,9 @@ done
 # Default tunnel provider
 : "${TUNNEL_PROVIDER:="github"}"
 
-# Name of the tunnel, when empty a random name is generated. Each time the
-# random name changes, you will have to reauthorize the tunnel with -f
+# Name of the tunnel, when empty the hostname will be used if it was set to
+# something sensible, i.e. not the shortname of the container ID. Each time the
+# name changes, you will have to reauthorize the tunnel with -f
 : "${TUNNEL_NAME:=""}"
 
 # Hook to run before starting the tunnel. This is useful for setting up
@@ -112,9 +113,14 @@ if [ "$TUNNEL_PROVIDER" != "github" ] && [ "$TUNNEL_PROVIDER" != "azure" ]; then
   error "Invalid tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
 fi
 
-# Generate a name
+# Pick a name, from hostname or at random
 if [ -z "$TUNNEL_NAME" ]; then
-  TUNNEL_NAME=$(generate_random)
+  # If the hostname is not a random name, use it as the tunnel name.
+  if ! hostname | grep -qE '[a-f0-9]{12}'; then
+    TUNNEL_NAME=$(hostname)
+  else
+    TUNNEL_NAME=$(generate_random)
+  fi
 elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
 else
