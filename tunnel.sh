@@ -96,10 +96,10 @@ elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
 fi
 
-# If the hostname is generated, override it with the tunnel name
+# If the hostname is generated, override it with the tunnel name if possible.
+# This will only work if the container was run with --privileged.
 if hostname | grep -qE '[a-f0-9]{12}'; then
-  verbose "Overriding hostname with tunnel name: %s" "$TUNNEL_NAME"
-  as_root hostname "$TUNNEL_NAME"
+  as_root hostname "$TUNNEL_NAME" || warn "Using a generated hostname: %s. You will have re-authorize your device next time with -f!" "$(hostname)"
 fi
 
 if [ -n "$TUNNEL_HOOK" ]; then
