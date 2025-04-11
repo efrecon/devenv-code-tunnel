@@ -180,6 +180,34 @@ EOF
   exit 0
 }
 
+
+daemonize_root() {
+  bin_name
+  _namespace=${1:-$(to_upper "$CODER_BIN")}
+  shift
+
+  while IFS= read -r varname; do
+    debug "Exporting $varname to prepare for daemonization"
+    # shellcheck disable=SC2163 # We want to export the name of the variable
+    export "$varname"
+  done <<EOF
+$(set | grep -E "^(${_namespace}_)" | sed -E 's/^([A-Z_]+)=.*/\1/g')
+EOF
+
+  # Restart ourselves in the background, with same arguments.
+  (
+    set -m
+    if [ "$(id -u)" = 0 ]; then
+      nohup "$0" -- "$@" </dev/null >/dev/null 2>&1 &
+    elif check_command sudo; then
+      verbose "Running elevated command: %s" "$*"
+      nohup sudo -- "$0" "$@" </dev/null >/dev/null 2>&1 &
+    fi
+  )
+
+  exit 0
+}
+
 # Find the executable passed as an argument in the PATH variable and print it if
 # it is not the second argument, typically $0. This will not work if there is a
 # directory containing a line break in the PATH (but... why?!)

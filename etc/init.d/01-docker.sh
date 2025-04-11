@@ -52,13 +52,16 @@ done
 
 log_init DOCKERD
 
-# If we are to daemonize, do it now and exit. Export all our variables to the
-# daemon so it starts the same way this script was started.
-if ! is_true "$DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; then
-  # Do not daemonize the daemon!
-  DOCKERD_PREVENT_DAEMONIZATION=1
-  DOCKERD_DAEMONIZE=0
-  daemonize DOCKERD "$@"
-fi
+# Only run if docker is present
+if check_command docker; then
+  # If we are to daemonize, do it now and exit. Export all our variables to the
+  # daemon so it starts the same way this script was started.
+  if ! is_true "$DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; then
+    # Do not daemonize the daemon!
+    DOCKERD_PREVENT_DAEMONIZATION=1
+    DOCKERD_DAEMONIZE=0
+    daemonize DOCKERD "$@"
+  fi
 
-as_root dockerd 2>&1 | tee -a "${DOCKERD_PREFIX}/log/dockerd.log" > /dev/null &
+  as_root dockerd 2>&1 | tee -a "${DOCKERD_PREFIX}/log/dockerd.log" > /dev/null &
+fi

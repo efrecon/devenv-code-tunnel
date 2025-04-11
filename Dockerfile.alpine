@@ -7,6 +7,9 @@ ARG INSTALL_PREFIX=/usr/local
 # What to install, default is everything
 ARG INSTALL_FEATURES=
 
+# Name of the user inside the container
+ARG INSTALL_USER=coder
+
 # Become root to be able to perform installation operations.
 USER root
 
@@ -15,11 +18,18 @@ COPY lib/*.sh ${INSTALL_PREFIX}/lib/
 COPY share/features/*.sh ${INSTALL_PREFIX}/share/features/
 COPY etc/init.d/*.sh ${INSTALL_PREFIX}/etc/init.d/
 
-VOLUME /home/coder
+# Home of the coder user
+VOLUME /home/${INSTALL_USER}
+
+# Container storage for rootfull and rootless podman
+VOLUME /var/lib/containers
+VOLUME /home/${INSTALL_USER}/.local/share/containers
+
+# Install through the install script, use the same user
 RUN chmod a+x ${INSTALL_PREFIX}/bin/*.sh && \
-    ${INSTALL_PREFIX}/bin/install.sh -vv -u coder && \
+    ${INSTALL_PREFIX}/bin/install.sh -vv -u "${INSTALL_USER}" && \
     ${INSTALL_PREFIX}/bin/hotfix.sh -vv
 
-USER coder
-WORKDIR /home/coder
+USER ${INSTALL_USER}
+WORKDIR /home/${INSTALL_USER}
 ENTRYPOINT [ "entrypoint.sh" ]
