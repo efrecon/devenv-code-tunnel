@@ -4,6 +4,9 @@ FROM alpine:3.21.3
 # Where to install our own stuff.
 ARG INSTALL_PREFIX=/usr/local
 
+# What to install, default is everything
+ARG INSTALL_FEATURES=
+
 # Become root to be able to perform installation operations.
 USER root
 

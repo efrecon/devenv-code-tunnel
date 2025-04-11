@@ -41,18 +41,16 @@ done
 # all features will be installed. When a dash, no feature will be installed.
 : "${INSTALL_FEATURES:=""}"
 
-# Build of vscode to install: only stable or insiders are available.
-: "${INSTALL_CODE_BUILD:="stable"}"
-
-# URL to download the code CLI from.
-: "${INSTALL_CODE_URL:="https://code.visualstudio.com/sha/download?build=${INSTALL_CODE_BUILD}&os=cli-alpine-x64"}"
-
 # Declared here, used in common.sh library.
+# shellcheck disable=SC2034 # Used in common.sh
 INSTALL_REPOS_SHA256=
 
+# shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="code container installer"
-while getopts "l:u:vh" opt; do
+while getopts "f:l:u:vh" opt; do
   case "$opt" in
+    f) # Features to install
+      INSTALL_FEATURES="$OPTARG";;
     u) # User or user:group to create
       INSTALL_USER="$OPTARG";;
     l) # Where to send logs
@@ -70,17 +68,6 @@ done
 
 # Initialize
 log_init INSTALL
-
-
-install_code() {
-  verbose "Installing code CLI"
-  download "$INSTALL_CODE_URL" /tmp/code.tar.gz
-  tmp=$(mktemp -d)
-  tar -C "$tmp" -zxvf /tmp/code.tar.gz
-  find "$tmp" -name 'code*' -exec mv -f \{\} "${INSTALL_PREFIX}/bin/code" \;
-  rm -rf "$tmp"
-  install_packages "libstdc++"
-}
 
 
 list_features() {
@@ -124,11 +111,10 @@ less
 - gcompat
 EOF
 
-create_user "$INSTALL_USER"
+[ -n "${INSTALL_USER:-}" ] && create_user "$INSTALL_USER"
 mkdir -p "$INSTALL_PREFIX"/log
-chown -R "$INSTALL_USER" "$INSTALL_PREFIX"/log
-
-install_code
+[ -n "${INSTALL_USER:-}" ] && chown -R "$INSTALL_USER" "$INSTALL_PREFIX"/log
+[ -n "${INSTALL_USER:-}" ] && xdg_user_dirs "$INSTALL_USER"
 
 # Export all variables that start with INSTALL_ so that they are available
 # to the features that are installed.
@@ -153,8 +139,16 @@ if [ -z "$INSTALL_FEATURES" ]; then
   verbose "Installing all features: %s" "$INSTALL_FEATURES"
 fi
 
+# shellcheck disable=SC2043  # On purpose to allow for more "mandatory" features
+for feature in codecli; do
+  if ! printf %s\\n "$INSTALL_FEATURES" | grep -qF "$feature"; then
+    warn "Feature %s will not be installed. Are you sure?" "$feature"
+  fi
+done
+
 # Install all required features, unless told not to.
 if [ "$INSTALL_FEATURES" != "-" ]; then
+  verbose "Installing features: %s" "$INSTALL_FEATURES"
   for feature in $INSTALL_FEATURES; do
     script=$(get_feature "$FEATURES_DIR" "$feature")
     if [ -z "$script" ]; then

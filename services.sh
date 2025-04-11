@@ -27,6 +27,7 @@ done
 # Where to find the services
 : "${SERVICES_DIR:="${SERVICES_PREFIX}/etc/init.d"}"
 
+# shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Start services"
 while getopts "l:n:vh" opt; do
   case "$opt" in

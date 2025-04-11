@@ -39,6 +39,7 @@ done
 
 : "${TUNNEL_FORCE:="0"}"
 
+# shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
 while getopts "fk:l:n:p:vh" opt; do
   case "$opt" in

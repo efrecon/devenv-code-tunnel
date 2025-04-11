@@ -289,6 +289,21 @@ create_user() {
   fi
 }
 
+xdg_user_dirs() {
+  USR=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
+  HM=$(getent passwd "$USR" | cut -d: -f6)
+
+  if [ -d "$HM" ]; then
+    mkdir -p "$HM/.config" && chown -R "${1:-$INSTALL_USER}" "$HM/.config"
+    mkdir -p "$HM/.cache" && chown -R "${1:-$INSTALL_USER}" "$HM/.cache"
+    mkdir -p "$HM/.local/share" && chown -R "${1:-$INSTALL_USER}" "$HM/.local/share"
+    mkdir -p "$HM/.local/state" && chown -R "${1:-$INSTALL_USER}" "$HM/.local/state"
+    mkdir -p "$HM/.local/bin" && chown -R "${1:-$INSTALL_USER}" "$HM/.local/bin"
+  else
+    warn "Home directory $HM for user $USR does not exist!"
+  fi
+}
+
 assert_version() {
   if printf %s\\n "$1" | grep -qE '^[0-9]+(\.[0-9]+){0,}$'; then
     return 0

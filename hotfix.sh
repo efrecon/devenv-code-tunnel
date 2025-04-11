@@ -28,7 +28,7 @@ done
 : "${HOTFIX_DOCKER_INITD:=/etc/init.d/docker}"
 
 
-# shellcheck disable=SC2034 # Used from functions in common.sh
+# shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Hotfix docker installation"
 while getopts "l:vh" opt; do
   case "$opt" in
