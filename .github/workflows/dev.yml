@@ -32,8 +32,8 @@ jobs:
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
       platforms: linux/amd64
-    secrets:
       username: ${{ github.actor }}
+    secrets:
       password: ${{ secrets.GITHUB_TOKEN }}
 
   minimal:
@@ -50,6 +50,6 @@ jobs:
       platforms: linux/amd64
       build-args: |
         INSTALL_FEATURES=sudo codecli
-    secrets:
       username: ${{ github.actor }}
+    secrets:
       password: ${{ secrets.GITHUB_TOKEN }}
