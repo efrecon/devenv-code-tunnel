@@ -35,3 +35,21 @@ jobs:
     secrets:
       username: ${{ github.actor }}
       password: ${{ secrets.GITHUB_TOKEN }}
+
+  minimal:
+    uses: ./.github/workflows/_build.yml
+    needs: repository
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        os: [alpine]
+    with:
+      image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
+      platforms: linux/amd64
+      build-args: |
+        TUNNEL_FEATURES=sudo codecli
+    secrets:
+      username: ${{ github.actor }}
+      password: ${{ secrets.GITHUB_TOKEN }}
