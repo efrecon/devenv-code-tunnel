@@ -15,22 +15,17 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
-# Level of verbosity, the higher the more verbose. All messages are sent to the
-# file at INSTALL_LOG.
+# All following vars have defaults here, but will be set and inherited from
+# calling install.sh script in the normal case.
 : "${INSTALL_VERBOSE:=0}"
-
-# Where to send logs
 : "${INSTALL_LOG:=2}"
+: "${INSTALL_PREFIX:="/usr/local"}"
 
 # Version of Powershell to install. Empty to disable.
 : "${INSTALL_POWERSHELL_VERSION:="7.5.0"}"
 
-# Prefix where to install Node.js. We have a default here, but the main prefix
-# comes from the calling install.sh.
-: "${INSTALL_PREFIX:="/usr/local"}"
-
 # Root URL where to find the tarballs.
-: "${INSTALL_ROOTURL:="https://github.com/PowerShell/PowerShell/releases/download"}"
+: "${INSTALL_POWERSHELL_ROOTURL:="https://github.com/PowerShell/PowerShell/releases/download"}"
 
 log_init INSTALL
 
@@ -71,7 +66,7 @@ if ! check_command "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
   [ "$arch" = "aarch64" ] && arch="arm64"
 
   # Download and install
-  INSTALL_TGZURL="${INSTALL_ROOTURL}/v${INSTALL_POWERSHELL_VERSION}/powershell-${INSTALL_POWERSHELL_VERSION}-${os}-${arch}.tar.gz"
+  INSTALL_TGZURL="${INSTALL_POWERSHELL_ROOTURL}/v${INSTALL_POWERSHELL_VERSION}/powershell-${INSTALL_POWERSHELL_VERSION}-${os}-${arch}.tar.gz"
   verbose "Installing powershell from %s" "$INSTALL_TGZURL"
   as_root mkdir -p "${INSTALL_PREFIX}/share/powershell"
   download "${INSTALL_TGZURL}" |

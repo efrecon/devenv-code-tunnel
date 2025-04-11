@@ -32,8 +32,16 @@ done
 # installation calls with the content of this var.
 : "${INSTALL_OPTIMIZE:=""}"
 
-# Prefix where to install binaries and libraries.
+# Prefix where to install system binaries and libraries.
 : "${INSTALL_PREFIX:="/usr/local"}"
+
+# Prefix where to install user binaries and libraries. When empty, will depend
+# on INSTALL_USER.
+: "${INSTALL_USER_PREFIX:=""}"
+
+# Where should feature installer prefer to install stuff. One of system or user.
+# user will automatically be cleared off when no user is specified.
+: "${INSTALL_TARGET:="user"}"
 
 # Features to install. For each feature, there must be a install-<feature>.sh
 # script in the share/features directory. The script will be called to install
@@ -111,10 +119,25 @@ less
 - gcompat
 EOF
 
+if [ -z "$INSTALL_USER" ]; then
+  if [ "${INSTALL_TARGET:-}" = "user" ]; then
+    INSTALL_TARGET="system"
+    warn "No user specified, force %s installation" "$INSTALL_TARGET"
+  fi
+fi
+
+# Create user and a proper XDG environment under its home directory.
 [ -n "${INSTALL_USER:-}" ] && create_user "$INSTALL_USER"
 mkdir -p "$INSTALL_PREFIX"/log
 [ -n "${INSTALL_USER:-}" ] && chown -R "$INSTALL_USER" "$INSTALL_PREFIX"/log
 [ -n "${INSTALL_USER:-}" ] && xdg_user_dirs "$INSTALL_USER"
+
+# Create the user local directory. This is where software local to the user can
+# be installed.
+[ -z "$INSTALL_USER_PREFIX" ] && INSTALL_USER_PREFIX=$(user_local_dir "$INSTALL_USER")
+if [ -n "${INSTALL_USER_PREFIX:-}" ] && [ "$INSTALL_USER_PREFIX" != "-" ]; then
+  make_owned_dir "$INSTALL_USER_PREFIX" "$INSTALL_USER"
+fi
 
 # Export all variables that start with INSTALL_ so that they are available
 # to the features that are installed.

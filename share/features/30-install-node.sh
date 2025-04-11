@@ -15,12 +15,14 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
-# Level of verbosity, the higher the more verbose. All messages are sent to the
-# file at INSTALL_LOG.
+# All following vars have defaults here, but will be set and inherited from
+# calling install.sh script in the normal case.
 : "${INSTALL_VERBOSE:=0}"
-
-# Where to send logs
 : "${INSTALL_LOG:=2}"
+: "${INSTALL_USER:="coder"}"
+: "${INSTALL_PREFIX:="/usr/local"}"
+: "${INSTALL_USER_PREFIX:="${HOME}/.local"}"
+: "${INSTALL_TARGET:="user"}"
 
 # Version of Node.js to install. Empty to disable. This will match as much as
 # you want, e.g. 10 or 10.12, etc.
@@ -36,9 +38,6 @@ done
 # node-based apps to install. This is a space separated list of apps to install.
 : "${INSTALL_NODE_APPS:="bun"}"
 
-# Prefix where to install Node.js. We have a default here, but the main prefix
-# comes from the calling install.sh.
-: "${INSTALL_PREFIX:="/usr/local"}"
 
 
 log_init INSTALL

@@ -266,6 +266,16 @@ install_ondemand() {
 }
 
 
+make_owned_dir() {
+  if ! [ -d "$1" ]; then
+    mkdir -p "$1"
+  fi
+  if [ -n "${2:-$INSTALL_USER}" ]; then
+    chown -R "${2:-$INSTALL_USER}" "$1"
+  fi
+}
+
+
 create_user() {
   NEW_USER=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
   if [ -n "${2:-}" ]; then
@@ -289,16 +299,28 @@ create_user() {
   fi
 }
 
+
+user_local_dir() {
+  USR=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
+  HM=$(getent passwd "$USR" | cut -d: -f6)
+
+  if [ -d "$HM" ]; then
+    printf %s\\n "${HM}/.local"
+  fi
+}
+
+
 xdg_user_dirs() {
   USR=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
   HM=$(getent passwd "$USR" | cut -d: -f6)
 
   if [ -d "$HM" ]; then
-    mkdir -p "$HM/.config" && chown -R "${1:-$INSTALL_USER}" "$HM/.config"
-    mkdir -p "$HM/.cache" && chown -R "${1:-$INSTALL_USER}" "$HM/.cache"
-    mkdir -p "$HM/.local/share" && chown -R "${1:-$INSTALL_USER}" "$HM/.local/share"
-    mkdir -p "$HM/.local/state" && chown -R "${1:-$INSTALL_USER}" "$HM/.local/state"
-    mkdir -p "$HM/.local/bin" && chown -R "${1:-$INSTALL_USER}" "$HM/.local/bin"
+    LCL=$(user_local_dir "${1:-$INSTALL_USER}")
+    make_owned_dir "$HM/.config" "${1:-$INSTALL_USER}"
+    make_owned_dir "$HM/.cache" "${1:-$INSTALL_USER}"
+    make_owned_dir "${LCL}/share" "${1:-$INSTALL_USER}"
+    make_owned_dir "${LCL}/state" "${1:-$INSTALL_USER}"
+    make_owned_dir "${LCL}/bin" "${1:-$INSTALL_USER}"
   else
     warn "Home directory $HM for user $USR does not exist!"
   fi

@@ -15,12 +15,11 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
-# Level of verbosity, the higher the more verbose. All messages are sent to the
-# file at INSTALL_LOG.
+# All following vars have defaults here, but will be set and inherited from
+# calling install.sh script in the normal case.
 : "${INSTALL_VERBOSE:=0}"
-
-# Where to send logs
 : "${INSTALL_LOG:=2}"
+: "${INSTALL_PREFIX:="/usr/local"}"
 
 # Version of .NET to install. Empty to disable. STS, LTS, 2-hand, 3-hand
 # versions
@@ -29,15 +28,11 @@ done
 # Quality for the current channel.
 : "${INSTALL_DOTNET_QUALITY:="GA"}"
 
-# Prefix where to install Node.js. We have a default here, but the main prefix
-# comes from the calling install.sh.
-: "${INSTALL_PREFIX:="/usr/local"}"
-
 # Location of the install script.
-: "${INSTALL_URL:="https://dot.net/v1/dotnet-install.sh"}"
+: "${INSTALL_DOTNET_URL:="https://dot.net/v1/dotnet-install.sh"}"
 
 # sha512 checksum of the install script.
-: "${INSTALL_SHA512:="749691260ef298c4c1adb6f4e78e47dff1963d57e8d2490bcfb105bad2f6a687093bf0057de5296e6a212dc40bdbbdaffbcd995f9746c8805c4e0024fdbed014"}"
+: "${INSTALL_DOTNET_SHA512:="749691260ef298c4c1adb6f4e78e47dff1963d57e8d2490bcfb105bad2f6a687093bf0057de5296e6a212dc40bdbbdaffbcd995f9746c8805c4e0024fdbed014"}"
 
 log_init INSTALL
 
@@ -49,7 +44,7 @@ if ! check_command "dotnet" && [ -n "$INSTALL_DOTNET_CHANNEL" ]; then
 
   INSTALL_DIR="${INSTALL_PREFIX}/share/dotnet"
   as_root mkdir -p "${INSTALL_DIR}"
-  as_root internet_install "$INSTALL_URL" dotnet "$INSTALL_SHA512" \
+  as_root internet_install "$INSTALL_DOTNET_URL" dotnet "$INSTALL_DOTNET_SHA512" \
             --channel "$INSTALL_DOTNET_CHANNEL" \
             --quality "$INSTALL_DOTNET_QUALITY" \
             --install-dir "$INSTALL_DIR" \

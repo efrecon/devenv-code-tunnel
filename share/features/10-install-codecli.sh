@@ -15,16 +15,14 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
-# Level of verbosity, the higher the more verbose. All messages are sent to the
-# file at INSTALL_LOG.
+# All following vars have defaults here, but will be set and inherited from
+# calling install.sh script in the normal case.
 : "${INSTALL_VERBOSE:=0}"
-
-# Where to send logs
 : "${INSTALL_LOG:=2}"
-
-# Prefix where to install the code CLI. We have a default here, but the main
-# prefix comes from the calling install.sh.
+: "${INSTALL_USER:="coder"}"
 : "${INSTALL_PREFIX:="/usr/local"}"
+: "${INSTALL_USER_PREFIX:="${HOME}/.local"}"
+: "${INSTALL_TARGET:="user"}"
 
 # Build of vscode to install: only stable or insiders are available.
 : "${INSTALL_CODE_BUILD:="stable"}"
@@ -44,7 +42,12 @@ download "$INSTALL_CODE_URL" - | tar -C "$tmp" -zxf -
 # Find the code CLI and move it to the bin directory. This ensures that the
 # destination is called "code", but it will find the binary even when it is
 # called code-insiders.
-find "$tmp" -name 'code*' -exec mv -f \{\} "${INSTALL_PREFIX}/bin/code" \;
+if [ "$INSTALL_TARGET" = "user" ]; then
+  find "$tmp" -name 'code*' -exec mv -f \{\} "${INSTALL_USER_PREFIX}/bin/code" \;
+  chown "$INSTALL_USER" "${INSTALL_USER_PREFIX}/bin/code"
+else
+  as_root find "$tmp" -name 'code*' -exec mv -f \{\} "${INSTALL_PREFIX}/bin/code" \;
+fi
 
 # Cleanup the temporary directory
 rm -rf "$tmp"

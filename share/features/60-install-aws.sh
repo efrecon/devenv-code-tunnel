@@ -15,11 +15,9 @@ for d in ../../lib ../lib lib; do
   fi
 done
 
-# Level of verbosity, the higher the more verbose. All messages are sent to the
-# file at INSTALL_LOG.
+# All following vars have defaults here, but will be set and inherited from
+# calling install.sh script in the normal case.
 : "${INSTALL_VERBOSE:=0}"
-
-# Where to send logs
 : "${INSTALL_LOG:=2}"
 
 
