@@ -127,6 +127,33 @@ as_root() {
 }
 
 
+as_user() {
+  USR=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
+  shift
+
+  if [ "$(id -un)" = "$USR" ]; then
+    "$@"
+  elif check_command sudo; then
+    sudo -u "$USR" -- "$@"
+  elif check_command su; then
+    # Create a temporary script that will call the remaining of the arguments.
+    # This is because su is evil and -c option only takes a single command...
+    tmpf=$(mktemp)
+    printf '#!%s\n' "/bin/sh" > "$tmpf"
+    printf "exec" >> "$tmpf"
+    for a in "$@"; do
+      [ -n "$a" ] && printf ' "%s"' "$a" >> "$tmpf"
+    done
+    printf \\n >> "$tmpf"
+    chmod a+rx "$tmpf"
+    su -c "$tmpf" "$USR"
+    rm -f "$tmpf"
+  else
+    "$@"
+  fi
+}
+
+
 # shellcheck disable=SC2120 # Take none or one argument
 to_lower() {
   if [ -z "${1:-}" ]; then
@@ -300,20 +327,22 @@ create_user() {
 }
 
 
-user_local_dir() {
+home_dir() {
   USR=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
   HM=$(getent passwd "$USR" | cut -d: -f6)
+  printf %s\\n "$HM"
+}
 
-  if [ -d "$HM" ]; then
-    printf %s\\n "${HM}/.local"
+
+user_local_dir() {
+  if [ -d "$(home_dir "${1:-$INSTALL_USER}")" ]; then
+    printf %s\\n "$(home_dir "${1:-$INSTALL_USER}")/.local"
   fi
 }
 
 
 xdg_user_dirs() {
-  USR=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
-  HM=$(getent passwd "$USR" | cut -d: -f6)
-
+  HM=$(home_dir "${1:-$INSTALL_USER}")
   if [ -d "$HM" ]; then
     LCL=$(user_local_dir "${1:-$INSTALL_USER}")
     make_owned_dir "$HM/.config" "${1:-$INSTALL_USER}"
