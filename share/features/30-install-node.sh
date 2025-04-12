@@ -43,11 +43,34 @@ done
 log_init INSTALL
 
 
-
+# Guess latest node version matching INSTALL_NODE_VERSION
 node_version() {
   download "${INSTALL_ROOTURL}/index.tab" |
     grep "^v${INSTALL_NODE_VERSION}" |
     awk '/^v[0-9]/{ print $1; exit }'
+}
+
+
+# Install package managers and node-based applications. The arguments are
+# prepended, and should be one of the as_* functions, with arguments if
+# relevant.
+install_sidekicks() {
+  verbose "Installing yarm and pnpm %s" "$(printf %s\\n "$*" | tr '_' ' ')"
+  # Upgrade and prepare package managers
+  "$@" npm install -g corepack
+  "$@" corepack enable
+  "$@" corepack prepare yarn@stable --activate
+  "$@" corepack prepare pnpm@latest --activate
+
+  # Install the node-based apps
+  for app in $INSTALL_NODE_APPS; do
+    if ! check_command "$app"; then
+      verbose "Installing %s %s" "$app" "$(printf %s\\n "$*" | tr '_' ' ')"
+      "$@" npm install -g "$app"
+    else
+      verbose "$app already installed %s" "$(printf %s\\n "$*" | tr '_' ' ')"
+    fi
+  done
 }
 
 
@@ -103,10 +126,14 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   ln -sf "${HM}/.config/npmrc" "${HM}/.npmrc"
   as_root chown "$INSTALL_USER" "${HM}/.npmrc" "${HM}/.config/npmrc"
   as_user "$USR" npm config set prefix "${INSTALL_USER_PREFIX}"
+  verbose "npm installations for user %s user under %s, as per %s" \
+    "$USR" "$INSTALL_USER_PREFIX" "${HM}/.npmrc"
 
   # Create system settings
   touch "${INSTALL_PREFIX}/etc/npmrc"
   as_root npm config -g set prefix "$INSTALL_PREFIX"
+  verbose "System-wide npm installation under %s, as per %s" \
+    "$INSTALL_PREFIX" "${INSTALL_PREFIX}/etc/npmrc"
 
   # Arrange to get the latest version of npm
   as_root npm update -g npm
@@ -114,37 +141,8 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   if [ "$INSTALL_TARGET" = "user" ]; then
     PATH="${INSTALL_USER_PREFIX}/bin:${PATH}"
     export PATH
-
-    # Upgrade and prepare package managers
-    as_user "$USR" npm install -g corepack
-    as_user "$USR" corepack enable
-    as_user "$USR" corepack prepare yarn@stable --activate
-    as_user "$USR" corepack prepare pnpm@latest --activate
-
-    # Install the node-based apps
-    for app in $INSTALL_NODE_APPS; do
-      if ! check_command "$app"; then
-        verbose "Installing $app"
-        as_user "$USR" npm install -g "$app"
-      else
-        verbose "$app already installed"
-      fi
-    done
+    install_sidekicks as_user "$USR"
   else
-    # Upgrade and prepare package managers
-    as_root npm install -g corepack
-    as_root corepack enable
-    as_root corepack prepare yarn@stable --activate
-    as_root corepack prepare pnpm@latest --activate
-
-    # Install the node-based apps
-    for app in $INSTALL_NODE_APPS; do
-      if ! check_command "$app"; then
-        verbose "Installing $app"
-        as_root npm install -g "$app"
-      else
-        verbose "$app already installed"
-      fi
-    done
+    install_sidekicks as_root
   fi
 fi
