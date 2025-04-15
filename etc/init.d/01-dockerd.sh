@@ -61,12 +61,12 @@ if as_root test -S /var/run/docker.sock; then
   exit 0
 fi
 
-if ! is_privileged; then
-  warn "DinD can only be run in a privileged container."
+if ! check_command "dockerd"; then
   exit 0
 fi
 
-if ! check_command "dockerd"; then
+if ! is_privileged; then
+  warn "DinD can only be run in a privileged container."
   exit 0
 fi
 
