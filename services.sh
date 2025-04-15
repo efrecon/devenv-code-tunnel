@@ -6,14 +6,17 @@ set -eu
 # Absolute location of the script where this script is located.
 SERVICES_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
-# Hurry up and find the common library
-for d in ../lib lib; do
-  if [ -d "${SERVICES_ROOTDIR}/$d" ]; then
-    # shellcheck disable=SC1091 source=lib/common.sh
-    . "${SERVICES_ROOTDIR}/$d/common.sh"
-    break
-  fi
+# Hurry up and find the libraries
+for lib in common system; do
+  for d in ../lib lib; do
+    if [ -d "${SERVICES_ROOTDIR}/$d" ]; then
+      # shellcheck disable=SC1090
+      . "${SERVICES_ROOTDIR}/$d/${lib}.sh"
+      break
+    fi
+  done
 done
+
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at SERVICES_LOG.

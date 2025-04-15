@@ -7,13 +7,15 @@ set -eu
 # Absolute location of the script where this script is located.
 HOTFIX_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
-# Hurry up and find the common library
-for d in ../lib lib; do
-  if [ -d "${HOTFIX_ROOTDIR}/$d" ]; then
-    # shellcheck disable=SC1091 source=lib/common.sh
-    . "${HOTFIX_ROOTDIR}/$d/common.sh"
-    break
-  fi
+# Hurry up and find the libraries
+for lib in common system; do
+  for d in ../lib lib; do
+    if [ -d "${HOTFIX_ROOTDIR}/$d" ]; then
+      # shellcheck disable=SC1090
+      . "${HOTFIX_ROOTDIR}/$d/${lib}.sh"
+      break
+    fi
+  done
 done
 
 

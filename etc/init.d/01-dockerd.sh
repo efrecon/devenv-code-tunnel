@@ -7,15 +7,16 @@ set -eu
 DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common docker; do
+for lib in common system docker; do
   for d in ../../lib ../lib lib; do
     if [ -d "${DOCKERD_ROOTDIR}/$d" ]; then
-      # shellcheck disable=SC1091 source=lib/common.sh
+      # shellcheck disable=SC1090
       . "${DOCKERD_ROOTDIR}/$d/${lib}.sh"
       break
     fi
   done
 done
+
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at DOCKERD_LOG.
@@ -54,8 +55,18 @@ done
 
 log_init DOCKERD
 
+if as_root test -S /var/run/docker.sock; then
+  # Docker is already running, so we don't need to start it again.
+  verbose "Docker daemon already running."
+  exit 0
+fi
+
 if ! is_privileged; then
   warn "DinD can only be run in a privileged container."
+  exit 0
+fi
+
+if ! check_command "dockerd"; then
   exit 0
 fi
 
