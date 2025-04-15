@@ -6,14 +6,17 @@ set -eu
 # Absolute location of the script where this script is located.
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
-# Hurry up and find the common library
-for d in ../../lib ../lib lib; do
-  if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
-    # shellcheck disable=SC1091 source=lib/common.sh
-    . "${INSTALL_ROOTDIR}/$d/common.sh"
-    break
-  fi
+# Hurry up and find the libraries
+for lib in common system; do
+  for d in ../../lib ../lib lib; do
+    if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
+      # shellcheck disable=SC1090
+      . "${INSTALL_ROOTDIR}/$d/${lib}.sh"
+      break
+    fi
+  done
 done
+
 
 # All following vars have defaults here, but will be set and inherited from
 # calling install.sh script in the normal case.
