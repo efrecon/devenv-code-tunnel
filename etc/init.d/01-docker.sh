@@ -6,13 +6,15 @@ set -eu
 # Absolute location of the script where this script is located.
 DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
-# Hurry up and find the common library
-for d in ../../lib ../lib lib; do
-  if [ -d "${DOCKERD_ROOTDIR}/$d" ]; then
-    # shellcheck disable=SC1091 source=lib/common.sh
-    . "${DOCKERD_ROOTDIR}/$d/common.sh"
-    break
-  fi
+# Hurry up and find the libraries
+for lib in common docker; do
+  for d in ../../lib ../lib lib; do
+    if [ -d "${DOCKERD_ROOTDIR}/$d" ]; then
+      # shellcheck disable=SC1091 source=lib/common.sh
+      . "${DOCKERD_ROOTDIR}/$d/${lib}.sh"
+      break
+    fi
+  done
 done
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
@@ -35,7 +37,7 @@ done
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
 CODE_DESCR="Docker daemon startup"
-while getopts "d:l:vh" opt; do
+while getopts "l:vh" opt; do
   case "$opt" in
     l) # Where to send logs
       DOCKERD_LOG="$OPTARG";;
@@ -51,6 +53,11 @@ while getopts "d:l:vh" opt; do
 done
 
 log_init DOCKERD
+
+if ! is_privileged; then
+  warn "DinD can only be run in a privileged container."
+  exit 0
+fi
 
 # If we are to daemonize, do it now and exit. Export all our variables to the
 # daemon so it starts the same way this script was started.
