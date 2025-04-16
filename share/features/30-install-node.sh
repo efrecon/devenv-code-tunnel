@@ -41,7 +41,8 @@ done
 # node-based apps to install. This is a space separated list of apps to install.
 : "${INSTALL_NODE_APPS:="bun typescript ts-node tslint eslint prettier"}"
 
-
+# Install from source
+: "${INSTALL_NODE_FROM_SOURCE:="auto"}"
 
 log_init INSTALL
 
@@ -76,7 +77,64 @@ install_sidekicks() {
   done
 }
 
-# TODO: On arm64, no official builds. Compile from source, see: https://hub.docker.com/layers/library/node/23.11.0-alpine3.21/images/sha256-5105011026638432d754015e93eac9e3030f677c8a4e0593a72e93a196225e79 3rd command
+build_from_source() {
+  verbose "Downloading and building Node.js %s from source" "$1"
+  curdir=$(pwd)
+  builddir=$(mktemp -d)
+  cd "$builddir"
+
+  # Download the source tarball and the SHA256 sum file
+  download "https://nodejs.org/dist/v${1}/node-v${1}.tar.gz" "node-v${1}.tar.gz"
+  download "https://nodejs.org/dist/v${1}/SHASUMS256.txt.asc" "SHASUMS256.txt.asc"
+
+  # Add build dependencies
+  as_root apk add --no-cache --virtual .build-deps-full \
+      binutils-gold \
+      g++ \
+      gcc \
+      gnupg \
+      libgcc \
+      linux-headers \
+      make \
+      python3 \
+      py-setuptools
+
+  # use pre-existing gpg directory, see https://github.com/nodejs/docker-node/pull/1895#issuecomment-1550389150
+  GNUPGHOME="$(mktemp -d)"
+  export GNUPGHOME
+  # gpg keys listed at https://github.com/nodejs/node#release-keys
+  for key in \
+    C0D6248439F1D5604AAFFB4021D900FFDB233756 \
+    DD792F5973C6DE52C432CBDAC77ABFA00DDBF2B7 \
+    CC68F5A3106FF448322E48ED27F5E38D5B0A215F \
+    8FCCA13FEF1D0C2E91008E09770F7A9A5AE15600 \
+    890C08DB8579162FEE0DF9DB8BEAB4DFCF555EF4 \
+    C82FA3AE1CBEDC6BE46B9360C43CEC45C17AB93C \
+    108F52B48DB57BB0CC439B2997B01419BD92F80A \
+    A363A499291CBBC940DD62E41F10027AF002F8B0 \
+  ; do
+    gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$key" ||
+    gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key"
+  done
+
+  # Decrypt the SHA256 sum file and verify the tarball
+  gpg --batch --decrypt --output SHASUMS256.txt SHASUMS256.txt.asc
+  gpgconf --kill all
+  rm -rf "$GNUPGHOME"
+  grep " node-v${1}.tar.gz\$" SHASUMS256.txt | sha256sum -c -
+
+  # Unpack, build and install into the proper location
+  tar -xf "node-v${1}.tar.gz"
+  cd "node-v${1}"
+  ./configure --prefix="$INSTALL_PREFIX"
+  make -j"$(getconf _NPROCESSORS_ONLN)" V=
+  as_root make install
+  as_root apk del .build-deps-full
+
+  cd "$curdir"
+  rm -rf "$builddir"
+}
+
 
 if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # Find out where to get the tarball from. This will switch to the unofficial
@@ -97,20 +155,33 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   latest=$(node_version)
   verbose "Installing Node $latest"
 
-  # When using the unofficial builds, we need to add the libc type to the OS.
-  if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
-    if is_musl_os; then
-      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-musl.tar.gz"
+  if [ "$INSTALL_NODE_FROM_SOURCE" = "auto" ]; then
+    # When using the unofficial builds, we need to add the libc type to the OS.
+    if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
+      if is_musl_os; then
+        # musl builds are only available for x64
+        if [ "$(get_arch)" = "x64" ]; then
+          INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-musl.tar.xz"
+        else
+          INSTALL_TGZURL=
+        fi
+      else
+        INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-glibc.tar.gz"
+      fi
     else
-      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-glibc.tar.gz"
+      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch).tar.gz"
     fi
   else
-    INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch).tar.gz"
+    INSTALL_TGZURL=
   fi
 
-  verbose "Downloading Node.js from: $INSTALL_TGZURL"
-  # TODO: Verify sha256 sums through file SHASUMS256.txt from same URL.
-  download "$INSTALL_TGZURL" | as_root tar -C "$INSTALL_PREFIX" -xzf - --strip-components 1 --exclude='*.md' --exclude='LICENSE'
+  if [ -z "$INSTALL_TGZURL" ]; then
+    build_from_source "${latest#v}"
+  else
+    verbose "Downloading Node.js from: $INSTALL_TGZURL"
+    # TODO: Verify sha256 sums through file SHASUMS256.txt from same URL.
+    download "$INSTALL_TGZURL" | as_root tar -C "$INSTALL_PREFIX" -xzf - --strip-components 1 --exclude='*.md' --exclude='LICENSE'
+  fi
   verbose "Installed Node: $(node --version)"
 
   # Create user settings
