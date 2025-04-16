@@ -47,7 +47,7 @@ jobs:
         os: [alpine]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
-      platforms: linux/amd64,linux/arm64
+      platforms: linux/amd64
       build-args: |
         INSTALL_FEATURES=sudo codecli
       username: ${{ github.actor }}

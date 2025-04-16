@@ -31,7 +31,6 @@ jobs:
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
       file: Dockerfile.${{ matrix.os }}
-      platforms: linux/amd64
       username: ${{ github.actor }}
     secrets:
       password: ${{ secrets.GITHUB_TOKEN }}
@@ -48,7 +47,6 @@ jobs:
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
       file: Dockerfile.${{ matrix.os }}
-      platforms: linux/amd64
       build-args: |
         INSTALL_FEATURES=sudo codecli
       username: ${{ github.actor }}
