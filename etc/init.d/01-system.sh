@@ -50,6 +50,6 @@ log_init SYSTEM
 
 current=$(cat /proc/sys/fs/inotify/max_user_watches 2>/dev/null || true)
 if [ "$current" != "$SYSTEM_INOTIFY_MAX" ]; then
-  verbose "Setting inotify max_user_watches to %s" "$SYSTEM_INOTIFY_MAX"
+  verbose "Trying to set inotify max_user_watches to %s" "$SYSTEM_INOTIFY_MAX"
   as_root sysctl -w fs.inotify.max_user_watches="$SYSTEM_INOTIFY_MAX" || true
 fi
