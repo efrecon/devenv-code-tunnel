@@ -123,8 +123,12 @@ build_from_source() {
   rm -rf "$GNUPGHOME"
   grep " node-v${1}.tar.gz\$" SHASUMS256.txt | sha256sum -c -
 
-  # Unpack, build and install into the proper location
+  # Unpack
+  trace "Extracting Node.js from %s" "node-v${1}.tar.gz"
   tar -xzf "node-v${1}.tar.gz"
+
+  # Build and install into the proper location
+  trace "Configuring Node.js %s. Installation prefix: %s" "$1" "$INSTALL_PREFIX"
   cd "node-v${1}"
   ./configure --prefix="$INSTALL_PREFIX"
   make -j"$(getconf _NPROCESSORS_ONLN)" V=
