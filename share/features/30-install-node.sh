@@ -159,7 +159,7 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     # When using the unofficial builds, we need to add the libc type to the OS.
     if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
       arch=$(get_arch)
-      verbose "Installing Node.js v%s for %s %s" "$1" "$(get_os)" "$arch"
+      verbose "Installing Node.js %s for %s %s" "$latest" "$(get_os)" "$arch"
       if is_musl_os; then
         # musl builds are only available for x64
         if [ "$arch" = "x64" ]; then
