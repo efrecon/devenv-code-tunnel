@@ -76,6 +76,7 @@ install_sidekicks() {
   done
 }
 
+# TODO: On arm64, no official builds. Compile from source, see: https://hub.docker.com/layers/library/node/23.11.0-alpine3.21/images/sha256-5105011026638432d754015e93eac9e3030f677c8a4e0593a72e93a196225e79 3rd command
 
 if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # Find out where to get the tarball from. This will switch to the unofficial
