@@ -124,7 +124,7 @@ build_from_source() {
   grep " node-v${1}.tar.gz\$" SHASUMS256.txt | sha256sum -c -
 
   # Unpack, build and install into the proper location
-  tar -xf "node-v${1}.tar.gz"
+  tar -xzf "node-v${1}.tar.gz"
   cd "node-v${1}"
   ./configure --prefix="$INSTALL_PREFIX"
   make -j"$(getconf _NPROCESSORS_ONLN)" V=
@@ -163,7 +163,7 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
       if is_musl_os; then
         # musl builds are only available for x64
         if [ "$arch" = "x64" ]; then
-          INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.xz"
+          INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.gz"
         else
           verbose "No binaries available for %s and musl, will build from source" "$arch"
           INSTALL_TGZURL=
