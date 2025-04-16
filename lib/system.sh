@@ -103,13 +103,34 @@ create_user() {
   if grep -q "^$NEW_USER" /etc/passwd; then
     error "%s already exists!" "$NEW_USER"
   else
-    addgroup "$NEW_GROUP"
-    adduser \
-      --disabled-password \
-      --gecos "" \
-      --shell "/bin/bash" \
-      --ingroup "$NEW_GROUP" \
-      "$NEW_USER"
+    if ! getent group "$NEW_GROUP" >/dev/null 2>&1; then
+      # If the group does not exist, create it.
+      verbose "Creating group %s" "$NEW_GROUP"
+      addgroup "$NEW_GROUP"
+    fi
+    if ! getent passwd "$NEW_USER" >/dev/null 2>&1; then
+      # Pick a shell for the user.
+      for shell in bash zsh ash dash sh; do
+        if [ -x "/bin/$shell" ]; then
+          SHELL="/bin/$shell"
+          break
+        fi
+      done
+
+      # Bail out when no shell is found.
+      if [ -z "$SHELL" ]; then
+        error "No shell found for user %s" "$NEW_USER"
+      fi
+
+      # If the user does not exist, create it.
+      verbose "Creating user %s, using shell: %s" "$NEW_USER" "$SHELL"
+      adduser \
+        --disabled-password \
+        --gecos "" \
+        --shell "$SHELL" \
+        --ingroup "$NEW_GROUP" \
+        "$NEW_USER"
+    fi
   fi
 }
 

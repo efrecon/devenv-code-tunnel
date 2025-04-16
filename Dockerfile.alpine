@@ -7,6 +7,10 @@ ARG INSTALL_PREFIX=/usr/local
 # What to install, default is everything
 ARG INSTALL_FEATURES=
 
+# Name of the user and group to create
+ARG INSTALL_USER=coder
+ARG INSTALL_GROUP=${INSTALL_USER}
+
 # Become root to be able to perform installation operations.
 USER root
 
@@ -15,16 +19,16 @@ COPY lib/*.sh ${INSTALL_PREFIX}/lib/
 COPY share/features/*.sh ${INSTALL_PREFIX}/share/features/
 COPY etc/init.d/*.sh ${INSTALL_PREFIX}/etc/init.d/
 
-VOLUME /home/coder
+VOLUME /home/${INSTALL_USER}
 RUN chmod a+x ${INSTALL_PREFIX}/bin/*.sh && \
-    ${INSTALL_PREFIX}/bin/install.sh -vv -u coder && \
+    ${INSTALL_PREFIX}/bin/install.sh -vv -u "${INSTALL_USER}:${INSTALL_GROUP}" && \
     ${INSTALL_PREFIX}/bin/hotfix.sh -vv
 
 # Overlay the rootfs with our own stuff.
 COPY rootfs/alpine/ /
 
-USER coder
-WORKDIR /home/coder
+USER ${INSTALL_USER}
+WORKDIR /home/${INSTALL_USER}
 ENV ENV=/etc/.shinit
 ENV BASH_ENV=/etc/.shinit
 ENTRYPOINT [ "entrypoint.sh" ]

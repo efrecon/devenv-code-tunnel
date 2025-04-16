@@ -48,11 +48,16 @@ done
 : "${TUNNEL_PREFIX:="/usr/local"}"
 : "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 
+# Alias for the home user
+: "${TUNNEL_ALIAS:=}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
-while getopts "fk:l:n:p:vh" opt; do
+while getopts "a:fk:l:n:p:vh" opt; do
   case "$opt" in
+    a) # Alias for the home user
+      TUNNEL_ALIAS="$OPTARG";;
     f) # Force device authorization again
       TUNNEL_FORCE="1";;
     k) # Internet hook to run before starting the tunnel
@@ -87,6 +92,7 @@ find_code() {
     return 0
   else
     for d in "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX"; do
+      trace "Checking %s/bin/code" "$d"
       if [ -x "${d}/bin/code" ]; then
         printf "%s\n" "${d}/bin/code"
         return 0
@@ -107,6 +113,18 @@ is_logged_in() {
   return 1
 }
 
+# Arrange for a link to exists, pointing to the real home of the user. Make this
+# the new home as much as possible.
+if [ -n "$TUNNEL_ALIAS" ]; then
+  AHOME=$(dirname "$HOME")/$TUNNEL_ALIAS
+  if ! [ -d "$AHOME" ]; then
+    as_root ln -sf "$HOME" "$AHOME"
+    as_root sed -ibak -E -e "s|${HOME}|${AHOME}|g" "/etc/passwd"
+    TUNNEL_USER_PREFIX=$(printf %s\\n "$TUNNEL_USER_PREFIX" | sed -E "s|${HOME}|${AHOME}|g")
+    HOME=$AHOME
+    export HOME
+  fi
+fi
 
 # Check if the tunnel provider is set and valid.
 if [ -z "$TUNNEL_PROVIDER" ]; then
