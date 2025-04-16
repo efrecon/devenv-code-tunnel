@@ -158,18 +158,21 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   if [ "$INSTALL_NODE_FROM_SOURCE" = "auto" ]; then
     # When using the unofficial builds, we need to add the libc type to the OS.
     if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
+      arch=$(get_arch)
+      verbose "Installing Node.js v%s for %s %s" "$1" "$(get_os)" "$arch"
       if is_musl_os; then
         # musl builds are only available for x64
-        if [ "$(get_arch)" = "x64" ]; then
-          INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-musl.tar.xz"
+        if [ "$arch" = "x64" ]; then
+          INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.xz"
         else
+          verbose "No binaries available for %s and musl, will build from source" "$arch"
           INSTALL_TGZURL=
         fi
       else
-        INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-glibc.tar.gz"
+        INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-glibc.tar.gz"
       fi
     else
-      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch).tar.gz"
+      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}.tar.gz"
     fi
   else
     INSTALL_TGZURL=
