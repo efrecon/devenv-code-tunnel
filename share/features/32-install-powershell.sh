@@ -57,19 +57,13 @@ if ! check_command "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
     openssh-client
 
   # Find out the OS, add the musl suffix if needed.
-  os=$(uname | to_lower)
+  os=$(get_os)
   if is_musl_os; then
     os="${os}-musl"
   fi
 
-  # Convert the local architecture to the one used by powershell.
-  arch=$(uname -m)
-  [ "$arch" = "x86_64" ] && arch="x64"
-  [ "$arch" = "x686" ] && arch="x86"
-  [ "$arch" = "aarch64" ] && arch="arm64"
-
   # Download and install
-  INSTALL_TGZURL="${INSTALL_POWERSHELL_ROOTURL}/v${INSTALL_POWERSHELL_VERSION}/powershell-${INSTALL_POWERSHELL_VERSION}-${os}-${arch}.tar.gz"
+  INSTALL_TGZURL="${INSTALL_POWERSHELL_ROOTURL}/v${INSTALL_POWERSHELL_VERSION}/powershell-${INSTALL_POWERSHELL_VERSION}-${os}-$(get_arch).tar.gz"
   verbose "Installing powershell from %s" "$INSTALL_TGZURL"
   as_root mkdir -p "${INSTALL_PREFIX}/share/powershell"
   download "${INSTALL_TGZURL}" |

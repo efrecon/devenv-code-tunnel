@@ -167,3 +167,22 @@ xdg_user_dirs() {
 is_musl_os() {
   (ldd --version 2>&1 || true) | grep -q musl
 }
+
+
+get_arch() {
+  case "$(uname -m)" in
+    x86_64) arch="x64" ;;
+    i686) arch="x86" ;;
+    i386) arch="x86" ;;
+    aarch64) arch="arm64" ;;
+    armv7l) arch="armhf" ;;
+    armv6l) arch="armhf" ;;
+    *) arch="$(uname -m)" ;;
+  esac
+  printf %s\\n "$arch"
+}
+
+
+get_os() {
+  printf %s\\n "$(uname | to_lower)"
+}

@@ -78,16 +78,6 @@ install_sidekicks() {
 
 
 if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
-  # Convert the local architecture to the one used by Node.js. Note: some of
-  # these do not use musl.
-  arch=$(uname -m)
-  [ "$arch" = "x86_64" ] && arch="x64"
-  [ "$arch" = "x686" ] && arch="x86"
-  [ "$arch" = "aarch64" ] && arch="arm64"
-
-  # OS name. This really has only been tested on linux...
-  os=$(uname | to_lower)
-
   # Find out where to get the tarball from. This will switch to the unofficial
   # builds when running on musl.
   if [ -z "$INSTALL_NODE_DOMAIN" ]; then
@@ -109,12 +99,12 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # When using the unofficial builds, we need to add the libc type to the OS.
   if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
     if is_musl_os; then
-      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-${os}-${arch}-musl.tar.gz"
+      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-musl.tar.gz"
     else
-      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-${os}-${arch}-glibc.tar.gz"
+      INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch)-glibc.tar.gz"
     fi
   else
-    INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-${os}-${arch}.tar.gz"
+    INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-$(get_arch).tar.gz"
   fi
 
   verbose "Downloading Node.js from: $INSTALL_TGZURL"
