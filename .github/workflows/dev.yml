@@ -31,7 +31,7 @@ jobs:
         os: [alpine]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
-      platforms: linux/amd64,linux/arm64
+      platforms: linux/amd64
       username: ${{ github.actor }}
     secrets:
       password: ${{ secrets.GITHUB_TOKEN }}
