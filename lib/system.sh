@@ -186,3 +186,15 @@ get_arch() {
 get_os() {
   printf %s\\n "$(uname | to_lower)"
 }
+
+get_release_info() {
+  grep -E -e "^${1}=" /etc/os-release | cut -d= -f2 | tr -d '"' | tr -d '\n'
+}
+
+get_distro_name() {
+  get_release_info ID
+}
+
+get_distro_version() {
+  get_release_info VERSION_ID
+}
