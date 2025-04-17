@@ -34,6 +34,12 @@ log_init INSTALL
 
 
 if ! check_command "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
+  arch=$(get_arch)
+  if [ "$arch" = "arm64" ] && is_musl_os; then
+    warn "No Powershell for arm64 musl available. Skipping installation."
+    return 0
+  fi
+
   # Install dependencies as per
   # https://learn.microsoft.com/en-us/powershell/scripting/install/install-alpine?view=powershell-7.5#installation-steps
   install_packages \
@@ -63,7 +69,7 @@ if ! check_command "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
   fi
 
   # Download and install
-  INSTALL_TGZURL="${INSTALL_POWERSHELL_ROOTURL}/v${INSTALL_POWERSHELL_VERSION}/powershell-${INSTALL_POWERSHELL_VERSION}-${os}-$(get_arch).tar.gz"
+  INSTALL_TGZURL="${INSTALL_POWERSHELL_ROOTURL}/v${INSTALL_POWERSHELL_VERSION}/powershell-${INSTALL_POWERSHELL_VERSION}-${os}-${arch}.tar.gz"
   verbose "Installing powershell from %s" "$INSTALL_TGZURL"
   as_root mkdir -p "${INSTALL_PREFIX}/share/powershell"
   download "${INSTALL_TGZURL}" |
