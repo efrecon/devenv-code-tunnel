@@ -77,6 +77,13 @@ install_sidekicks() {
   done
 }
 
+# TODO: building node from source takes too long. Try copying from existing image?
+# 1. pull the image with docker image pull
+# 2. save the image with docker save to a local directory.
+# 3. Inside the directory, locate the largest .tar file, e.g. e7534a3f8e08ced32b4ae96362bd638da2ee72ca094e149a4d40ca345c3f0f5a.tar
+# 4. Extract the tar file
+# 5. Copy the content of the usr/local directory into our target prefix.
+
 build_from_source() {
   verbose "Downloading and building Node.js %s from source" "$1"
   curdir=$(pwd)
