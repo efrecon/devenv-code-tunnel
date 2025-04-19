@@ -31,7 +31,7 @@ done
 : "${INSTALL_CODE_BUILD:="stable"}"
 
 # URL to download the code CLI from.
-: "${INSTALL_CODE_URL:="https://code.visualstudio.com/sha/download?build=${INSTALL_CODE_BUILD}&os=cli-alpine-x64"}"
+: "${INSTALL_CODE_URL:="https://code.visualstudio.com/sha/download?build=${INSTALL_CODE_BUILD}&os=cli-alpine-$(get_arch)"}"
 
 log_init INSTALL
 

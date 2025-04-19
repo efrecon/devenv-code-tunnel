@@ -34,6 +34,12 @@ log_init INSTALL
 
 
 if ! check_command "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
+  arch=$(get_arch)
+  if [ "$arch" = "arm64" ] && is_musl_os; then
+    warn "No Powershell for arm64 musl available. Skipping installation."
+    return 0
+  fi
+
   # Install dependencies as per
   # https://learn.microsoft.com/en-us/powershell/scripting/install/install-alpine?view=powershell-7.5#installation-steps
   install_packages \
@@ -57,16 +63,10 @@ if ! check_command "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
     openssh-client
 
   # Find out the OS, add the musl suffix if needed.
-  os=$(uname | to_lower)
+  os=$(get_os)
   if is_musl_os; then
     os="${os}-musl"
   fi
-
-  # Convert the local architecture to the one used by powershell.
-  arch=$(uname -m)
-  [ "$arch" = "x86_64" ] && arch="x64"
-  [ "$arch" = "x686" ] && arch="x86"
-  [ "$arch" = "aarch64" ] && arch="arm64"
 
   # Download and install
   INSTALL_TGZURL="${INSTALL_POWERSHELL_ROOTURL}/v${INSTALL_POWERSHELL_VERSION}/powershell-${INSTALL_POWERSHELL_VERSION}-${os}-${arch}.tar.gz"
