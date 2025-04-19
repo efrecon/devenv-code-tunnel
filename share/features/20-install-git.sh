@@ -41,6 +41,7 @@ lazygit
 tig
 gitui
 git-annex
+- util-linux-misc
 EOF
 
 as_root internet_install "$INSTALL_GIT_LEFTHOOK_URL" lefthook "$INSTALL_GIT_LEFTHOOK_SHA512"
