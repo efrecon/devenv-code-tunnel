@@ -22,10 +22,13 @@ done
 # calling install.sh script in the normal case.
 : "${INSTALL_VERBOSE:=0}"
 : "${INSTALL_LOG:=2}"
-: "${INSTALL_USER:="coder"}"
+: "${INSTALL_PREFIX:="/usr/local"}"
 
 : "${INSTALL_GIT_LEFTHOOK_URL:="https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.alpine.sh"}"
 : "${INSTALL_GIT_LEFTHOOK_SHA512:="6c2b28a84501c4761a7a49dc4e4b71b580d8bf644675baa057928ff567bc611bdada62f7d2cbf2cd0150af62d2e94d2db0f3767ad9beadeb6ddf0e3a527313c4"}"
+
+: "${INSTALL_GIT_EXTRAS_URL:="https://raw.githubusercontent.com/tj/git-extras/main/install.sh"}"
+: "${INSTALL_GIT_EXTRAS_SHA512:="915def79bb2f86448d5fad8542ceb3265cf4a99d95f2da4c6d9d07f1c16d1c26928f1579fa916ad20efe05f6cf55dbcc1c027cd753f1091f0aeb7e084ddf1c71"}"
 
 log_init INSTALL
 
@@ -40,4 +43,5 @@ gitui
 git-annex
 EOF
 
-as_root internet_install "$INSTALL_GIT_LEFTHOOK_URL" dotnet "$INSTALL_GIT_LEFTHOOK_SHA512"
+as_root internet_install "$INSTALL_GIT_LEFTHOOK_URL" lefthook "$INSTALL_GIT_LEFTHOOK_SHA512"
+as_root PREFIX="$INSTALL_PREFIX" internet_install "$INSTALL_GIT_EXTRAS_URL" git-extras "$INSTALL_GIT_EXTRAS_SHA512"
