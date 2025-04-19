@@ -115,10 +115,9 @@ install_ondemand<<EOF
 curl
 zip
 jq
-git
-git-lfs
 bash
 less
+make
 - gcompat
 EOF
 
