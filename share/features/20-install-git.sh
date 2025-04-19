@@ -44,4 +44,4 @@ git-annex
 EOF
 
 as_root internet_install "$INSTALL_GIT_LEFTHOOK_URL" lefthook "$INSTALL_GIT_LEFTHOOK_SHA512"
-as_root PREFIX="$INSTALL_PREFIX" internet_install "$INSTALL_GIT_EXTRAS_URL" git-extras "$INSTALL_GIT_EXTRAS_SHA512"
+PREFIX="$INSTALL_PREFIX" as_root internet_install "$INSTALL_GIT_EXTRAS_URL" git-extras "$INSTALL_GIT_EXTRAS_SHA512"
