@@ -117,6 +117,7 @@ zip
 jq
 bash
 less
+make
 - gcompat
 EOF
 
