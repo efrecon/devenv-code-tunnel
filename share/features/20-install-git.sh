@@ -37,9 +37,6 @@ install_ondemand<<EOF
 git
 git-lfs
 pre-commit
-lazygit
-tig
-gitui
 git-annex
 - util-linux-misc
 EOF
