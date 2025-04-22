@@ -31,4 +31,10 @@ USER ${INSTALL_USER}
 WORKDIR /home/${INSTALL_USER}
 ENV ENV=/etc/.shinit
 ENV BASH_ENV=/etc/.shinit
-ENTRYPOINT [ "entrypoint.sh" ]
+
+EXPOSE 2222
+
+# Run behind tini, capturing the entire process group to properly teardown all
+# subprocesses.
+STOPSIGNAL SIGINT
+ENTRYPOINT [ "/sbin/tini", "-wgv", "--", "${INSTALL_PREFIX}/bin/entrypoint.sh" ]
