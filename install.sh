@@ -115,6 +115,8 @@ install_ondemand<<EOF
 curl
 zip
 jq
+tini
+openssh
 bash
 less
 make
