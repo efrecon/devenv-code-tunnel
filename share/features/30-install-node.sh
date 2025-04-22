@@ -168,7 +168,7 @@ build_from_source() {
 # content of docker files without the docker client installed (and without the
 # docker daemon running: at installation time, the daemon is not running yet).
 install_regclient() {
-  arch=$(printf %s\\n "$(get_arch)" | sed 's/x64/amd64/g')
+  arch=$(get_arch x86_64 amd64)
   regclient_url=https://github.com/regclient/regclient/releases/download/v${INSTALL_NODE_REGCLIENT_VERSION}/regctl-$(get_os)-${arch}
   download "$regclient_url" > "${INSTALL_PREFIX}/bin/regctl"
   chmod a+x "${INSTALL_PREFIX}/bin/regctl"
