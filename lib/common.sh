@@ -227,7 +227,7 @@ assert_version() {
 
 
 generate_random() {
-  LC_ALL=C tr -dc "${2:-'a-zA-Z0-9'}" < /dev/urandom | head -c "${1:-16}"
+  LC_ALL=C tr -dc "${2:-"a-zA-Z0-9"}" < /dev/urandom | head -c "${1:-16}"
 }
 
 
@@ -256,6 +256,15 @@ export_varset() {
   while IFS= read -r varname; do
     # shellcheck disable=SC2163 # We want to export the name of the variable
     export "$varname"
+  done <<EOF
+$(set | grep "^${1:-}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
+EOF
+}
+
+unset_varset() {
+  while IFS= read -r varname; do
+    # shellcheck disable=SC2163 # We want to unset the name of the variable
+    unset "$varname"
   done <<EOF
 $(set | grep "^${1:-}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
 EOF

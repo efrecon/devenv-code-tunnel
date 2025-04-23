@@ -37,6 +37,9 @@ log_init INSTALL
 
 verbose "Installing cloudflared v%s" "$INSTALL_CLOUDFLARED_VERSION"
 
+install_ondemand<<EOF
+nc netcat-openbsd
+EOF
 
 if [ "$INSTALL_TARGET" = "user" ]; then
   download "$INSTALL_CLOUDFLARED_URL" > "${INSTALL_USER_PREFIX}/bin/cloudflared"

@@ -14,16 +14,19 @@ ARG INSTALL_GROUP=${INSTALL_USER}
 # Become root to be able to perform installation operations.
 USER root
 
-COPY *.sh ${INSTALL_PREFIX}/bin/
-COPY build/*.sh ${INSTALL_PREFIX}/bin/
+# Copy installation scripts and files.
 COPY lib/*.sh ${INSTALL_PREFIX}/lib/
+COPY build/*.sh ${INSTALL_PREFIX}/bin/
 COPY share/features/*.sh ${INSTALL_PREFIX}/share/features/
-COPY etc/init.d/*.sh ${INSTALL_PREFIX}/etc/init.d/
 
 VOLUME /home/${INSTALL_USER}
 RUN chmod a+x ${INSTALL_PREFIX}/bin/*.sh && \
     ${INSTALL_PREFIX}/bin/install.sh -vv -u "${INSTALL_USER}:${INSTALL_GROUP}" && \
     ${INSTALL_PREFIX}/bin/hotfix.sh -vv
+
+# Copy the init scripts and other files.
+COPY *.sh ${INSTALL_PREFIX}/bin/
+COPY etc/init.d/*.sh ${INSTALL_PREFIX}/etc/init.d/
 
 # Overlay the rootfs with our own stuff.
 COPY rootfs/alpine/ /
@@ -38,4 +41,4 @@ EXPOSE 2222
 # Run behind tini, capturing the entire process group to properly teardown all
 # subprocesses.
 STOPSIGNAL SIGINT
-ENTRYPOINT [ "/sbin/tini", "-wv", "--", "tunnel.sh" ]
+ENTRYPOINT [ "/sbin/tini", "-sv", "--", "tunnel.sh" ]

@@ -109,95 +109,23 @@ alias_create() {
 }
 
 
-code_tunnel_logged_in() {
-  if [ -f "${TUNNEL_STORAGE%/}/token.json" ]; then
-    token=$(cat "${TUNNEL_STORAGE%/}/token.json")
-    if [ "$token" != "null" ]; then
-      return 0
-    fi
-  fi
-  return 1
-}
-
-
-code_tunnel_configure() {
-  # Check if the tunnel provider is set and valid.
-  if [ -z "$TUNNEL_PROVIDER" ]; then
-    error "No tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
-  fi
-  if [ "$TUNNEL_PROVIDER" != "github" ] && [ "$TUNNEL_PROVIDER" != "azure" ]; then
-    error "Invalid tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
-  fi
-
-  # Pick a name, from hostname or at random
-  if [ -z "$TUNNEL_NAME" ]; then
-    # If the hostname is not a random name, use it as the tunnel name.
-    if ! hostname | grep -qE '[a-f0-9]{12}'; then
-      TUNNEL_NAME=$(hostname)
-    else
-      TUNNEL_NAME=$(generate_random)
-    fi
-  elif [ "$TUNNEL_NAME" = "-" ]; then
-    TUNNEL_NAME=
-  else
-    # If the hostname is generated, override it with the tunnel name if possible.
-    # This will only work if the container was run with --privileged.
-    if hostname | grep -qE '[a-f0-9]{12}'; then
-      as_root hostname "$TUNNEL_NAME" ||
-        warn "Using a generated hostname: %s. Force hostname of container to avoid having to re-authorize the device!" "$(hostname)"
-    fi
-  fi
-}
-
-
-# Authorize device. This will print out a URL to the console. Open it in a
-# browser and authorize the device.
-code_tunnel_login() {
-  if is_true "$TUNNEL_FORCE"; then
-    "$1" tunnel user login --provider "$TUNNEL_PROVIDER"
-  elif ! code_tunnel_logged_in; then
-    "$1" tunnel user login --provider "$TUNNEL_PROVIDER"
-  fi
-}
-
-# Start the tunnel
-code_tunnel_start() {
-  if [ -z "$TUNNEL_NAME" ]; then
-    "$1" tunnel --accept-server-license-terms --random-name
-  else
-    "$1" tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
-  fi
-}
-
-
-cloudflare_tunnel_start() {
-  verbose "Starting cloudflare tunnel, logging at %s" "$TUNNEL_LOG"
-  CLOUDFLARE_LOG="${TUNNEL_PREFIX}/log/cloudflared.log"
-  "$1" tunnel --url "tcp://localhost:$TUNNEL_SSH" > "$CLOUDFLARE_LOG" 2>&1 &
-  verbose "Wait for cloudflare tunnel to start..."
-  url=$(while ! grep -o 'https://.*\.trycloudflare.com' "$CLOUDFLARE_LOG"; do sleep 1; done)
-  public_key=$(cut -d' ' -f1,2 < "${TUNNEL_PREFIX}/etc/ssh/ssh_host_rsa_key.pub")
-  verbose "Cloudflare tunnel started at %s" "$url"
-
-  KNOWN_HOST=$TUNNEL_NAME
-  [ -z "$KNOWN_HOST" ] && KNOWN_HOST=$(hostname)
-
-  printf \\n
-  printf \\n
-  printf "Run the following command to connect:\n"
-  printf "    ssh-keygen -R %s && echo '%s %s' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname %s' %s@%s\n" \
-          "$KNOWN_HOST" "$KNOWN_HOST" "$public_key" "$url" "$(id -un)" "$KNOWN_HOST"
-  printf \\n
-  printf "Run the following command to connect without verification (DANGER!):"
-  printf "    ssh -o ProxyCommand='cloudflared access tcp --hostname %s' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new %s@%s\n" \
-          "$url" "$(id -un)" "$KNOWN_HOST"
-  printf \\n
-  printf \\n
-}
-
-
 # Create the alias for the home user
 [ -n "$TUNNEL_ALIAS" ] && alias_create "$TUNNEL_ALIAS"
+
+# shellcheck disable=SC2034 # Used in tunnel implementations
+TUNNEL_ORIGINAL_NAME=$TUNNEL_NAME
+
+# Pick a name, from hostname or at random
+if [ -z "$TUNNEL_NAME" ]; then
+  # If the hostname is not a random name, use it as the tunnel name.
+  if ! hostname | grep -qE '[a-f0-9]{12}'; then
+    TUNNEL_NAME=$(hostname)
+  else
+    TUNNEL_NAME=$(generate_random)
+  fi
+elif [ "$TUNNEL_NAME" = "-" ]; then
+  TUNNEL_NAME=
+fi
 
 # Start services
 export_varset "TUNNEL"
@@ -215,15 +143,15 @@ if [ -n "$TUNNEL_HOOK" ]; then
   internet_install "$TUNNEL_HOOK" hook ""
 fi
 
+# Start tunnels in the background
+for tunnel in codecli cloudflare; do
+  if [ -x "${TUNNEL_ROOTDIR}/${tunnel}.sh" ]; then
+    verbose "Starting %s" "$tunnel"
+    # shellcheck disable=SC1090
+    "${TUNNEL_ROOTDIR}/${tunnel}.sh" &
+  fi
+done
 
-CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
-if [ -n "$CODE_BIN" ]; then
-  code_tunnel_configure
-  code_tunnel_login "$CODE_BIN"
-  code_tunnel_start "$CODE_BIN" &
-fi
-
-CLOUDFLARE_BIN=$(find_inpath cloudflared "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
-if [ -n "$TUNNEL_SSH" ] && [ -n "$CLOUDFLARE_BIN" ]; then
-  cloudflare_tunnel_start "$CLOUDFLARE_BIN" &
-fi
+# TODO: Rotate the logs from tunnels and serives at regular intervals
+# TODO: Collect logs from the tunnels and services and reexpose them
+sleep 3600
