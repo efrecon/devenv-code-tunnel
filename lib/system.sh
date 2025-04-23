@@ -130,6 +130,9 @@ create_user() {
         --shell "$SHELL" \
         --ingroup "$NEW_GROUP" \
         "$NEW_USER"
+      # Unlock account and set an invalid password hash. See:
+      # https://unix.stackexchange.com/a/750967
+      printf '%s:*\n' "$NEW_USER" | chpasswd -e
     fi
   fi
 }
