@@ -229,3 +229,34 @@ assert_version() {
 generate_random() {
   LC_ALL=C tr -dc "${2:-'a-zA-Z0-9'}" < /dev/urandom | head -c "${1:-16}"
 }
+
+
+find_inpath() {
+  prg=$1; shift
+  binpath=$(command -v "$prg" 2>/dev/null || true)
+  if [ -n "$binpath" ]; then
+    printf "%s\n" "$binpath"
+    return 0
+  else
+    while [ "$#" != 0 ]; do
+      trace "Checking ${1%/}/bin/${prg}"
+      if [ -x "${1%/}/bin/${prg}" ]; then
+        printf "%s\n" "${1%/}/bin/${prg}"
+        return 0
+      fi
+      shift
+    done
+  fi
+  warn "Cannot find %s in PATH: %s or standard locations" "$prg" "$PATH"
+}
+
+# Export all variables that start with a prefix so that they are available
+# to subprocesses
+export_varset() {
+  while IFS= read -r varname; do
+    # shellcheck disable=SC2163 # We want to export the name of the variable
+    export "$varname"
+  done <<EOF
+$(set | grep "^${1:-}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
+EOF
+}

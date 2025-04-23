@@ -29,7 +29,7 @@ done
 : "${DOCKERD_DAEMONIZE:=0}"
 
 # Prevent detaching in the background (RESERVED for use by the daemon)
-: "${DOCKERD_PREVENT_DAEMONIZATION:=0}"
+: "${_DOCKERD_PREVENT_DAEMONIZATION:=0}"
 
 : "${DOCKERD_PREFIX:="/usr/local"}"
 
@@ -72,9 +72,9 @@ fi
 
 # If we are to daemonize, do it now and exit. Export all our variables to the
 # daemon so it starts the same way this script was started.
-if ! is_true "$DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; then
+if ! is_true "$_DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; then
   # Do not daemonize the daemon!
-  DOCKERD_PREVENT_DAEMONIZATION=1
+  _DOCKERD_PREVENT_DAEMONIZATION=1
   DOCKERD_DAEMONIZE=0
   daemonize DOCKERD "$@"
 fi

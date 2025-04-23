@@ -20,29 +20,28 @@ done
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at SSHD_LOG.
-: "${SSHD_VERBOSE:=0}"
+: "${SSHD_VERBOSE:="${TUNNEL_VERBOSE:-"0"}"}"
 
 # Where to send logs
-: "${SSHD_LOG:=2}"
+: "${SSHD_LOG:="${TUNNEL_LOG:-"2"}"}"
 
-# Detach in the background
-: "${SSHD_DAEMONIZE:=0}"
-
-# Prevent detaching in the background (RESERVED for use by the daemon)
-: "${SSHD_PREVENT_DAEMONIZATION:=0}"
-
-: "${SSHD_PREFIX:="/usr/local"}"
+: "${SSHD_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
 
 : "${SSHD_USER:=""}"
 
 : "${SSHD_SHELL:=""}"
 
-: "${SSHD_GITHUB_USER:=""}"
+: "${SSHD_GITHUB_USER:="${TUNNEL_GITHUB_USER:-""}"}"
 
-: "${SSHD_PORT:="2222"}"
+: "${SSHD_PORT:="${TUNNEL_SSH:-"2222"}"}"
 
 : "${SSHD_CONFIG_DIR:="${SSHD_PREFIX}/etc/ssh"}"
 
+# Detach in the background
+: "${SSHD_DAEMONIZE:=0}"
+
+# Prevent detaching in the background (RESERVED for use by ourselves)
+: "${_SSHD_PREVENT_DAEMONIZATION:=0}"
 
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
@@ -148,9 +147,9 @@ fi
 
 # If we are to daemonize, do it now and exit. Export all our variables to the
 # daemon so it starts the same way this script was started.
-if ! is_true "$SSHD_PREVENT_DAEMONIZATION" && is_true "$SSHD_DAEMONIZE"; then
+if ! is_true "$_SSHD_PREVENT_DAEMONIZATION" && is_true "$SSHD_DAEMONIZE"; then
   # Do not daemonize the daemon!
-  SSHD_PREVENT_DAEMONIZATION=1
+  _SSHD_PREVENT_DAEMONIZATION=1
   SSHD_DAEMONIZE=0
   daemonize SSHD "$@"
 fi
