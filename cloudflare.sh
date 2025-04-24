@@ -36,7 +36,7 @@ CODER_DESCR="cloudflare tunnel starter"
 log_init TUNNEL
 
 sshd_wait() {
-  verbose "Wait for sshd to start..."
+  debug "Wait for sshd to start..."
   while ! nc -z localhost "$TUNNEL_SSH"; do
     sleep 1
   done
@@ -48,12 +48,12 @@ tunnel_start() (
   ssh_port="$TUNNEL_SSH"
   unset_varset TUNNEL
 
-  verbose "Starting cloudflare tunnel using %s, logging at %s" "$1" "$CLOUDFLARE_LOG"
+  debug "Starting cloudflare tunnel using %s, logging at %s" "$1" "$CLOUDFLARE_LOG"
   "$1" tunnel --no-autoupdate --url "tcp://localhost:$ssh_port" > "$CLOUDFLARE_LOG" 2>&1 &
 )
 
 tunnel_wait() {
-  verbose "Wait for cloudflare tunnel to start..."
+  debug "Wait for cloudflare tunnel to start..."
   url=$(while ! grep -o 'https://.*\.trycloudflare.com' "$CLOUDFLARE_LOG"; do sleep 1; done)
   public_key=$(cut -d' ' -f1,2 < "${TUNNEL_PREFIX}/etc/ssh_host_rsa_key.pub")
   verbose "Cloudflare tunnel started at %s" "$url"

@@ -54,7 +54,7 @@ log_init SERVICES
 for svc in "${SERVICES_DIR%/}"/*.sh; do
   if [ -f "$svc" ]; then
     if ! [ -x "$svc" ]; then
-      verbose "Making $svc executable"
+      debug "Making $svc executable"
       chmod a+x "$svc"
     fi
     verbose "Starting $svc"

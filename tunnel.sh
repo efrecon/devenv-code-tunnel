@@ -130,7 +130,7 @@ fi
 # Start services
 export_varset "TUNNEL"
 if [ -x "${TUNNEL_ROOTDIR}/services.sh" ]; then
-  verbose "Starting services"
+  info "Starting services"
   SERVICES_LOG=$TUNNEL_LOG \
   SERVICES_VERBOSE=$TUNNEL_VERBOSE \
   SERVICES_PREFIX=$TUNNEL_PREFIX \
@@ -139,14 +139,14 @@ fi
 
 # Start the Internet hook to perform extra setup
 if [ -n "$TUNNEL_HOOK" ]; then
-  verbose "Running hook: %s" "$TUNNEL_HOOK"
+  info "Running hook: %s" "$TUNNEL_HOOK"
   internet_install "$TUNNEL_HOOK" hook ""
 fi
 
 # Start tunnels in the background
 for tunnel in codecli cloudflare; do
   if [ -x "${TUNNEL_ROOTDIR}/${tunnel}.sh" ]; then
-    verbose "Starting %s" "$tunnel"
+    info "Starting %s" "$tunnel"
     # shellcheck disable=SC1090
     "${TUNNEL_ROOTDIR}/${tunnel}.sh" &
   fi
