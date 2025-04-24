@@ -40,6 +40,8 @@ sshd_wait() {
   while ! nc -z localhost "$TUNNEL_SSH"; do
     sleep 1
   done
+  verbose "sshd responding on port %s, forwarding logs at %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
+  "${TUNNEL_ROOTDIR}/logger.sh" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
 }
 
 tunnel_start() (
@@ -49,7 +51,7 @@ tunnel_start() (
   unset_varset TUNNEL
 
   debug "Starting cloudflare tunnel using %s, logging at %s" "$1" "$CLOUDFLARE_LOG"
-  "$1" tunnel --no-autoupdate --url "tcp://localhost:$ssh_port" > "$CLOUDFLARE_LOG" 2>&1 &
+  "$1" tunnel --no-autoupdate --url "tcp://localhost:$ssh_port" >"$CLOUDFLARE_LOG" 2>&1 &
 )
 
 tunnel_wait() {
@@ -58,20 +60,18 @@ tunnel_wait() {
   public_key=$(cut -d' ' -f1,2 < "${TUNNEL_PREFIX}/etc/ssh_host_rsa_key.pub")
   verbose "Cloudflare tunnel started at %s" "$url"
 
-  # TODO: Use regular logging instead?
-  printf \\n
-  printf \\n
-  printf "Run the following command to connect:\n"
-  printf "    ssh-keygen -R %s && echo '%s %s' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname %s' %s@%s\n" \
+  _log "" ""
+  _log "" ""
+  _log "" "Run the following command to connect:"
+  _log "" "    ssh-keygen -R %s && echo '%s %s' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname %s' %s@%s" \
           "$TUNNEL_HOSTNAME" "$TUNNEL_HOSTNAME" "$public_key" "$url" "$(id -un)" "$TUNNEL_HOSTNAME"
-  printf \\n
-  printf "Run the following command to connect without verification (DANGER!):"
-  printf "    ssh -o ProxyCommand='cloudflared access tcp --hostname %s' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new %s@%s\n" \
+  _log "" ""
+  _log "" "Run the following command to connect without verification (DANGER!):"
+  _log "" "    ssh -o ProxyCommand='cloudflared access tcp --hostname %s' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new %s@%s" \
           "$url" "$(id -un)" "$TUNNEL_HOSTNAME"
-  printf \\n
-  printf \\n
+  _log "" ""
+  _log "" ""
 }
-
 
 TUNNEL_HOSTNAME=$TUNNEL_NAME
 [ -z "$TUNNEL_HOSTNAME" ] && TUNNEL_HOSTNAME=$(hostname)
@@ -83,4 +83,5 @@ if [ -n "$TUNNEL_SSH" ] && [ -n "$CLOUDFLARE_BIN" ]; then
   sshd_wait
   tunnel_start "$CLOUDFLARE_BIN"
   tunnel_wait
+  exec "${TUNNEL_ROOTDIR}/logger.sh" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG"
 fi

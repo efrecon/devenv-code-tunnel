@@ -29,11 +29,21 @@ done
 
 : "${SSHD_USER:=""}"
 
+# GitHub user to fetch keys from
 : "${SSHD_GITHUB_USER:="${TUNNEL_GITHUB_USER:-""}"}"
 
+# Port of the SSH daemon to listen on
 : "${SSHD_PORT:="${TUNNEL_SSH:-"2222"}"}"
 
+# Where to store sshd data
 : "${SSHD_CONFIG_DIR:="${SSHD_PREFIX}/etc/ssh"}"
+
+# Where to store sshd logs, will be accessible by the user
+: "${SSHD_LOGFILE:="${SSHD_PREFIX}/log/sshd.log"}"
+
+# Log level to use in sshd. One of: QUIET, FATAL, ERROR, INFO, VERBOSE, DEBUG,
+# DEBUG1, DEBUG2, and DEBUG3
+: "${SSHD_LOGLEVEL:="INFO"}"
 
 # Detach in the background
 : "${SSHD_DAEMONIZE:=0}"
@@ -97,7 +107,7 @@ configure_sshd() {
 
   SSHD_TEMPLATE=$(mktemp)
   cat <<'EOF' > "$SSHD_TEMPLATE"
-LogLevel DEBUG3
+LogLevel $LOGLEVEL
 Port $PORT
 HostKey $PWD/server/ssh_host_rsa_key
 PidFile $PWD/server/sshd.pid
@@ -128,6 +138,7 @@ EOF
 
   if [ -f "$SSHD_TEMPLATE" ]; then
     sed \
+      -e "s,\$LOGLEVEL,${SSHD_LOGLEVEL},g" \
       -e "s,\$PWD,${SSHD_CONFIG_DIR},g" \
       -e "s,\$USER,${SSHD_USER},g" \
       -e "s,\$PORT,${SSHD_PORT},g" \
@@ -157,6 +168,7 @@ if ! is_true "$_SSHD_PREVENT_DAEMONIZATION" && is_true "$SSHD_DAEMONIZE"; then
 fi
 
 configure_sshd
-as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "${SSHD_PREFIX}/log/sshd.log" &
+touch "$SSHD_LOGFILE"
+as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" &
 pid_sshd=$!
 verbose "sshd started with pid %s" "$pid_sshd"

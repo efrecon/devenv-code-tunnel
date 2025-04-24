@@ -73,7 +73,6 @@ tunnel_logged_in() {
 # Authorize device. This will print out a URL to the console. Open it in a
 # browser and authorize the device.
 tunnel_login() {
-  # TODO: redirect to log and reprint encapsulated
   if is_true "$TUNNEL_FORCE"; then
     "$1" tunnel user login --provider "$TUNNEL_PROVIDER"
   elif ! tunnel_logged_in; then
@@ -83,7 +82,6 @@ tunnel_login() {
 
 # Start the tunnel
 tunnel_start() {
-  # TODO: redirect to log and reprint encapsulated
   if [ -z "$TUNNEL_NAME" ]; then
     "$1" tunnel --accept-server-license-terms --random-name
   else
@@ -106,6 +104,6 @@ fi
 CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
 if [ -n "$CODE_BIN" ]; then
   tunnel_configure
-  tunnel_login "$CODE_BIN"
-  tunnel_start "$CODE_BIN"
+  tunnel_login "$CODE_BIN" | "$TUNNEL_ROOTDIR/logger.sh" -s "$CODE_BIN"
+  tunnel_start "$CODE_BIN" | "$TUNNEL_ROOTDIR/logger.sh" -s "$CODE_BIN"
 fi
