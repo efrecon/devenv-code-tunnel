@@ -81,6 +81,7 @@ install_ondemand() {
 
 
 make_owned_dir() {
+  [ -z "$1" ] && error "make_owned_dir: no dir given"
   if ! [ -d "$1" ]; then
     mkdir -p "$1"
   fi
