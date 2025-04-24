@@ -46,6 +46,14 @@ usage() {
 }
 
 # PML: Poor Man's Logging...
+# shellcheck disable=SC2120 # We just want to use the default value...
+_logtag() {
+  _CODER_BINTAG=$CODER_BIN
+  while [ "$(printf %s "$_CODER_BINTAG" | wc -c)" -lt "${1:-14}" ]; do
+    _CODER_BINTAG=">${_CODER_BINTAG}<"
+  done
+  _CODER_BINTAG=$(printf %s "$_CODER_BINTAG" | cut -c "1-${1:-14}")
+}
 
 # Print a log line. The first argument is a (preferred) 3 letters human-readable
 # log-level. All other arguments are passed blindly to printf, a builtin
@@ -54,9 +62,10 @@ _logline() {
   # Capture level and shift it away, rest will be passed blindly to printf
   _lvl=${1:-LOG}; shift
   bin_name
+  [ -z "${_CODER_BINTAG:-}" ] && _logtag
   # shellcheck disable=SC2059 # We want to expand the format string
-  printf '>>>>>%s<<<<< [%s] [%s] %s\n' \
-    "$CODER_BIN" \
+  printf '%s [%s] [%s] %s\n' \
+    "$_CODER_BINTAG" \
     "$_lvl" \
     "$(date +'%Y%m%d-%H%M%S')" \
     "$(printf "$@")"
