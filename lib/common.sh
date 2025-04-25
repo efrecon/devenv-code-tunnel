@@ -46,6 +46,14 @@ usage() {
 }
 
 # PML: Poor Man's Logging...
+# shellcheck disable=SC2120 # We just want to use the default value...
+_logtag() {
+  _CODER_BINTAG=$CODER_BIN
+  while [ "$(printf %s "$_CODER_BINTAG" | wc -c)" -lt "${1:-14}" ]; do
+    _CODER_BINTAG=">${_CODER_BINTAG}<"
+  done
+  _CODER_BINTAG=$(printf %s "$_CODER_BINTAG" | cut -c "1-${1:-14}")
+}
 
 # Print a log line. The first argument is a (preferred) 3 letters human-readable
 # log-level. All other arguments are passed blindly to printf, a builtin
@@ -54,9 +62,10 @@ _logline() {
   # Capture level and shift it away, rest will be passed blindly to printf
   _lvl=${1:-LOG}; shift
   bin_name
+  [ -z "${_CODER_BINTAG:-}" ] && _logtag
   # shellcheck disable=SC2059 # We want to expand the format string
-  printf '>>>>>%s<<<<< [%s] [%s] %s\n' \
-    "$CODER_BIN" \
+  printf '%s [%s] [%s] %s\n' \
+    "$_CODER_BINTAG" \
     "$_lvl" \
     "$(date +'%Y%m%d-%H%M%S')" \
     "$(printf "$@")"
@@ -141,13 +150,7 @@ daemonize() {
   _namespace=${1:-$(to_upper "$CODER_BIN")}
   shift
 
-  while IFS= read -r varname; do
-    debug "Exporting $varname to prepare for daemonization"
-    # shellcheck disable=SC2163 # We want to export the name of the variable
-    export "$varname"
-  done <<EOF
-$(set | grep -E "^(${_namespace}_)" | sed -E 's/^([A-Z_]+)=.*/\1/g')
-EOF
+  export_varset "$_namespace"
 
   # Restart ourselves in the background, with same arguments.
   (
@@ -158,30 +161,30 @@ EOF
   exit 0
 }
 
+
 # Find the executable passed as an argument in the PATH variable and print it if
 # it is not the second argument, typically $0. This will not work if there is a
 # directory containing a line break in the PATH (but... why?!)
 find_exec() {
-  while IFS= read -r dir; do
-    if [ -n "${dir}" ] && [ -d "${dir}" ] && [ -x "${dir%/}/$1" ]; then
-      if [ -z "${2:-}" ]; then
-        printf %s\\n "${dir%/}/$1"
-        break
-      elif [ "${dir%/}/$1" != "$2" ]; then
-        printf %s\\n "${dir%/}/$1"
-        break
-      fi
+  [ -z "$1" ] && error "find_exec: no command given"
+  if command -v "$1" >/dev/null; then
+    if [ -z "${2:-}" ]; then
+      # shellcheck disable=SC2046 # We want to expand the command
+      command -v "$1"
+    elif [ "$(command -v "$1")" != "$2" ]; then
+      command -v "$1"
     fi
-  done <<EOF
-$(printf %s\\n "$PATH"|tr ':' '\n')
-EOF
+  fi
 }
+
 
 # Verify that file at $1 has sha512 checksum $2. When $3 is present, it is used
 # to provide a description of the file. When $4 is present, it is the mode to
 # use for the file (otherwise text mode is used, which should work in most
 # cases). When no checksum is provided, a warning is issued.
+# TODO: use sha512 or sha256 depending on size?
 checksum() {
+  [ -z "$1" ] && error "checksum: no file given"
   if [ -n "${2:-}" ]; then
     if ! printf "%s %s%s\n" "$2" "${4:-" "}" "$1" | sha512sum -c - >/dev/null; then
       rm -f "$1"
@@ -197,6 +200,7 @@ checksum() {
 # Download the URL passed as first argument to the file passed as second.
 # Defaults to stdout if no file.
 download() {
+  [ -z "$1" ] && error "download: no url given"
   debug "Downloading $1"
   ${INSTALL_OPTIMIZE:-} curl -sSL "$1" --output "${2:-"-"}"
 }
@@ -205,6 +209,7 @@ download() {
 # Install a script from the internet. This is a convenience function that
 # generates a log line to make this more appearent.
 internet_install() {
+  [ -z "$1" ] && error "internet_install: no url given"
   _tmp=$(mktemp -t "${2:-"$(basename "$1")"}".XXXXXX)
   download "$1" "$_tmp"
   if [ -n "${3:-}" ]; then
@@ -218,14 +223,56 @@ internet_install() {
 
 
 assert_version() {
-  if printf %s\\n "$1" | grep -qE '^[0-9]+(\.[0-9]+){0,}$'; then
+  if printf %s\\n "${1:-}" | grep -qE '^[0-9]+(\.[0-9]+){0,}$'; then
     return 0
   else
-    error "Version $1 is not a valid version number"
+    error "Version ${1:-} is not a valid version number"
   fi
 }
 
 
 generate_random() {
-  LC_ALL=C tr -dc "${2:-'a-zA-Z0-9'}" < /dev/urandom | head -c "${1:-16}"
+  LC_ALL=C tr -dc "${2:-"a-zA-Z0-9"}" < /dev/urandom | head -c "${1:-16}"
+}
+
+
+find_inpath() {
+  [ -z "$1" ] && error "find_inpath: no bin given"
+  _prg=$1; shift
+  if command -v "$_prg" >/dev/null; then
+    command -v "$_prg"
+    return 0
+  else
+    while [ "$#" != 0 ]; do
+      trace "Checking ${1%/}/bin/${_prg}"
+      if [ -x "${1%/}/bin/${_prg}" ]; then
+        printf "%s\n" "${1%/}/bin/${_prg}"
+        return 0
+      fi
+      shift
+    done
+  fi
+  warn "Cannot find %s in PATH: %s or standard locations" "$_prg" "$PATH"
+}
+
+# Export all variables that start with a prefix so that they are available
+# to subprocesses
+export_varset() {
+  [ -z "$1" ] && error "export_varset: no var prefix given"
+  while IFS= read -r varname; do
+    # shellcheck disable=SC2163 # We want to export the name of the variable
+    export "$varname"
+  done <<EOF
+$(set | grep "^${1}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
+EOF
+}
+
+unset_varset() {
+  [ -z "$1" ] && error "export_varset: no var prefix given"
+  while IFS= read -r varname; do
+    # shellcheck disable=SC2163 # We want to unset the name of the variable
+    unset "$varname"
+  done <<EOF
+$(set | grep "^${1}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
+EOF
 }

@@ -81,6 +81,7 @@ install_ondemand() {
 
 
 make_owned_dir() {
+  [ -z "$1" ] && error "make_owned_dir: no dir given"
   if ! [ -d "$1" ]; then
     mkdir -p "$1"
   fi
@@ -130,6 +131,9 @@ create_user() {
         --shell "$SHELL" \
         --ingroup "$NEW_GROUP" \
         "$NEW_USER"
+      # Unlock account and set an invalid password hash. See:
+      # https://unix.stackexchange.com/a/750967
+      printf '%s:*\n' "$NEW_USER" | chpasswd -e
     fi
   fi
 }
@@ -170,7 +174,17 @@ is_musl_os() {
 
 
 get_arch() {
-  case "$(uname -m)" in
+  arch=$(uname -m)
+  while [ "$#" -gt 0 ]; do
+    if [ "$1" = "$arch" ]; then
+      printf %s\\n "$2"
+      return 0
+    else
+      shift 2
+    fi
+  done
+
+  case "$arch" in
     x86_64) arch="x64" ;;
     i686) arch="x86" ;;
     i386) arch="x86" ;;

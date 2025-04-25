@@ -115,6 +115,8 @@ install_ondemand<<EOF
 curl
 zip
 jq
+tini
+openssh
 bash
 less
 make
@@ -143,12 +145,7 @@ fi
 
 # Export all variables that start with INSTALL_ so that they are available
 # to the features that are installed.
-while IFS= read -r varset; do
-  export "$(printf %s\\n "$varset" | cut -d= -f1)"
-done <<EOF
-$(set | grep '^INSTALL_')
-EOF
-
+export_varset "INSTALL"
 
 # Find out where the features directory is.
 for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features"; do

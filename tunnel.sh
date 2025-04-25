@@ -51,15 +51,23 @@ done
 # Alias for the home user
 : "${TUNNEL_ALIAS:=}"
 
+# Port of the SSH daemon to tunnel via cloudflare
+: "${TUNNEL_SSH:="2222"}"
+
+# Github user to fetch keys from
+: "${TUNNEL_GITHUB_USER:=""}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
-while getopts "a:fk:l:n:p:vh" opt; do
+while getopts "a:fg:k:l:n:p:s:vh" opt; do
   case "$opt" in
     a) # Alias for the home user
       TUNNEL_ALIAS="$OPTARG";;
     f) # Force device authorization again
       TUNNEL_FORCE="1";;
+    g) # GitHub user to fetch keys from and restrict ssh access to
+      TUNNEL_GITHUB_USER="$OPTARG";;
     k) # Internet hook to run before starting the tunnel
       TUNNEL_HOOK="$OPTARG";;
     l) # Where to send logs
@@ -68,6 +76,8 @@ while getopts "a:fk:l:n:p:vh" opt; do
       TUNNEL_NAME="$OPTARG";;
     p) # Tunnel provider
       TUNNEL_PROVIDER="$OPTARG";;
+    s) # Port of the SSH daemon, to tunnel via cloudflare
+      TUNNEL_SSH="$OPTARG";;
     v) # Increase verbosity, repeat to increase
       TUNNEL_VERBOSE=$((TUNNEL_VERBOSE + 1));;
     h) # Show help
@@ -85,38 +95,10 @@ log_init TUNNEL
 VSCODE_CLI_DATA_DIR=$TUNNEL_STORAGE
 export VSCODE_CLI_DATA_DIR
 
-find_code() {
-  code=$(command -v "code" 2>/dev/null || true)
-  if [ -n "$code" ]; then
-    printf "%s\n" "$code"
-    return 0
-  else
-    for d in "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX"; do
-      trace "Checking %s/bin/code" "$d"
-      if [ -x "${d}/bin/code" ]; then
-        printf "%s\n" "${d}/bin/code"
-        return 0
-      fi
-    done
-  fi
-  error "Cannot find code cli in PATH: %s or standard locations" "$PATH"
-}
-
-
-is_logged_in() {
-  if [ -f "${TUNNEL_STORAGE%/}/token.json" ]; then
-    token=$(cat "${TUNNEL_STORAGE%/}/token.json")
-    if [ "$token" != "null" ]; then
-      return 0
-    fi
-  fi
-  return 1
-}
-
 # Arrange for a link to exists, pointing to the real home of the user. Make this
 # the new home as much as possible.
-if [ -n "$TUNNEL_ALIAS" ]; then
-  AHOME=$(dirname "$HOME")/$TUNNEL_ALIAS
+alias_create() {
+  AHOME=$(dirname "$HOME")/$1
   if ! [ -d "$AHOME" ]; then
     as_root ln -sf "$HOME" "$AHOME"
     as_root sed -ibak -E -e "s|${HOME}|${AHOME}|g" "/etc/passwd"
@@ -124,14 +106,18 @@ if [ -n "$TUNNEL_ALIAS" ]; then
     HOME=$AHOME
     export HOME
   fi
-fi
+}
 
-# Check if the tunnel provider is set and valid.
-if [ -z "$TUNNEL_PROVIDER" ]; then
-  error "No tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
-fi
-if [ "$TUNNEL_PROVIDER" != "github" ] && [ "$TUNNEL_PROVIDER" != "azure" ]; then
-  error "Invalid tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
+
+# Create the alias for the home user
+[ -n "$TUNNEL_ALIAS" ] && alias_create "$TUNNEL_ALIAS"
+
+# shellcheck disable=SC2034 # Used in tunnel implementations
+TUNNEL_ORIGINAL_NAME=$TUNNEL_NAME
+
+TUNNEL_BINS_DIR=${TUNNEL_ROOTDIR%/}/../share/tunnel
+if ! [ -d "$TUNNEL_BINS_DIR" ]; then
+  error "No tunnel binaries found in %s" "$TUNNEL_BINS_DIR"
 fi
 
 # Pick a name, from hostname or at random
@@ -144,31 +130,37 @@ if [ -z "$TUNNEL_NAME" ]; then
   fi
 elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
-else
-  # If the hostname is generated, override it with the tunnel name if possible.
-  # This will only work if the container was run with --privileged.
-  if hostname | grep -qE '[a-f0-9]{12}'; then
-    as_root hostname "$TUNNEL_NAME" || warn "Using a generated hostname: %s. Force hostname of container to avoid having to re-authorize the device!" "$(hostname)"
-  fi
 fi
 
+# Start services
+export_varset "TUNNEL"
+if [ -x "${TUNNEL_BINS_DIR}/services.sh" ]; then
+  info "Starting services"
+  SERVICES_LOG=$TUNNEL_LOG \
+  SERVICES_VERBOSE=$TUNNEL_VERBOSE \
+  SERVICES_PREFIX=$TUNNEL_PREFIX \
+    "${TUNNEL_BINS_DIR}/services.sh"
+fi
+
+# Start the Internet hook to perform extra setup
 if [ -n "$TUNNEL_HOOK" ]; then
-  verbose "Running hook: %s" "$TUNNEL_HOOK"
+  info "Running hook: %s" "$TUNNEL_HOOK"
   internet_install "$TUNNEL_HOOK" hook ""
 fi
 
-# Authorize device. This will print out a URL to the console. Open it in a
-# browser and authorize the device.
-CODEBIN=$(find_code)
-if is_true "$TUNNEL_FORCE"; then
-  "$CODEBIN" tunnel user login --provider "$TUNNEL_PROVIDER"
-elif ! is_logged_in; then
-  "$CODEBIN" tunnel user login --provider "$TUNNEL_PROVIDER"
-fi
+# Start tunnels in the background
+for tunnel in codecli cloudflare; do
+  if [ -x "${TUNNEL_BINS_DIR}/${tunnel}.sh" ]; then
+    # TODO: Log the output of the tunnel helpers to files?
+    info "Starting %s tunnel" "$tunnel"
+    # shellcheck disable=SC1090
+    "${TUNNEL_BINS_DIR}/${tunnel}.sh" &
+  fi
+done
 
-# Start the tunnel
-if [ -z "$TUNNEL_NAME" ]; then
-  "$CODEBIN" tunnel --accept-server-license-terms --random-name
-else
-  "$CODEBIN" tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
-fi
+# TODO: Rotate the logs from tunnels and services at regular intervals
+# TODO: Make re-expose of logs a configurable option?
+
+while true; do
+  sleep 1
+done

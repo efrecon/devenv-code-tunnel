@@ -49,7 +49,7 @@ jobs:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
       platforms: linux/amd64
       build-args: |
-        INSTALL_FEATURES=sudo codecli git
+        INSTALL_FEATURES=sudo codecli cloudflare git
       username: ${{ github.actor }}
     secrets:
       password: ${{ secrets.GITHUB_TOKEN }}
