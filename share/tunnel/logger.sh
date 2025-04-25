@@ -8,7 +8,7 @@ LOGGER_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")
 
 # Hurry up and find the libraries
 for lib in common system; do
-  for d in ../lib lib; do
+  for d in ../../lib ../lib lib; do
     if [ -d "${LOGGER_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
       . "${LOGGER_ROOTDIR}/$d/${lib}.sh"

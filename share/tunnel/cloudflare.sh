@@ -8,7 +8,7 @@ TUNNEL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")
 
 # Hurry up and find the libraries
 for lib in common system; do
-  for d in ../lib lib; do
+  for d in ../../lib ../lib lib; do
     if [ -d "${TUNNEL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
       . "${TUNNEL_ROOTDIR}/$d/${lib}.sh"
@@ -39,6 +39,7 @@ sshd_wait() {
   debug "Wait for sshd to start..."
   while ! nc -z localhost "$TUNNEL_SSH"; do
     sleep 1
+    trace "Waiting for sshd to start on port %s..." "$TUNNEL_SSH"
   done
   verbose "sshd responding on port %s, forwarding logs at %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
   "${TUNNEL_ROOTDIR}/logger.sh" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &

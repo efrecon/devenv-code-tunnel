@@ -115,6 +115,11 @@ alias_create() {
 # shellcheck disable=SC2034 # Used in tunnel implementations
 TUNNEL_ORIGINAL_NAME=$TUNNEL_NAME
 
+TUNNEL_BINS_DIR=${TUNNEL_ROOTDIR%/}/../share/tunnel
+if ! [ -d "$TUNNEL_BINS_DIR" ]; then
+  error "No tunnel binaries found in %s" "$TUNNEL_BINS_DIR"
+fi
+
 # Pick a name, from hostname or at random
 if [ -z "$TUNNEL_NAME" ]; then
   # If the hostname is not a random name, use it as the tunnel name.
@@ -129,12 +134,12 @@ fi
 
 # Start services
 export_varset "TUNNEL"
-if [ -x "${TUNNEL_ROOTDIR}/services.sh" ]; then
+if [ -x "${TUNNEL_BINS_DIR}/services.sh" ]; then
   info "Starting services"
   SERVICES_LOG=$TUNNEL_LOG \
   SERVICES_VERBOSE=$TUNNEL_VERBOSE \
   SERVICES_PREFIX=$TUNNEL_PREFIX \
-    "${TUNNEL_ROOTDIR}/services.sh"
+    "${TUNNEL_BINS_DIR}/services.sh"
 fi
 
 # Start the Internet hook to perform extra setup
@@ -145,13 +150,17 @@ fi
 
 # Start tunnels in the background
 for tunnel in codecli cloudflare; do
-  if [ -x "${TUNNEL_ROOTDIR}/${tunnel}.sh" ]; then
-    info "Starting %s" "$tunnel"
+  if [ -x "${TUNNEL_BINS_DIR}/${tunnel}.sh" ]; then
+    # TODO: Log the output of the tunnel helpers to files?
+    info "Starting %s tunnel" "$tunnel"
     # shellcheck disable=SC1090
-    "${TUNNEL_ROOTDIR}/${tunnel}.sh" &
+    "${TUNNEL_BINS_DIR}/${tunnel}.sh" &
   fi
 done
 
-# TODO: Rotate the logs from tunnels and serives at regular intervals
-# TODO: Collect logs from the tunnels and services and reexpose them
-sleep 3600
+# TODO: Rotate the logs from tunnels and services at regular intervals
+# TODO: Make re-expose of logs a configurable option?
+
+while true; do
+  sleep 1
+done
