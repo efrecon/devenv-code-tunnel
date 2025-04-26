@@ -145,7 +145,7 @@ fi
 # Start the Internet hook to perform extra setup
 if [ -n "$TUNNEL_HOOK" ]; then
   info "Running hook: %s" "$TUNNEL_HOOK"
-  internet_install "$TUNNEL_HOOK" hook ""
+  internet_installer "$TUNNEL_HOOK" hook ""
 fi
 
 # Start tunnels in the background

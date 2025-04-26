@@ -182,11 +182,17 @@ find_exec() {
 # to provide a description of the file. When $4 is present, it is the mode to
 # use for the file (otherwise text mode is used, which should work in most
 # cases). When no checksum is provided, a warning is issued.
-# TODO: use sha512 or sha256 depending on size?
 checksum() {
   [ -z "$1" ] && error "checksum: no file given"
   if [ -n "${2:-}" ]; then
-    if ! printf "%s %s%s\n" "$2" "${4:-" "}" "$1" | sha512sum -c - >/dev/null; then
+    if [ "$(printf %s "$2" | wc -c)" = "128" ]; then
+      _sum=sha512
+    elif [ "$(printf %s "$2" | wc -c)" = "64" ]; then
+      _sum=sha256
+    else
+      error "checksum: invalid checksum length"
+    fi
+    if ! printf "%s %s%s\n" "$2" "${4:-" "}" "$1" | "${_sum}sum" -c - >/dev/null; then
       rm -f "$1"
       error "Checksum mismatch for ${3:-$1}"
     else
@@ -208,8 +214,8 @@ download() {
 
 # Install a script from the internet. This is a convenience function that
 # generates a log line to make this more appearent.
-internet_install() {
-  [ -z "$1" ] && error "internet_install: no url given"
+internet_installer() {
+  [ -z "$1" ] && error "internet_installer: no url given"
   _tmp=$(mktemp -t "${2:-"$(basename "$1")"}".XXXXXX)
   download "$1" "$_tmp"
   if [ -n "${3:-}" ]; then
