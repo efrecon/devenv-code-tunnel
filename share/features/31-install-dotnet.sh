@@ -47,7 +47,7 @@ if ! check_command "dotnet" && [ -n "$INSTALL_DOTNET_CHANNEL" ]; then
 
   INSTALL_DIR="${INSTALL_PREFIX}/share/dotnet"
   as_root mkdir -p "${INSTALL_DIR}"
-  as_root internet_installer "$INSTALL_DOTNET_URL" dotnet "$INSTALL_DOTNET_SHA512" \
+  as_root internet_script_installer "$INSTALL_DOTNET_URL" dotnet "$INSTALL_DOTNET_SHA512" \
             --channel "$INSTALL_DOTNET_CHANNEL" \
             --quality "$INSTALL_DOTNET_QUALITY" \
             --install-dir "$INSTALL_DIR" \

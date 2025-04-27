@@ -37,17 +37,22 @@ log_init INSTALL
 
 verbose "Installing cloudflared v%s" "$INSTALL_CLOUDFLARED_VERSION"
 
+# When started, our cloudflared wrapper will wait for a responding sshd. We will
+# use nc.
 install_ondemand<<EOF
 nc netcat-openbsd
 EOF
 
-if [ "$INSTALL_TARGET" = "user" ]; then
-  download "$INSTALL_CLOUDFLARED_URL" > "${INSTALL_USER_PREFIX}/bin/cloudflared"
-  chmod +x "${INSTALL_USER_PREFIX}/bin/cloudflared"
-  verbose "Installed cloudflared %s" "$("${INSTALL_USER_PREFIX}/bin/cloudflared" --version)"
-else
-  download "$INSTALL_CLOUDFLARED_URL" | as_root tee "${INSTALL_PREFIX}/bin/cloudflared" > /dev/null
-  as_root chmod +x "${INSTALL_PREFIX}/bin/cloudflared"
-  verbose "Installed cloudflared v%s" "$("${INSTALL_PREFIX}/bin/cloudflared" --version)"
-fi
+# Install the code CLI in the proper directory location, i.e. as per
+# INSTALL_TARGET preference.
+[ "$INSTALL_TARGET" = "user" ] \
+  && BINDIR="${INSTALL_USER_PREFIX}/bin" \
+  || BINDIR="${INSTALL_PREFIX}/bin"
+cloudflared=$(internet_bin_installer \
+                "$INSTALL_CLOUDFLARED_URL" \
+                "$BINDIR" \
+                "cloudflared")
+
+# Verify installation through printing the version.
+verbose "Installed cloudflared %s" "$("$cloudflared" --version)"
 
