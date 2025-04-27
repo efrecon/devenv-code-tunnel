@@ -7,7 +7,7 @@ set -eu
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in common install system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -42,7 +42,7 @@ verbose "Installing code CLI"
 [ "$INSTALL_TARGET" = "user" ] \
   && BINDIR="${INSTALL_USER_PREFIX}/bin" \
   || BINDIR="${INSTALL_PREFIX}/bin"
-code=$(internet_tgz_installer \
+code=$(internet_bintgz_installer \
           "$INSTALL_CODE_URL" \
           "$BINDIR" \
           "code" \

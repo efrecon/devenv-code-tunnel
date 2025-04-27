@@ -7,7 +7,7 @@ set -eu
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in common install system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -277,8 +277,15 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     fi
   else
     verbose "Downloading Node.js from: $INSTALL_TGZURL"
-    # TODO: Verify sha256 sums through file SHASUMS256.txt from same URL.
-    download "$INSTALL_TGZURL" | as_root tar -C "$INSTALL_PREFIX" -xzf - --strip-components 1 --exclude='*.md' --exclude='LICENSE'
+    internet_tgz_installer \
+      "$INSTALL_TGZURL" \
+      "$INSTALL_PREFIX" \
+      "node" \
+      "${INSTALL_ROOTURL}/${latest}/SHASUMS256.txt" \
+      --strip-components 1 --exclude='*.md' --exclude='LICENSE'
+    install_packages \
+      libstdc++ \
+      libgcc
   fi
   verbose "Installed Node.js: $(node --version)"
 
@@ -293,6 +300,7 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     "$USR" "$INSTALL_USER_PREFIX" "${HM}/.npmrc"
 
   # Create system settings
+  mkdir -p "${INSTALL_PREFIX}/etc"
   touch "${INSTALL_PREFIX}/etc/npmrc"
   as_root npm config -g set prefix "$INSTALL_PREFIX"
   verbose "System-wide npm installation under %s, as per %s" \

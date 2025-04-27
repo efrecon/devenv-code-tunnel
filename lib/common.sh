@@ -178,116 +178,12 @@ find_exec() {
 }
 
 
-# Verify that file at $1 has sha512/sha256 checksum $2. When $3 is present, it
-# is used to provide a description of the file. When $4 is present, it is the
-# mode to use for the file (otherwise text mode is used, which should work in
-# most cases). When no checksum is provided, a warning is issued.
-checksum() {
-  [ -z "$1" ] && error "checksum: no file given"
-  if [ -n "${2:-}" ]; then
-    if [ "$(printf %s "$2" | wc -c)" = "128" ]; then
-      _sum=sha512
-    elif [ "$(printf %s "$2" | wc -c)" = "64" ]; then
-      _sum=sha256
-    else
-      error "checksum: invalid checksum length"
-    fi
-    if ! printf "%s %s%s\n" "$2" "${4:-" "}" "$1" | "${_sum}sum" -c - >/dev/null; then
-      rm -f "$1"
-      error "Checksum mismatch for ${3:-$1}"
-    else
-      trace "Checksum verified for ${3:-$1}"
-    fi
-  else
-    warn "No checksum provided for ${3:-$1}. Skipping verification."
-  fi
-}
-
 # Download the URL passed as first argument to the file passed as second.
 # Defaults to stdout if no file.
 download() {
   [ -z "$1" ] && error "download: no url given"
   debug "Downloading $1"
   ${INSTALL_OPTIMIZE:-} curl -sSL "$1" --output "${2:-"-"}"
-}
-
-
-# Install a script from the internet. This is a convenience function that
-# generates a log line to make this more appearent.
-internet_script_installer() {
-  [ -z "$1" ] && error "internet_script_installer: no url given"
-  _tmp=$(mktemp -t "${2:-"$(basename "$1")"}".XXXXXX)
-  download "$1" "$_tmp"
-  if [ -n "${3:-}" ]; then
-    checksum "$_tmp" "$3" "$2"
-  fi
-  verbose "Running downloaded script $_tmp"
-  shift 3
-  ${INSTALL_OPTIMIZE:-} bash -- "$_tmp" "$@"
-  rm -f "$_tmp"
-}
-
-# $1 is the URL to download from.
-# $2 is the target directory. Ownership will be respected.
-# $3 is the name of the target file. Empty->basename of the URL.
-# $4 is the checksum to verify. Empty->no verification.
-# TODO: Add support for checksum verification from URL
-internet_bin_installer() {
-  [ -z "$1" ] && error "internet_bin_installer: no url given"
-  _tgt=${3:-"$(basename "$1")"}
-  _tmp=$(mktemp -t "$_tgt".XXXXXX)
-  download "$1" "$_tmp"
-  if [ -n "${4:-}" ]; then
-    checksum "$_tmp" "$4" "$_tgt"
-  fi
-  if [ "$(stat -c %u "${2:-"/usr/local/bin"}")" = "0" ]; then
-    verbose "Installing %s to %s, as root" \
-      "$1" "${2:-"/usr/local/bin"}/$_tgt"
-    as_root cp -f "$_tmp" "${2:-"/usr/local/bin"}/$_tgt"
-  else
-    verbose "Installing %s to %s" \
-      "$1" "${2:-"/usr/local/bin"}/$_tgt"
-    cp -f "$_tmp" "${2:-"/usr/local/bin"}/$_tgt"
-  fi
-  rm -f "$_tmp"
-  chmod a+x "${2:-"/usr/local/bin"}/$_tgt"
-  printf "%s\n" "${2:-"/usr/local/bin"}/$_tgt"
-}
-
-
-# $1 is the URL to download from.
-# $2 is the target directory. Ownership will be respected.
-# $3 is the name of the target file. Empty->basename of the URL. xx* will be searched for inside tgz
-# $4 is the checksum to verify. Empty->no verification.
-# $5 is the pattern to search for inside the tgz. Empty->same as $3.
-# TODO: Add support for checksum verification from URL
-internet_tgz_installer() {
-  [ -z "$1" ] && error "internet_tgz_installer: no url given"
-  _tgt=${3:-"$(basename "$1")"}
-  _tmp_tgz=$(mktemp -t "$_tgt".XXXXXX)
-  download "$1" "$_tmp_tgz"
-  if [ -n "${4:-}" ]; then
-    checksum "$_tmp_tgz" "$4" "$_tgt"
-  fi
-
-  _tmp_d=$(mktemp -d -t "$_tgt".XXXXXX)
-  tar -C "$_tmp_d" -zxf "$_tmp_tgz"
-
-  if [ "$(stat -c %u "${2:-"/usr/local/bin"}")" = "0" ]; then
-    verbose "Installing from %s to %s, as root" \
-      "$1" "${2:-"/usr/local/bin"}/$_tgt"
-    as_root find "$_tmp_d" -name "${5:-$_tgt}" -type f -exec mv -f \{\} "${2:-"/usr/local/bin"}/$_tgt" \;
-  else
-    verbose "Installing from %s to %s" \
-      "$1" "${2:-"/usr/local/bin"}/$_tgt"
-    find "$_tmp_d" -name "${5:-$_tgt}" -type f -exec mv -f \{\} "${2:-"/usr/local/bin"}/$_tgt" \;
-  fi
-
-  rm -rf "$_tmp_d"
-  rm -f "$_tmp_tgz"
-  chmod a+x "${2:-"/usr/local/bin"}/$_tgt"
-
-  printf "%s\n" "${2:-"/usr/local/bin"}/$_tgt"
 }
 
 
@@ -323,6 +219,7 @@ find_inpath() {
   fi
   warn "Cannot find %s in PATH: %s or standard locations" "$_prg" "$PATH"
 }
+
 
 # Export all variables that start with a prefix so that they are available
 # to subprocesses

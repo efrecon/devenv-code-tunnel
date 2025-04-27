@@ -7,7 +7,7 @@ set -eu
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in common install system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -32,6 +32,7 @@ done
 
 : "${INSTALL_GIT_GITHUB_VERSION:="2.71.2"}"
 : "${INSTALL_GIT_GITHUB_URL:="https://github.com/cli/cli/releases/download/v${INSTALL_GIT_GITHUB_VERSION}/gh_${INSTALL_GIT_GITHUB_VERSION}_$(get_os)_$(get_arch x86_64 amd64 i686 386).tar.gz"}"
+: "${INSTALL_GIT_GITHUB_SUMS:="https://github.com/cli/cli/releases/download/v${INSTALL_GIT_GITHUB_VERSION}/gh_${INSTALL_GIT_GITHUB_VERSION}_checksums.txt"}"
 
 log_init INSTALL
 
@@ -52,10 +53,11 @@ PREFIX="$INSTALL_PREFIX" as_root internet_script_installer "$INSTALL_GIT_EXTRAS_
 [ "$INSTALL_TARGET" = "user" ] \
   && BINDIR="${INSTALL_USER_PREFIX}/bin" \
   || BINDIR="${INSTALL_PREFIX}/bin"
-gh=$(internet_tgz_installer \
+gh=$(internet_bintgz_installer \
           "$INSTALL_GIT_GITHUB_URL" \
           "$BINDIR" \
-          "gh")
+          "gh" \
+          "$INSTALL_GIT_GITHUB_SUMS")
 
 # Verify installation through printing the version.
 verbose "Installed github CLI %s" "$("$gh" --version)"

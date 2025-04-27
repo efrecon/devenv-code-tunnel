@@ -7,7 +7,7 @@ set -eu
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in common install system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -31,6 +31,8 @@ done
 
 # URL to download the code CLI from.
 : "${INSTALL_CLOUDFLARED_URL:="https://github.com/cloudflare/cloudflared/releases/download/${INSTALL_CLOUDFLARED_VERSION}/cloudflared-$(get_os)-$(get_arch x86_64 amd64 i686 386)"}"
+: "${INSTALL_CLOUDFLARED_SUMS:="https://github.com/cloudflare/cloudflared/releases/tag/${INSTALL_CLOUDFLARED_VERSION}"}"
+
 
 log_init INSTALL
 
@@ -51,7 +53,8 @@ EOF
 cloudflared=$(internet_bin_installer \
                 "$INSTALL_CLOUDFLARED_URL" \
                 "$BINDIR" \
-                "cloudflared")
+                "cloudflared" \
+                "$INSTALL_CLOUDFLARED_SUMS")
 
 # Verify installation through printing the version.
 verbose "Installed cloudflared %s" "$("$cloudflared" --version)"
