@@ -219,6 +219,11 @@ install_from_image() {
   # Copy the content of the usr/local directory into our target prefix
   as_root cp -r "$layerdir"/usr/local/* "$INSTALL_PREFIX"
 
+  # Install dependencies
+  install_packages \
+    libstdc++ \
+    libgcc
+
   # Clean up
   rm -rf "$layerdir"
   verbose "Installed Node.js %s from image %s" "$1" "$tag"
@@ -276,6 +281,10 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
       error "Don't know how to install Node.js %s" "$latest"
     fi
   else
+    # Install dependencies
+    install_packages \
+      libstdc++ \
+      libgcc
     verbose "Downloading Node.js from: $INSTALL_TGZURL"
     internet_tgz_installer \
       "$INSTALL_TGZURL" \
@@ -283,9 +292,6 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
       "node" \
       "${INSTALL_ROOTURL}/${latest}/SHASUMS256.txt" \
       --strip-components 1 --exclude='*.md' --exclude='LICENSE'
-    install_packages \
-      libstdc++ \
-      libgcc
   fi
   verbose "Installed Node.js: $(node --version)"
 
