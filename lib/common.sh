@@ -178,47 +178,12 @@ find_exec() {
 }
 
 
-# Verify that file at $1 has sha512 checksum $2. When $3 is present, it is used
-# to provide a description of the file. When $4 is present, it is the mode to
-# use for the file (otherwise text mode is used, which should work in most
-# cases). When no checksum is provided, a warning is issued.
-# TODO: use sha512 or sha256 depending on size?
-checksum() {
-  [ -z "$1" ] && error "checksum: no file given"
-  if [ -n "${2:-}" ]; then
-    if ! printf "%s %s%s\n" "$2" "${4:-" "}" "$1" | sha512sum -c - >/dev/null; then
-      rm -f "$1"
-      error "Checksum mismatch for ${3:-$1}"
-    else
-      debug "Checksum verified for ${3:-$1}"
-    fi
-  else
-    warn "No checksum provided for ${3:-$1}. Skipping verification."
-  fi
-}
-
 # Download the URL passed as first argument to the file passed as second.
 # Defaults to stdout if no file.
 download() {
   [ -z "$1" ] && error "download: no url given"
   debug "Downloading $1"
   ${INSTALL_OPTIMIZE:-} curl -sSL "$1" --output "${2:-"-"}"
-}
-
-
-# Install a script from the internet. This is a convenience function that
-# generates a log line to make this more appearent.
-internet_install() {
-  [ -z "$1" ] && error "internet_install: no url given"
-  _tmp=$(mktemp -t "${2:-"$(basename "$1")"}".XXXXXX)
-  download "$1" "$_tmp"
-  if [ -n "${3:-}" ]; then
-    checksum "$_tmp" "$3" "$2"
-  fi
-  verbose "Running downloaded script $_tmp"
-  shift 3
-  ${INSTALL_OPTIMIZE:-} bash -- "$_tmp" "$@"
-  rm -f "$_tmp"
 }
 
 
@@ -254,6 +219,7 @@ find_inpath() {
   fi
   warn "Cannot find %s in PATH: %s or standard locations" "$_prg" "$PATH"
 }
+
 
 # Export all variables that start with a prefix so that they are available
 # to subprocesses

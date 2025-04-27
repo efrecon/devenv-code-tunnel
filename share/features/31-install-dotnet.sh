@@ -7,7 +7,7 @@ set -eu
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in common install system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -47,7 +47,7 @@ if ! check_command "dotnet" && [ -n "$INSTALL_DOTNET_CHANNEL" ]; then
 
   INSTALL_DIR="${INSTALL_PREFIX}/share/dotnet"
   as_root mkdir -p "${INSTALL_DIR}"
-  as_root internet_install "$INSTALL_DOTNET_URL" dotnet "$INSTALL_DOTNET_SHA512" \
+  as_root internet_script_installer "$INSTALL_DOTNET_URL" dotnet "$INSTALL_DOTNET_SHA512" \
             --channel "$INSTALL_DOTNET_CHANNEL" \
             --quality "$INSTALL_DOTNET_QUALITY" \
             --install-dir "$INSTALL_DIR" \

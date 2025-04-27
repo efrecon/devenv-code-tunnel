@@ -7,7 +7,7 @@ set -eu
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in common install system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -31,23 +31,31 @@ done
 
 # URL to download the code CLI from.
 : "${INSTALL_CLOUDFLARED_URL:="https://github.com/cloudflare/cloudflared/releases/download/${INSTALL_CLOUDFLARED_VERSION}/cloudflared-$(get_os)-$(get_arch x86_64 amd64 i686 386)"}"
+: "${INSTALL_CLOUDFLARED_SUMS:="https://github.com/cloudflare/cloudflared/releases/tag/${INSTALL_CLOUDFLARED_VERSION}"}"
+
 
 log_init INSTALL
 
 
 verbose "Installing cloudflared v%s" "$INSTALL_CLOUDFLARED_VERSION"
 
+# When started, our cloudflared wrapper will wait for a responding sshd. We will
+# use nc.
 install_ondemand<<EOF
 nc netcat-openbsd
 EOF
 
-if [ "$INSTALL_TARGET" = "user" ]; then
-  download "$INSTALL_CLOUDFLARED_URL" > "${INSTALL_USER_PREFIX}/bin/cloudflared"
-  chmod +x "${INSTALL_USER_PREFIX}/bin/cloudflared"
-  verbose "Installed cloudflared %s" "$("${INSTALL_USER_PREFIX}/bin/cloudflared" --version)"
-else
-  download "$INSTALL_CLOUDFLARED_URL" | as_root tee "${INSTALL_PREFIX}/bin/cloudflared" > /dev/null
-  as_root chmod +x "${INSTALL_PREFIX}/bin/cloudflared"
-  verbose "Installed cloudflared v%s" "$("${INSTALL_PREFIX}/bin/cloudflared" --version)"
-fi
+# Install the code CLI in the proper directory location, i.e. as per
+# INSTALL_TARGET preference.
+[ "$INSTALL_TARGET" = "user" ] \
+  && BINDIR="${INSTALL_USER_PREFIX}/bin" \
+  || BINDIR="${INSTALL_PREFIX}/bin"
+cloudflared=$(internet_bin_installer \
+                "$INSTALL_CLOUDFLARED_URL" \
+                "$BINDIR" \
+                "cloudflared" \
+                "$INSTALL_CLOUDFLARED_SUMS")
+
+# Verify installation through printing the version.
+verbose "Installed cloudflared %s" "$("$cloudflared" --version)"
 
