@@ -242,3 +242,22 @@ unset_varset() {
 $(set | grep "^${1}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
 EOF
 }
+
+
+init_list() {
+  [ -z "$1" ] && error "init_list: No directory given"
+
+  find "$1" -type f -executable -maxdepth 1 -name "${2:-"*.sh"}" |
+    sed -E -e 's|^.*/(.*\.sh)|\1|g' |
+    sort |
+    sed -E -e 's|^[0-9]+-(.*)\.sh|\1|g' |
+    tr '\n' ' '
+}
+
+
+init_get() {
+  [ -z "$1" ] && error "init_get: No directory given"
+  [ -z "$1" ] && error "init_get: No init script given"
+
+  find "$1" -type f -executable -maxdepth 1 -name "*-${2}.sh"
+}

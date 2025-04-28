@@ -81,18 +81,6 @@ done
 log_init INSTALL
 
 
-list_features() {
-  find "$1" -name '*install-*.sh' |
-    sort |
-    sed -e 's|.*/.*install-\(.*\)\.sh|\1|' |
-    tr '\n' ' '
-}
-
-
-get_feature() {
-  find "$1" -name "*install-$2.sh"
-}
-
 
 ######################################################################
 # Let's start the installation process. This is the main part of the script.
@@ -157,7 +145,7 @@ done
 
 # Look for all features to install
 if [ -z "$INSTALL_FEATURES" ]; then
-  INSTALL_FEATURES=$(list_features "$FEATURES_DIR")
+  INSTALL_FEATURES=$(init_list "$FEATURES_DIR" '??-install-*.sh'|sed -E 's/install-//g')
   verbose "Installing all features: %s" "$INSTALL_FEATURES"
 fi
 
@@ -172,13 +160,13 @@ done
 if [ "$INSTALL_FEATURES" != "-" ]; then
   verbose "Installing features: %s" "$INSTALL_FEATURES"
   for feature in $INSTALL_FEATURES; do
-    script=$(get_feature "$FEATURES_DIR" "$feature")
+    script=$(init_get "$FEATURES_DIR" "install-$feature")
     if [ -z "$script" ]; then
       warn "Feature %s not found in %s" "$feature" "$FEATURES_DIR"
       continue
     fi
     if [ -x "$script" ]; then
-      verbose "Installing feature: $feature"
+      verbose "Installing feature %s using %s" "$feature" "$script"
       $INSTALL_OPTIMIZE "$script"
     fi
   done
