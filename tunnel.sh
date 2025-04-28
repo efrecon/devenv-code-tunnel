@@ -57,10 +57,13 @@ done
 # Github user to fetch keys from
 : "${TUNNEL_GITHUB_USER:=""}"
 
+# Services to start. When empty, all services will be started.
+: "${TUNNEL_SERVICES:=""}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
-while getopts "a:fg:k:l:n:p:s:vh" opt; do
+while getopts "a:fg:k:l:n:p:s:S:vh" opt; do
   case "$opt" in
     a) # Alias for the home user
       TUNNEL_ALIAS="$OPTARG";;
@@ -78,6 +81,8 @@ while getopts "a:fg:k:l:n:p:s:vh" opt; do
       TUNNEL_PROVIDER="$OPTARG";;
     s) # Port of the SSH daemon, to tunnel via cloudflare
       TUNNEL_SSH="$OPTARG";;
+    S) # Services to start
+      TUNNEL_SERVICES="$OPTARG";;
     v) # Increase verbosity, repeat to increase
       TUNNEL_VERBOSE=$((TUNNEL_VERBOSE + 1));;
     h) # Show help
@@ -135,11 +140,11 @@ fi
 # Start services
 export_varset "TUNNEL"
 if [ -x "${TUNNEL_BINS_DIR}/services.sh" ]; then
-  info "Starting services"
+  info "Starting services %s" "$TUNNEL_SERVICES"
   SERVICES_LOG=$TUNNEL_LOG \
   SERVICES_VERBOSE=$TUNNEL_VERBOSE \
   SERVICES_PREFIX=$TUNNEL_PREFIX \
-    "${TUNNEL_BINS_DIR}/services.sh"
+    "${TUNNEL_BINS_DIR}/services.sh" -s "$TUNNEL_SERVICES"
 fi
 
 # Start the Internet hook to perform extra setup

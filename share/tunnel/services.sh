@@ -30,10 +30,15 @@ done
 # Where to find the services
 : "${SERVICES_DIR:="${SERVICES_PREFIX}/etc/init.d"}"
 
+# List of services to start. When empty, all services will be started.
+: "${SERVICES_SERVICES:=""}"
+
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Start services"
-while getopts "l:n:vh" opt; do
+while getopts "s:l:vh" opt; do
   case "$opt" in
+    s) # List of services to start
+      SERVICES_SERVICES="$OPTARG";;
     l) # Where to send logs
       SERVICES_LOG="$OPTARG";;
     v) # Increase verbosity, repeat to increase
@@ -50,14 +55,19 @@ done
 # Initialize
 log_init SERVICES
 
+if [ -z "$SERVICES_SERVICES" ]; then
+  SERVICES_SERVICES=$(init_list "$SERVICES_DIR" '??-*.sh')
+  verbose "Running all services: %s" "$SERVICES_SERVICES"
+fi
 
-for svc in "${SERVICES_DIR%/}"/*.sh; do
-  if [ -f "$svc" ]; then
-    if ! [ -x "$svc" ]; then
-      debug "Making $svc executable"
-      chmod a+x "$svc"
-    fi
-    verbose "Starting $svc"
-    "$svc"
+for svc in $SERVICES_SERVICES; do
+  script=$(init_get "$SERVICES_DIR" "$svc")
+  if [ -z "$script" ]; then
+    warn "Service %s not found in %s" "$svc" "$SERVICES_DIR"
+    continue
+  fi
+  if [ -x "$script" ]; then
+    verbose "Starting %s using %s" "$svc" "$script"
+    "$script"
   fi
 done
