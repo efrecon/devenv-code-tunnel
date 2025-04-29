@@ -98,9 +98,26 @@ configure_sshd() {
     chmod go-rwx "${SSHD_CONFIG_DIR}/user/authorized_keys"
   fi
 
-  verbose "Generating ssh host keys"
-  as_root ssh-keygen -q -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key" -N '' -b 4096 -t rsa
-  as_root cp "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key.pub" "${SSHD_PREFIX}/etc/ssh_host_rsa_key.pub"
+  if as_root test -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key" \
+      && as_root test -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key.pub"; then
+    verbose "Found existing ssh host keys, skipping generation"
+  else
+    verbose "Generating ssh host keys"
+    for f in ssh_host_rsa_key ssh_host_rsa_key.pub; do
+      if [ -f "${SSHD_CONFIG_DIR}/server/$f" ]; then
+        verbose "Removing old host key %s" "${SSHD_CONFIG_DIR}/server/$f"
+        as_root rm -f "${SSHD_CONFIG_DIR}/server/$f"
+      fi
+    done
+    as_root ssh-keygen \
+              -q \
+              -C "sshd for $SSHD_USER" \
+              -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key" \
+              -N '' \
+              -b 4096 \
+              -t rsa
+  fi
+  as_root cp -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key.pub" "${SSHD_PREFIX}/etc/ssh_host_rsa_key.pub"
 
   verbose "Making ssh host public key at %s readable by %s" "${SSHD_PREFIX}/etc/ssh_host_rsa_key.pub" "$SSHD_USER"
   as_root chown "$SSHD_USER" "${SSHD_PREFIX}/etc/ssh_host_rsa_key.pub"

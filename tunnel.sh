@@ -7,7 +7,7 @@ set -eu
 TUNNEL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in common system install; do
   for d in ../lib lib; do
     if [ -d "${TUNNEL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
