@@ -81,18 +81,6 @@ done
 log_init INSTALL
 
 
-list_features() {
-  find "$1" -name '*install-*.sh' |
-    sort |
-    sed -e 's|.*/.*install-\(.*\)\.sh|\1|' |
-    tr '\n' ' '
-}
-
-
-get_feature() {
-  find "$1" -name "*install-$2.sh"
-}
-
 
 ######################################################################
 # Let's start the installation process. This is the main part of the script.
@@ -155,34 +143,15 @@ for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features";
   fi
 done
 
-# Look for all features to install
-if [ -z "$INSTALL_FEATURES" ]; then
-  INSTALL_FEATURES=$(list_features "$FEATURES_DIR")
-  verbose "Installing all features: %s" "$INSTALL_FEATURES"
-fi
+# Start features to install
+features=$(start_deps "feature" "$FEATURES_DIR" "$INSTALL_FEATURES" '??-install-*.sh')
 
 # shellcheck disable=SC2043  # On purpose to allow for more "mandatory" features
 for feature in codecli; do
-  if ! printf %s\\n "$INSTALL_FEATURES" | grep -qF "$feature"; then
+  if ! printf %s\\n "$features" | grep -qE "$feature"; then
     warn "Feature %s will not be installed. Are you sure?" "$feature"
   fi
 done
-
-# Install all required features, unless told not to.
-if [ "$INSTALL_FEATURES" != "-" ]; then
-  verbose "Installing features: %s" "$INSTALL_FEATURES"
-  for feature in $INSTALL_FEATURES; do
-    script=$(get_feature "$FEATURES_DIR" "$feature")
-    if [ -z "$script" ]; then
-      warn "Feature %s not found in %s" "$feature" "$FEATURES_DIR"
-      continue
-    fi
-    if [ -x "$script" ]; then
-      verbose "Installing feature: $feature"
-      $INSTALL_OPTIMIZE "$script"
-    fi
-  done
-fi
 
 
 # Clean repository cache

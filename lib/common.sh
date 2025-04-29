@@ -242,3 +242,65 @@ unset_varset() {
 $(set | grep "^${1}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
 EOF
 }
+
+
+init_list() {
+  [ -z "$1" ] && error "init_list: No directory given"
+
+  find "$1" -type f -executable -maxdepth 1 -name "${2:-"*.sh"}" |
+    sed -E -e 's|^.*/(.*\.sh)|\1|g' |
+    sort |
+    sed -E -e 's|^[0-9]+-||g' -e 's|\.sh$||g' |
+    tr '\n' ' '
+}
+
+
+init_get() {
+  [ -z "$1" ] && error "init_get: No directory given"
+  [ -z "$1" ] && error "init_get: No init script given"
+
+  find "$1" -type f -executable -maxdepth 1 -name "*${2}.sh"
+}
+
+
+# Start dependency scripts
+# $1 is the type of script, used in messages and for background/foreground
+# $2 is the directory to look for scripts
+# $3 is the list of scripts to start, when empty all scripts matching $4 will be started
+# $4 is the pattern to match scripts against, default is *.sh
+# $5 is a boolean wether to start the script in the background or not.
+# Remaining arguments are passed to the scripts, as is.
+start_deps() {
+  [ -z "${1:-}" ] && error "start_deps: No type given"
+  [ -z "${2:-}" ] && error "start_deps: No directory given"
+
+  _human_t=$1
+  _scripts_d=$2
+  [ -z "${3:-}" ] && _deps="$(init_list "$_scripts_d" "${4:-"*.sh"}")" || _deps="$3"
+  _bg_run=${5:-"0"}
+
+  shift 5 || shift "$#"
+  if [ "$_deps" = "-" ]; then
+    verbose "Starting of %s scripts disabled" "$_human_t"
+  else
+    verbose "Starting %s scripts in %s: %s" "$_human_t" "$_scripts_d" "$_deps"
+
+    for _s in $_deps; do
+      _script=$(init_get "$_scripts_d" "$_s")
+      if [ -z "$_script" ]; then
+        warn "%s %s not found in %s" "$_human_t" "$_s" "$_scripts_d"
+        continue
+      fi
+      if [ -x "$_script" ]; then
+        # TODO: Log the output to files?
+        verbose "Starting %s using %s" "$_s" "$_script"
+        if is_true "$_bg_run"; then
+          ${INSTALL_OPTIMIZE:-} "$_script" "$@" &
+        else
+          ${INSTALL_OPTIMIZE:-} "$_script" "$@"
+        fi
+        printf %s\\n "$_s"
+      fi
+    done
+  fi
+}
