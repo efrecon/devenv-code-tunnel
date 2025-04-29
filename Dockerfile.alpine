@@ -27,7 +27,8 @@ RUN chmod a+x ${INSTALL_PREFIX}/bin/*.sh && \
 # Copy the init scripts and other files.
 COPY *.sh ${INSTALL_PREFIX}/bin/
 COPY etc/init.d/*.sh ${INSTALL_PREFIX}/etc/init.d/
-COPY share/tunnel/*.sh ${INSTALL_PREFIX}/share/tunnel/
+COPY share/tunnels/*.sh ${INSTALL_PREFIX}/share/tunnels/
+COPY share/orchestration/*.sh ${INSTALL_PREFIX}/share/orchestration/
 
 # Overlay the rootfs with our own stuff.
 COPY rootfs/alpine/ /

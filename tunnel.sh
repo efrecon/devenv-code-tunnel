@@ -60,10 +60,13 @@ done
 # Services to start. When empty, all services will be started.
 : "${TUNNEL_SERVICES:=""}"
 
+# List of tunnels to establish. When empty, all tunnels will be started.
+: "${TUNNEL_TUNNELS:=""}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
-while getopts "a:fg:k:l:n:p:s:S:vh" opt; do
+while getopts "a:fg:k:l:n:p:s:S:T:vh" opt; do
   case "$opt" in
     a) # Alias for the home user
       TUNNEL_ALIAS="$OPTARG";;
@@ -83,6 +86,8 @@ while getopts "a:fg:k:l:n:p:s:S:vh" opt; do
       TUNNEL_SSH="$OPTARG";;
     S) # Services to start
       TUNNEL_SERVICES="$OPTARG";;
+    T) # Tunnels to start
+      TUNNEL_TUNNELS="$OPTARG";;
     v) # Increase verbosity, repeat to increase
       TUNNEL_VERBOSE=$((TUNNEL_VERBOSE + 1));;
     h) # Show help
@@ -114,16 +119,32 @@ alias_create() {
 }
 
 
+# Find a sub-directory in the hierarchy of the tunnel root directory.
+# $1 is the sub-directory to look for
+# $2 is the name of the directory to look for, used in error messages
+# Returns the full path to the directory if found, otherwise exit with error
+# message
+pick_dir() {
+  [ -z "${1:-}" ] && error "pick_dir: No sub-directory given"
+  for d in "${TUNNEL_ROOTDIR%/}/.." "$TUNNEL_ROOTDIR"; do
+    if [ -d "${d%/}/$1" ]; then
+      printf %s\\n "${d%/}/$1"
+      return 0
+    fi
+  done
+  error "No %s binaries found in hierarchy" "${2:-$(basename "$1")}"
+}
+
+
 # Create the alias for the home user
 [ -n "$TUNNEL_ALIAS" ] && alias_create "$TUNNEL_ALIAS"
 
 # shellcheck disable=SC2034 # Used in tunnel implementations
 TUNNEL_ORIGINAL_NAME=$TUNNEL_NAME
 
-TUNNEL_BINS_DIR=${TUNNEL_ROOTDIR%/}/../share/tunnel
-if ! [ -d "$TUNNEL_BINS_DIR" ]; then
-  error "No tunnel binaries found in %s" "$TUNNEL_BINS_DIR"
-fi
+# Make sure we can access scripts that we will make use of.
+TUNNEL_TUNNELS_DIR=$(pick_dir "share/tunnels")
+TUNNEL_SERVICES_DIR=$(pick_dir "etc/init.d")
 
 # Pick a name, from hostname or at random
 if [ -z "$TUNNEL_NAME" ]; then
@@ -137,15 +158,13 @@ elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
 fi
 
-# Start services
+# Export all variables that start with TUNNEL_ so that they are available to
+# subprocesses.
 export_varset "TUNNEL"
-if [ -x "${TUNNEL_BINS_DIR}/services.sh" ]; then
-  info "Starting services %s" "$TUNNEL_SERVICES"
-  SERVICES_LOG=$TUNNEL_LOG \
-  SERVICES_VERBOSE=$TUNNEL_VERBOSE \
-  SERVICES_PREFIX=$TUNNEL_PREFIX \
-    "${TUNNEL_BINS_DIR}/services.sh" -s "$TUNNEL_SERVICES"
-fi
+
+# Start services from the init.d directory. Services are started in order and in
+# the foreground. Some of these will respawn in the background.
+start_deps "service" "$TUNNEL_SERVICES_DIR" "$TUNNEL_SERVICES" '??-*.sh' >/dev/null
 
 # Start the Internet hook to perform extra setup
 if [ -n "$TUNNEL_HOOK" ]; then
@@ -154,14 +173,7 @@ if [ -n "$TUNNEL_HOOK" ]; then
 fi
 
 # Start tunnels in the background
-for tunnel in codecli cloudflare; do
-  if [ -x "${TUNNEL_BINS_DIR}/${tunnel}.sh" ]; then
-    # TODO: Log the output of the tunnel helpers to files?
-    info "Starting %s tunnel" "$tunnel"
-    # shellcheck disable=SC1090
-    "${TUNNEL_BINS_DIR}/${tunnel}.sh" &
-  fi
-done
+start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" >/dev/null
 
 # TODO: Rotate the logs from tunnels and services at regular intervals
 # TODO: Make re-expose of logs a configurable option?

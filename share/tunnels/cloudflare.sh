@@ -35,6 +35,7 @@ CODER_DESCR="cloudflare tunnel starter"
 # Initialize
 log_init TUNNEL
 
+
 sshd_wait() {
   debug "Wait for sshd to start..."
   while ! nc -z localhost "$TUNNEL_SSH"; do
@@ -42,8 +43,9 @@ sshd_wait() {
     trace "Waiting for sshd to start on port %s..." "$TUNNEL_SSH"
   done
   verbose "sshd responding on port %s, forwarding logs at %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
-  "${TUNNEL_ROOTDIR}/logger.sh" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
+  "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
 }
+
 
 tunnel_start() (
   # Remove all TUNNEL_ variables from the environment, since cloudflared
@@ -54,6 +56,7 @@ tunnel_start() (
   debug "Starting cloudflare tunnel using %s, logging at %s" "$1" "$CLOUDFLARE_LOG"
   "$1" tunnel --no-autoupdate --url "tcp://localhost:$ssh_port" >"$CLOUDFLARE_LOG" 2>&1 &
 )
+
 
 tunnel_wait() {
   debug "Wait for cloudflare tunnel to start..."
@@ -74,6 +77,7 @@ tunnel_wait() {
   _log "" ""
 }
 
+
 TUNNEL_HOSTNAME=$TUNNEL_NAME
 [ -z "$TUNNEL_HOSTNAME" ] && TUNNEL_HOSTNAME=$(hostname)
 
@@ -84,5 +88,5 @@ if [ -n "$TUNNEL_SSH" ] && [ -n "$CLOUDFLARE_BIN" ]; then
   sshd_wait
   tunnel_start "$CLOUDFLARE_BIN"
   tunnel_wait
-  exec "${TUNNEL_ROOTDIR}/logger.sh" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG"
+  exec "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG"
 fi

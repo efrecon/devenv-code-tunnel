@@ -104,6 +104,6 @@ fi
 CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
 if [ -n "$CODE_BIN" ]; then
   tunnel_configure
-  tunnel_login "$CODE_BIN" | "$TUNNEL_ROOTDIR/logger.sh" -s "$CODE_BIN"
-  tunnel_start "$CODE_BIN" | "$TUNNEL_ROOTDIR/logger.sh" -s "$CODE_BIN"
+  tunnel_login "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
+  tunnel_start "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
 fi
