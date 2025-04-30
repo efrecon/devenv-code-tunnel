@@ -293,13 +293,16 @@ start_deps() {
       fi
       if [ -x "$_script" ]; then
         # TODO: Log the output to files?
-        verbose "Starting %s using %s" "$_s" "$_script"
         if is_true "$_bg_run"; then
+          verbose "Spawning %s using %s" "$_s" "$_script"
           ${INSTALL_OPTIMIZE:-} "$_script" "$@" &
         else
+          verbose "Running %s using %s" "$_s" "$_script"
           ${INSTALL_OPTIMIZE:-} "$_script" "$@"
         fi
         printf %s\\n "$_s"
+      else
+        warn "%s %s is not executable" "$_human_t" "$_script"
       fi
     done
   fi
