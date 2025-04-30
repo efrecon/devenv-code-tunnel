@@ -173,7 +173,7 @@ if [ -n "$TUNNEL_HOOK" ]; then
 fi
 
 # Start tunnels in the background
-start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" >/dev/null
+start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
 
 # TODO: Rotate the logs from tunnels and services at regular intervals
 # TODO: Make re-expose of logs a configurable option?
