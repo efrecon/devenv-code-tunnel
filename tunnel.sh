@@ -63,10 +63,14 @@ done
 # List of tunnels to establish. When empty, all tunnels will be started.
 : "${TUNNEL_TUNNELS:=""}"
 
+# List of services which logs we should re-expose to the main container log.
+# When empty, all services will be re-exposed.
+: "${TUNNEL_REEXPOSE:="code"}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
-while getopts "a:fg:k:l:n:p:s:S:T:vh" opt; do
+while getopts "a:fg:k:l:L:n:p:s:S:T:vh" opt; do
   case "$opt" in
     a) # Alias for the home user
       TUNNEL_ALIAS="$OPTARG";;
@@ -78,6 +82,8 @@ while getopts "a:fg:k:l:n:p:s:S:T:vh" opt; do
       TUNNEL_HOOK="$OPTARG";;
     l) # Where to send logs
       TUNNEL_LOG="$OPTARG";;
+    L) # List of services to re-expose in log
+      TUNNEL_REEXPOSE="$OPTARG";;
     n) # Name of the tunnel, empty for random name
       TUNNEL_NAME="$OPTARG";;
     p) # Tunnel provider
@@ -176,7 +182,6 @@ fi
 start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
 
 # TODO: Rotate the logs from tunnels and services at regular intervals
-# TODO: Make re-expose of logs a configurable option?
 
 while true; do
   sleep 1

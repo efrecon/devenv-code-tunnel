@@ -42,8 +42,12 @@ sshd_wait() {
     sleep 1
     trace "Waiting for sshd to start on port %s..." "$TUNNEL_SSH"
   done
-  verbose "sshd responding on port %s, forwarding logs at %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
-  "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
+  if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'sshd'; then
+    verbose "sshd responding on port %s, forwarding logs from %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
+    "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
+  else
+    verbose "sshd responding on port %s" "$TUNNEL_SSH"
+  fi
 }
 
 
@@ -53,7 +57,7 @@ tunnel_start() (
   ssh_port="$TUNNEL_SSH"
   unset_varset TUNNEL
 
-  debug "Starting cloudflare tunnel using %s, logging at %s" "$1" "$CLOUDFLARE_LOG"
+  debug "Starting cloudflare tunnel using %s, logs at %s" "$1" "$CLOUDFLARE_LOG"
   "$1" tunnel --no-autoupdate --url "tcp://localhost:$ssh_port" >"$CLOUDFLARE_LOG" 2>&1 &
 )
 
@@ -88,5 +92,7 @@ if [ -n "$TUNNEL_SSH" ] && [ -n "$CLOUDFLARE_BIN" ]; then
   sshd_wait
   tunnel_start "$CLOUDFLARE_BIN"
   tunnel_wait
-  exec "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG"
+  if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'cloudflared'; then
+    exec "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG"
+  fi
 fi

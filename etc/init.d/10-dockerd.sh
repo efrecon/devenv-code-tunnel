@@ -5,8 +5,6 @@ set -eu
 
 # Absolute location of the script where this script is located.
 DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
-
-# Hurry up and find the libraries
 for lib in common system docker; do
   for d in ../../lib ../lib lib; do
     if [ -d "${DOCKERD_ROOTDIR}/$d" ]; then
@@ -20,20 +18,21 @@ done
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at DOCKERD_LOG.
-: "${DOCKERD_VERBOSE:=0}"
+: "${DOCKERD_VERBOSE:="${TUNNEL_VERBOSE:-"0"}"}"
 
 # Where to send logs
-: "${DOCKERD_LOG:=2}"
+: "${DOCKERD_LOG:="${TUNNEL_LOG:-"2"}"}"
+
+: "${DOCKERD_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
+
+# Where the docker daemon listens, defaults to the standard docker socket.
+: "${DOCKERD_SOCK:="/var/run/docker.sock"}"
 
 # Detach in the background
 : "${DOCKERD_DAEMONIZE:=0}"
 
 # Prevent detaching in the background (RESERVED for use by the daemon)
 : "${_DOCKERD_PREVENT_DAEMONIZATION:=0}"
-
-: "${DOCKERD_PREFIX:="/usr/local"}"
-
-
 
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
@@ -55,7 +54,20 @@ done
 
 log_init DOCKERD
 
-if as_root test -S /var/run/docker.sock; then
+dockerd_start() {
+  as_root dockerd 2>&1 | tee -a "$DOCKERD_LOGFILE" > /dev/null &
+}
+
+dockerd_wait() {
+  while true; do
+    if curl --head --unix-socket "$DOCKERD_SOCK" http://localhost/_ping 2>/dev/null | grep -q 'HTTP/1.1 200 OK'; then
+      break
+    fi
+    sleep 1
+  done
+}
+
+if as_root test -S "$DOCKERD_SOCK"; then
   # Docker is already running, so we don't need to start it again.
   verbose "Docker daemon already running."
   exit 0
@@ -79,4 +91,12 @@ if ! is_true "$_DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; 
   daemonize DOCKERD "$@"
 fi
 
-as_root dockerd 2>&1 | tee -a "${DOCKERD_PREFIX}/log/dockerd.log" > /dev/null &
+DOCKERD_LOGFILE="${DOCKERD_PREFIX}/log/dockerd.log"
+dockerd_start
+dockerd_wait
+if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'dockerd'; then
+  verbose "Docker daemon responding on socket %s, forwarding logs from %s" "$DOCKERD_SOCK" "$DOCKERD_LOGFILE"
+  "${DOCKERD_ROOTDIR}/../../share/orchestration/logger.sh" -s "dockerd" -- "$DOCKERD_LOGFILE" &
+else
+  verbose "Docker daemon responding on socket %s, logs at %s" "$DOCKERD_SOCK" "$DOCKERD_LOGFILE"
+fi
