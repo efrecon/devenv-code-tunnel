@@ -188,4 +188,4 @@ configure_sshd
 touch "$SSHD_LOGFILE"
 as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" &
 pid_sshd=$!
-verbose "sshd started with pid %s" "$pid_sshd"
+verbose "sshd started with pid %s. Logs at %s" "$pid_sshd" "$SSHD_LOGFILE"

@@ -30,6 +30,7 @@ done
 : "${TUNNEL_PREFIX:="/usr/local"}"
 : "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 : "${TUNNEL_ALIAS:=}"
+: "${TUNNEL_REEXPOSE:=""}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -104,6 +105,11 @@ fi
 CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
 if [ -n "$CODE_BIN" ]; then
   tunnel_configure
-  tunnel_login "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
-  tunnel_start "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
+  if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
+    tunnel_login "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
+    tunnel_start "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
+  else
+    tunnel_login "$CODE_BIN"
+    tunnel_start "$CODE_BIN"
+  fi
 fi
