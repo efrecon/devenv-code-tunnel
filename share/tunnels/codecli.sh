@@ -103,13 +103,14 @@ fi
 
 # configure, login and start the tunnel if the vscode CLI is installed.
 CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
+CODE_LOG="${TUNNEL_PREFIX}/log/code.log"
 if [ -n "$CODE_BIN" ]; then
   tunnel_configure
+  verbose "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
   if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
-    tunnel_login "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
-    tunnel_start "$CODE_BIN" | "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN"
-  else
-    tunnel_login "$CODE_BIN"
-    tunnel_start "$CODE_BIN"
+    verbose "Forwarding logs from %s" "$CODE_LOG"
+    "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN" -- "$CODE_LOG" &
   fi
+  tunnel_login "$CODE_BIN" >"$CODE_LOG" 2>&1
+  tunnel_start "$CODE_BIN" >"$CODE_LOG" 2>&1
 fi
