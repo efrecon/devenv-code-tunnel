@@ -27,6 +27,8 @@ done
 : "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 : "${TUNNEL_SSH:="2222"}"
 : "${TUNNEL_GITHUB_USER:=""}"
+: "${TUNNEL_REEXPOSE:="cloudflared"}"
+: "${TUNNEL_GIST_FILE:=""}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -68,17 +70,20 @@ tunnel_wait() {
   public_key=$(cut -d' ' -f1,2 < "${TUNNEL_PREFIX}/etc/ssh_host_rsa_key.pub")
   verbose "Cloudflare tunnel started at %s" "$url"
 
-  _log "" ""
-  _log "" ""
-  _log "" "Run the following command to connect:"
-  _log "" "    ssh-keygen -R %s && echo '%s %s' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname %s' %s@%s" \
-          "$TUNNEL_HOSTNAME" "$TUNNEL_HOSTNAME" "$public_key" "$url" "$(id -un)" "$TUNNEL_HOSTNAME"
-  _log "" ""
-  _log "" "Run the following command to connect without verification (DANGER!):"
-  _log "" "    ssh -o ProxyCommand='cloudflared access tcp --hostname %s' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new %s@%s" \
-          "$url" "$(id -un)" "$TUNNEL_HOSTNAME"
-  _log "" ""
-  _log "" ""
+  while IFS= read -r line; do
+    log "" "$line"
+    if [ -n "$TUNNEL_GIST_FILE" ]; then
+      printf %s\\n "$line" >>"$TUNNEL_GIST_FILE"
+    fi
+  done <<EOF
+
+Run the following command to connect:
+    ssh-keygen -R $TUNNEL_HOSTNAME && echo '$TUNNEL_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $url' $(id -un)@$TUNNEL_HOSTNAME
+
+Run the following command to connect without verification (DANGER!):
+    ssh -o ProxyCommand='cloudflared access tcp --hostname $url' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new $(id -un)@$TUNNEL_HOSTNAME
+
+EOF
 }
 
 

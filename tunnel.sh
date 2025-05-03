@@ -67,10 +67,12 @@ done
 # When empty, all services will be re-exposed.
 : "${TUNNEL_REEXPOSE:="code"}"
 
+# Gist where to publish tunnel details
+: "${TUNNEL_GIST:=""}"
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
-while getopts "a:fg:k:l:L:n:p:s:S:T:vh" opt; do
+while getopts "a:fg:G:k:l:L:n:p:s:S:T:vh" opt; do
   case "$opt" in
     a) # Alias for the home user
       TUNNEL_ALIAS="$OPTARG";;
@@ -78,6 +80,8 @@ while getopts "a:fg:k:l:L:n:p:s:S:T:vh" opt; do
       TUNNEL_FORCE="1";;
     g) # GitHub user to fetch keys from and restrict ssh access to
       TUNNEL_GITHUB_USER="$OPTARG";;
+    G) # Gist where to publish tunnel details
+      TUNNEL_GIST="$OPTARG";;
     k) # Internet hook to run before starting the tunnel
       TUNNEL_HOOK="$OPTARG";;
     l) # Where to send logs
@@ -164,6 +168,9 @@ elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
 fi
 
+# TODO: checkout the gist to a temp directory. One file per tunnel name?
+# TODO: Give away the path to the file into TUNNEL_GIST_FILE
+
 # Export all variables that start with TUNNEL_ so that they are available to
 # subprocesses.
 export_varset "TUNNEL"
@@ -180,6 +187,8 @@ fi
 
 # Start tunnels in the background
 start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
+
+# TODO: Push the (new) content of the gist to github.
 
 # TODO: Rotate the logs from tunnels and services at regular intervals
 
