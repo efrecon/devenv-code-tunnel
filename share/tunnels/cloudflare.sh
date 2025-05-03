@@ -71,7 +71,7 @@ tunnel_wait() {
   verbose "Cloudflare tunnel started at %s" "$url"
 
   while IFS= read -r line; do
-    log "" "$line"
+    _log "" "$line"
     if [ -n "$TUNNEL_GIST_FILE" ]; then
       printf %s\\n "$line" >>"$TUNNEL_GIST_FILE"
     fi

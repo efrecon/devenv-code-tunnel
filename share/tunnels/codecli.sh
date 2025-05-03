@@ -113,4 +113,8 @@ if [ -n "$CODE_BIN" ]; then
   fi
   tunnel_login "$CODE_BIN" >"$CODE_LOG" 2>&1
   tunnel_start "$CODE_BIN" >"$CODE_LOG" 2>&1
+  if [ -n "$TUNNEL_GIST_FILE" ]; then
+    printf "\ncode tunnel running as:\n" >>"$TUNNEL_GIST_FILE"
+    grep "Open this link in your browser" "$CODE_LOG" >>"$TUNNEL_GIST_FILE"
+  fi
 fi

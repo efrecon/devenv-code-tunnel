@@ -168,8 +168,25 @@ elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
 fi
 
-# TODO: checkout the gist to a temp directory. One file per tunnel name?
-# TODO: Give away the path to the file into TUNNEL_GIST_FILE
+# Create a TUNNEL_GIST_FILE variable where to store the tunnel details.
+if [ -n "$TUNNEL_GIST" ]; then
+  GIST_DIR=$(mktemp -tu 'gist-XXXXXX')
+  if yes | git clone "$TUNNEL_GIST" "$GIST_DIR"; then
+    # Decide upon a (good?) name
+    if [ -z "$TUNNEL_NAME" ]; then
+      TUNNEL_GIST_FILE=${GIST_DIR}/tunnel-$(hostname).txt
+    else
+      TUNNEL_GIST_FILE=${GIST_DIR}/${TUNNEL_NAME}.txt
+    fi
+    # Reset content
+    if [ -f "$TUNNEL_GIST_FILE" ]; then
+      rm -f "$TUNNEL_GIST_FILE"
+    fi
+    verbose "Storing tunnel details in %s" "$TUNNEL_GIST_FILE"
+  else
+    warn "Failed to clone gist %s" "$TUNNEL_GIST"
+  fi
+fi
 
 # Export all variables that start with TUNNEL_ so that they are available to
 # subprocesses.
@@ -188,7 +205,12 @@ fi
 # Start tunnels in the background
 start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
 
-# TODO: Push the (new) content of the gist to github.
+# Push details to the gist
+if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
+  git add "$TUNNEL_GIST_FILE"
+  git commit -m "Update tunnel details at $(date)"
+  git push
+fi
 
 # TODO: Rotate the logs from tunnels and services at regular intervals
 
