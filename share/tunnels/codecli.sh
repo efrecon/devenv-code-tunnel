@@ -111,10 +111,10 @@ if [ -n "$CODE_BIN" ]; then
     verbose "Forwarding logs from %s" "$CODE_LOG"
     "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN" -- "$CODE_LOG" &
   fi
-  tunnel_login "$CODE_BIN" >"$CODE_LOG" 2>&1
-  tunnel_start "$CODE_BIN" >"$CODE_LOG" 2>&1
+  tunnel_login "$CODE_BIN" >>"$CODE_LOG" 2>&1
+  tunnel_start "$CODE_BIN" >>"$CODE_LOG" 2>&1 &
   if [ -n "$TUNNEL_GIST_FILE" ]; then
     printf "\ncode tunnel running as:\n" >>"$TUNNEL_GIST_FILE"
-    grep "Open this link in your browser" "$CODE_LOG" >>"$TUNNEL_GIST_FILE"
+    tail -f "$CODE_LOG" | grep "Open this link in your browser" >>"$TUNNEL_GIST_FILE"
   fi
 fi
