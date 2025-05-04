@@ -155,6 +155,7 @@ TUNNEL_ORIGINAL_NAME=$TUNNEL_NAME
 # Make sure we can access scripts that we will make use of.
 TUNNEL_TUNNELS_DIR=$(pick_dir "share/tunnels")
 TUNNEL_SERVICES_DIR=$(pick_dir "etc/init.d")
+TUNNEL_ORCHESTRATION_DIR=$(pick_dir "share/orchestration")
 
 # Pick a name, from hostname or at random
 if [ -z "$TUNNEL_NAME" ]; then
@@ -166,26 +167,6 @@ if [ -z "$TUNNEL_NAME" ]; then
   fi
 elif [ "$TUNNEL_NAME" = "-" ]; then
   TUNNEL_NAME=
-fi
-
-# Create a TUNNEL_GIST_FILE variable where to store the tunnel details.
-if [ -n "$TUNNEL_GIST" ]; then
-  GIST_DIR=$(mktemp -tu 'gist-XXXXXX')
-  if yes | git clone "$TUNNEL_GIST" "$GIST_DIR"; then
-    # Decide upon a (good?) name
-    if [ -z "$TUNNEL_NAME" ]; then
-      TUNNEL_GIST_FILE=${GIST_DIR}/tunnel-$(hostname).txt
-    else
-      TUNNEL_GIST_FILE=${GIST_DIR}/${TUNNEL_NAME}.txt
-    fi
-    # Reset content
-    if [ -f "$TUNNEL_GIST_FILE" ]; then
-      rm -f "$TUNNEL_GIST_FILE"
-    fi
-    verbose "Storing tunnel details in %s" "$TUNNEL_GIST_FILE"
-  else
-    warn "Failed to clone gist %s" "$TUNNEL_GIST"
-  fi
 fi
 
 # Export all variables that start with TUNNEL_ so that they are available to
@@ -202,18 +183,68 @@ if [ -n "$TUNNEL_HOOK" ]; then
   internet_script_installer "$TUNNEL_HOOK" hook ""
 fi
 
+# Create a TUNNEL_GIST_FILE variable where to store the tunnel details.
+if [ -n "$TUNNEL_GIST" ]; then
+  if check_command git; then
+    GIST_DIR=$(mktemp -tu 'gist-XXXXXX')
+    if git clone "$TUNNEL_GIST" "$GIST_DIR"; then
+      # Decide upon a (good?) name
+      if [ -z "$TUNNEL_NAME" ]; then
+        GIST_FILENAME=tunnel-$(hostname)
+      else
+        GIST_FILENAME=${TUNNEL_NAME}
+      fi
+      TUNNEL_GIST_FILE=${GIST_DIR}/${GIST_FILENAME}.txt
+      # Reset content
+      if [ -f "$TUNNEL_GIST_FILE" ]; then
+        rm -f "$TUNNEL_GIST_FILE"
+      fi
+      verbose "Storing tunnel details in %s" "$TUNNEL_GIST_FILE"
+
+      (
+        cd "$GIST_DIR" || error "Failed to change directory to $GIST_DIR"
+        if ! git config get user.name >/dev/null; then
+          if [ -z "$TUNNEL_GITHUB_USER" ]; then
+            verbose "Setting git user.name to %s" "$(id -un)"
+            git config user.name "$(id -un)"
+          else
+            verbose "Setting git user.name to %s" "$TUNNEL_GITHUB_USER"
+            git config user.name "$TUNNEL_GITHUB_USER"
+          fi
+        fi
+        if ! git config get user.email >/dev/null; then
+          if [ -z "$TUNNEL_GITHUB_USER" ]; then
+            verbose "Setting git user.name to %s" "$(id -un)@${GIST_FILENAME}"
+            git config user.name "$(id -un)@${GIST_FILENAME}"
+          else
+            verbose "Setting git user.email to %s" "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
+            git config user.email "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
+          fi
+        fi
+      )
+    else
+      warn "Failed to clone gist %s" "$TUNNEL_GIST"
+    fi
+  fi
+fi
+[ -n "${TUNNEL_GIST_FILE:-}" ] && export TUNNEL_GIST_FILE
+
 # Start tunnels in the background
 start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
 
-# Push details to the gist
+# Push the tunnel details to the gist whenever the TUNNEL_GIST_FILE is changed.
+# Note that cloudflared tunnels will be established soonish, but code tunnels
+# might take time as they might require interaction with the user to authorize
+# the device.
 if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
-  git add "$TUNNEL_GIST_FILE"
-  git commit -m "Update tunnel details at $(date)"
-  git push
+  "${TUNNEL_ORCHESTRATION_DIR}/notify.sh" \
+    -f "$TUNNEL_GIST_FILE" \
+    -- \
+      "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" &
 fi
 
 # TODO: Rotate the logs from tunnels and services at regular intervals
 
 while true; do
-  sleep 1
+  sleep 5
 done
