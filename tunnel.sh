@@ -201,6 +201,7 @@ if [ -n "$TUNNEL_GIST" ]; then
       fi
       verbose "Storing tunnel details in %s" "$TUNNEL_GIST_FILE"
 
+      # TODO: Capture the values from the gist instead, when at github? owner, etc.
       (
         cd "$GIST_DIR" || error "Failed to change directory to $GIST_DIR"
         if ! git config get user.name >/dev/null; then

@@ -46,17 +46,19 @@ log_init GIST
 
 check_command git || exit 1
 
+# TODO: Add git log
 for file in "$@"; do
   if [ -f "$file" ]; then
     (
       cd "$(dirname "$file")" || error "Failed to change directory to $(dirname "$file")"
       verbose "Pushing changes to %s to git repository" "$file"
       git add "$(basename "$file")"
-      if git diff --quiet; then
-        verbose "No change to commit for %s" "$file"
-      else
+      if git status --porcelain | grep -qF "$(basename "$file")"; then
+        verbose "Changes detected in %s" "$file"
         git commit -m "Update tunnel details at $(date)"
         git push
+      else
+        verbose "No changes detected in %s" "$file"
       fi
     )
   fi
