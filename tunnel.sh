@@ -214,8 +214,8 @@ if [ -n "$TUNNEL_GIST" ]; then
         fi
         if ! git config get user.email >/dev/null; then
           if [ -z "$TUNNEL_GITHUB_USER" ]; then
-            verbose "Setting git user.name to %s" "$(id -un)@${GIST_FILENAME}"
-            git config user.name "$(id -un)@${GIST_FILENAME}"
+            verbose "Setting git user.email to %s" "$(id -un)@${GIST_FILENAME}"
+            git config user.email "$(id -un)@${GIST_FILENAME}"
           else
             verbose "Setting git user.email to %s" "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
             git config user.email "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
