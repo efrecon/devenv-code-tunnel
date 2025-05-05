@@ -46,17 +46,18 @@ log_init GIST
 
 check_command git || exit 1
 
-# TODO: Add git log
+LWRAP="$GIST_ROOTDIR/lwrap.sh"
+
 for file in "$@"; do
   if [ -f "$file" ]; then
     (
       cd "$(dirname "$file")" || error "Failed to change directory to $(dirname "$file")"
       verbose "Pushing changes to %s to git repository" "$file"
-      git add "$(basename "$file")"
+      "$LWRAP" git add "$(basename "$file")"
       if git status --porcelain | grep -qF "$(basename "$file")"; then
         verbose "Changes detected in %s" "$file"
-        git commit -m "Update tunnel details at $(date)"
-        git push
+        "$LWRAP" git commit -m "Update tunnel details at $(date)"
+        "$LWRAP" git push
       else
         verbose "No changes detected in %s" "$file"
       fi

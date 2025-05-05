@@ -156,6 +156,7 @@ TUNNEL_ORIGINAL_NAME=$TUNNEL_NAME
 TUNNEL_TUNNELS_DIR=$(pick_dir "share/tunnels")
 TUNNEL_SERVICES_DIR=$(pick_dir "etc/init.d")
 TUNNEL_ORCHESTRATION_DIR=$(pick_dir "share/orchestration")
+LWRAP="$TUNNEL_ORCHESTRATION_DIR/lwrap.sh"
 
 # Pick a name, from hostname or at random
 if [ -z "$TUNNEL_NAME" ]; then
@@ -187,7 +188,7 @@ fi
 if [ -n "$TUNNEL_GIST" ]; then
   if check_command git; then
     GIST_DIR=$(mktemp -tu 'gist-XXXXXX')
-    if git clone "$TUNNEL_GIST" "$GIST_DIR"; then
+    if "$LWRAP" git clone "$TUNNEL_GIST" "$GIST_DIR"; then
       # Decide upon a (good?) name
       if [ -z "$TUNNEL_NAME" ]; then
         GIST_FILENAME=tunnel-$(hostname)
@@ -204,22 +205,22 @@ if [ -n "$TUNNEL_GIST" ]; then
       # TODO: Capture the values from the gist instead, when at github? owner, etc.
       (
         cd "$GIST_DIR" || error "Failed to change directory to $GIST_DIR"
-        if ! git config get user.name >/dev/null; then
+        if ! "$LWRAP" git config get user.name; then
           if [ -z "$TUNNEL_GITHUB_USER" ]; then
             verbose "Setting git user.name to %s" "$(id -un)"
-            git config user.name "$(id -un)"
+            "$LWRAP" git config user.name "$(id -un)"
           else
             verbose "Setting git user.name to %s" "$TUNNEL_GITHUB_USER"
-            git config user.name "$TUNNEL_GITHUB_USER"
+            "$LWRAP" git config user.name "$TUNNEL_GITHUB_USER"
           fi
         fi
-        if ! git config get user.email >/dev/null; then
+        if ! "$LWRAP" git config get user.email; then
           if [ -z "$TUNNEL_GITHUB_USER" ]; then
             verbose "Setting git user.email to %s" "$(id -un)@${GIST_FILENAME}"
-            git config user.email "$(id -un)@${GIST_FILENAME}"
+            "$LWRAP" git config user.email "$(id -un)@${GIST_FILENAME}"
           else
             verbose "Setting git user.email to %s" "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
-            git config user.email "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
+            "$LWRAP" git config user.email "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
           fi
         fi
       )
