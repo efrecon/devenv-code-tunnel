@@ -25,7 +25,7 @@ done
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="gist updater"
-while getopts "f:vh-" opt; do
+while getopts "vh-" opt; do
   case "$opt" in
     v) # Increase verbosity, repeat to increase
       GIST_VERBOSE=$((GIST_VERBOSE + 1));;
