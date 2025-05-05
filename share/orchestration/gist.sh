@@ -52,8 +52,12 @@ for file in "$@"; do
       cd "$(dirname "$file")" || error "Failed to change directory to $(dirname "$file")"
       verbose "Pushing changes to %s to git repository" "$file"
       git add "$(basename "$file")"
-      git commit -m "Update tunnel details at $(date)"
-      git push
+      if git diff --quiet; then
+        verbose "No change to commit for %s" "$file"
+      else
+        git commit -m "Update tunnel details at $(date)"
+        git push
+      fi
     )
   fi
 done
