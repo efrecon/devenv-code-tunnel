@@ -69,11 +69,11 @@ tunnel_logged_in() {
   fi
   return 1
 }
-
+d
 # Wrapper around code tunnel
-code_tunnel() { "${CODE_BIN:-"code"}" tunnel "$@" >>"$CODE_LOG" 2>&1; }
+code_tunnel() { "${CODE_BIN:-code}" tunnel "$@" >>"$CODE_LOG" 2>&1; }
 code_tunnel_bg() {
-  "${CODE_BIN:-"code"}" tunnel "$@" >>"$CODE_LOG" 2>&1 &
+  "${CODE_BIN:-code}" tunnel "$@" >>"$CODE_LOG" 2>&1 &
 }
 
 # Authorize device. This will print out a URL to the console. Open it in a
