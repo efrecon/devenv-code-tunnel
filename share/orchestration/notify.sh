@@ -54,6 +54,7 @@ if [ -z "$NOTIFY_PATH" ]; then
   error "No path to watch given"
 fi
 
+# TODO: Use inotifywait instead of polling with stat. Implement a delay to smooth out periods of high activity.
 LAST_WRITE=
 while true; do
   if [ -f "$NOTIFY_PATH" ]; then
