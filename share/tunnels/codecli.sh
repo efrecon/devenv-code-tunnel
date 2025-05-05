@@ -70,27 +70,51 @@ tunnel_logged_in() {
   return 1
 }
 
+# Wrapper around code tunnel
+code_tunnel() { "${CODE_BIN:-"code"}" tunnel "$@" >>"$CODE_LOG" 2>&1; }
+code_tunnel_bg() {
+  "${CODE_BIN:-"code"}" tunnel "$@" >>"$CODE_LOG" 2>&1 &
+}
 
 # Authorize device. This will print out a URL to the console. Open it in a
 # browser and authorize the device.
 tunnel_login() {
   if is_true "$TUNNEL_FORCE"; then
-    "$1" tunnel user login --provider "$TUNNEL_PROVIDER"
+    code_tunnel user login --provider "$TUNNEL_PROVIDER"
   elif ! tunnel_logged_in; then
-    "$1" tunnel user login --provider "$TUNNEL_PROVIDER"
+    code_tunnel user login --provider "$TUNNEL_PROVIDER"
   fi
 }
 
 # Start the tunnel
 tunnel_start() {
   if [ -z "$TUNNEL_NAME" ]; then
-    "$1" tunnel --accept-server-license-terms --random-name
+    code_tunnel_bg --accept-server-license-terms --random-name
   else
-    "$1" tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
+    code_tunnel_bg --accept-server-license-terms --name "$TUNNEL_NAME"
   fi
 }
 
+# Wait for the tunnel to be started and print out its URL
+tunnel_wait() {
+  debug "Wait for code tunnel to start..."
+  _started=$(while ! grep -F 'Open this link in your browser' "$CODE_LOG"; do sleep 1; done)
+  url=$(printf %s\\n "$_started" | grep -oE 'https?://.*')
 
+  verbose "Code tunnel started at %s" "$url"
+
+  while IFS= read -r line; do
+    _log "" "$line"
+    if [ -n "$TUNNEL_GIST_FILE" ]; then
+      printf %s\\n "$line" >>"$TUNNEL_GIST_FILE"
+    fi
+  done <<EOF
+
+Code tunnel running, access it from your browser at the following URL:
+    $url
+
+EOF
+}
 
 # Check if the tunnel provider is set and valid.
 if [ -z "$TUNNEL_PROVIDER" ]; then
@@ -111,10 +135,7 @@ if [ -n "$CODE_BIN" ]; then
     verbose "Forwarding logs from %s" "$CODE_LOG"
     "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN" -- "$CODE_LOG" &
   fi
-  tunnel_login "$CODE_BIN" >>"$CODE_LOG" 2>&1
-  tunnel_start "$CODE_BIN" >>"$CODE_LOG" 2>&1 &
-  if [ -n "$TUNNEL_GIST_FILE" ]; then
-    printf "\ncode tunnel running as:\n" >>"$TUNNEL_GIST_FILE"
-    tail -f "$CODE_LOG" | grep "Open this link in your browser" >>"$TUNNEL_GIST_FILE"
-  fi
+  tunnel_login
+  tunnel_start;  # Starts tunnel in the background
+  tunnel_wait
 fi
