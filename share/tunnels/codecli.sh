@@ -69,7 +69,7 @@ tunnel_logged_in() {
   fi
   return 1
 }
-d
+
 # Wrapper around code tunnel
 code_tunnel() { "${CODE_BIN:-code}" tunnel "$@" >>"$CODE_LOG" 2>&1; }
 code_tunnel_bg() {
