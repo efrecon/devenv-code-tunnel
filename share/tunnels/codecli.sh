@@ -30,7 +30,7 @@ done
 : "${TUNNEL_PREFIX:="/usr/local"}"
 : "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 : "${TUNNEL_ALIAS:=}"
-: "${TUNNEL_REEXPOSE:=""}"
+: "${TUNNEL_REEXPOSE:="code"}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
