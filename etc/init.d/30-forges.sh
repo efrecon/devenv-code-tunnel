@@ -43,7 +43,26 @@ ensure_ownership() {
   fi
 }
 
+sshkey2sha256() {
+  ssh-keygen -l -f "$1" |
+    grep -F "$2" |
+    awk '{print $2}' |
+    sed -E 's/^SHA256://g'
+}
+
+json2sha256() {
+  jq ."ssh_key_fingerprints" "$1" |
+    grep -F "$2" |
+    awk '{print $2}'|
+    sed -E -e 's/^"//g' -e 's/",?//g'
+}
+
+
 authorize_github() {
+  # Download fingerprints reported by GH API
+  _fingerprints=$(mktemp json.XXXXXX)
+  download https://api.github.com/meta "$_fingerprints"
+
   for _domain in github.com gist.github.com; do
     verbose "Adding %s keys to %s" "$_domain" "${HOME}/.ssh/known_hosts"
     _gh_keys=$(mktemp known_hosts.XXXXXX)
@@ -54,17 +73,10 @@ authorize_github() {
       else
         verbose "Adding %s %s key to %s" "$_domain" "${_crypto}" "${HOME}/.ssh/known_hosts"
         # Compute the fingerprint of the key, see https://serverfault.com/a/701637
-        _reported=$( ssh-keygen -l -f "$_gh_keys" |
-                    grep -F "$_crypto" |
-                    awk '{print $2}' |
-                    sed -E 's/^SHA256://g' )
+        _reported=$(sshkey2sha256 "$_gh_keys" "$_crypto")
         # Extract the official fingerprint from the GitHub API. See
         # https://serverfault.com/a/701637
-        _official=$( download https://api.github.com/meta |
-                    jq ."ssh_key_fingerprints" |
-                    grep -F "$_crypto" |
-                    awk '{print $2}'|
-                    sed -E -e 's/^"//g' -e 's/",?//g' )
+        _official=$(json2sha256 "$_fingerprints" "$_crypto")
         # If they match, add the key to the known_hosts file
         if [ "$_reported" = "$_official" ]; then
           grep -F "$(to_lower "${_crypto}")" "$_gh_keys" >> "${HOME}/.ssh/known_hosts"
@@ -75,7 +87,9 @@ authorize_github() {
     done
     rm -f "$_gh_keys"
   done
+  rm -f "$_fingerprints"
 }
+
 
 if ! [ -d "${HOME}/.ssh" ]; then
   mkdir -p "${HOME}/.ssh"
