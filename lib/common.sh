@@ -90,6 +90,15 @@ info() { if [ "${CODER_VERBOSE:-0}" -ge "1" ]; then _log NFO "$@"; fi; }
 warn() { _log WRN "$@"; }
 error() { _log ERR "$@" && exit 1; }
 
+reprint() {
+  while IFS= read -r line; do
+    _log "" "$line"
+    if [ -n "${1:-}" ]; then
+      printf %s\\n "$line" >>"$1"
+    fi
+  done
+}
+
 # Get the content of the variable which name is passed as an argument.
 get_var() { eval printf "%s\\\n" "\$${1:-}" || true; }
 

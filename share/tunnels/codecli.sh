@@ -70,10 +70,10 @@ tunnel_logged_in() {
   return 1
 }
 
-# Wrapper around code tunnel
-code_tunnel() { "${CODE_BIN:-code}" tunnel "$@" >>"$CODE_LOG" 2>&1; }
+# Wrapper around code tunnel. Will log automatically.
+code_tunnel() { "$TUNNEL_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
 code_tunnel_bg() {
-  "${CODE_BIN:-code}" tunnel "$@" >>"$CODE_LOG" 2>&1 &
+  "$TUNNEL_LWRAP" -- "$CODE_BIN" tunnel "$@" &
 }
 
 # Authorize device. This will print out a URL to the console. Open it in a
@@ -103,14 +103,9 @@ tunnel_wait() {
 
   verbose "Code tunnel started at %s" "$url"
 
-  while IFS= read -r line; do
-    _log "" "$line"
-    if [ -n "$TUNNEL_GIST_FILE" ]; then
-      printf %s\\n "$line" >>"$TUNNEL_GIST_FILE"
-    fi
-  done <<EOF
+  reprint "$TUNNEL_GIST_FILE" <<EOF
 
-Code tunnel running, access it from your browser at the following URL:
+(vs)code tunnel running, access it from your browser at the following URL:
     $url
 
 EOF
@@ -124,18 +119,23 @@ if [ "$TUNNEL_PROVIDER" != "github" ] && [ "$TUNNEL_PROVIDER" != "azure" ]; then
   error "Invalid tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
 fi
 
+# Check dependencies
+CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
+[ -z "$CODE_BIN" ] && exit; # Gentle warning, in case not installed on purpose
+TUNNEL_ORCHESTRATION_DIR=${TUNNEL_ROOTDIR}/../orchestration
+TUNNEL_LOGGER=${TUNNEL_ORCHESTRATION_DIR}/logger.sh
+TUNNEL_LWRAP=${TUNNEL_ORCHESTRATION_DIR}/lwrap.sh
+[ -x "$TUNNEL_LOGGER" ] || error "Cannot find logger.sh"
+[ -x "$TUNNEL_LWRAP" ] || error "Cannot find lwrap.sh"
+CODE_LOG=$("$TUNNEL_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.
-CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
-CODE_LOG="${TUNNEL_PREFIX}/log/code.log"
-if [ -n "$CODE_BIN" ]; then
-  tunnel_configure
-  verbose "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
-  if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
-    verbose "Forwarding logs from %s" "$CODE_LOG"
-    "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN" -- "$CODE_LOG" &
-  fi
-  tunnel_login
-  tunnel_start;  # Starts tunnel in the background
-  tunnel_wait
+tunnel_configure
+verbose "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
+if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
+  verbose "Forwarding logs from %s" "$CODE_LOG"
+  "$TUNNEL_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
 fi
+tunnel_login
+tunnel_start;  # Starts tunnel in the background
+tunnel_wait

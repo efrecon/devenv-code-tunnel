@@ -23,11 +23,14 @@ done
 : "${LWRAP_VERBOSE:=0}"
 : "${LWRAP_LOG:=2}"
 : "${LWRAP_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
+: "${LWRAP_PRINT:=0}"
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Auto logger wrapper"
-while getopts "vh-" opt; do
+while getopts "Lvh-" opt; do
   case "$opt" in
+    L) # Print target log file and exit
+      LWRAP_PRINT=1;;
     v) # Increase verbosity, repeat to increase
       LWRAP_VERBOSE=$((LWRAP_VERBOSE + 1));;
     h) # Show help
@@ -51,6 +54,16 @@ log_init LWRAP
 unset CODER_BIN
 bin_name "$1"
 
+# Decide upon location of log
 LWRAP_LOG="${LWRAP_PREFIX}/log/${CODER_BIN}.log"
+
+# Print log location and exit when flag is set.
+if [ "$LWRAP_PRINT" = "1" ]; then
+  printf %s\\n "$LWRAP_LOG"
+  exit
+fi
+
+# Reprint command, then send all lines to log
 _logline "" %s "$*" >>"$LWRAP_LOG"
+# TODO: Should we forward into logger.sh? Make it configuration, as some tools might timestamp?
 exec "$@" >>"$LWRAP_LOG" 2>&1

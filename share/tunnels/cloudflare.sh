@@ -46,7 +46,7 @@ sshd_wait() {
   done
   if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'sshd'; then
     verbose "sshd responding on port %s, forwarding logs from %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
-    "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
+    "$TUNNEL_LOGGER" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
   else
     verbose "sshd responding on port %s" "$TUNNEL_SSH"
   fi
@@ -59,8 +59,10 @@ tunnel_start() (
   ssh_port="$TUNNEL_SSH"
   unset_varset TUNNEL
 
-  debug "Starting cloudflare tunnel using %s, logs at %s" "$1" "$CLOUDFLARE_LOG"
-  "$1" tunnel --no-autoupdate --url "tcp://localhost:$ssh_port" >"$CLOUDFLARE_LOG" 2>&1 &
+  "$TUNNEL_LWRAP" -- \
+    "$CLOUDFLARE_BIN" tunnel \
+      --no-autoupdate \
+      --url "tcp://localhost:$ssh_port" &
 )
 
 
@@ -70,17 +72,12 @@ tunnel_wait() {
   public_key=$(cut -d' ' -f1,2 < "${TUNNEL_PREFIX}/etc/ssh_host_rsa_key.pub")
   verbose "Cloudflare tunnel started at %s" "$url"
 
-  while IFS= read -r line; do
-    _log "" "$line"
-    if [ -n "$TUNNEL_GIST_FILE" ]; then
-      printf %s\\n "$line" >>"$TUNNEL_GIST_FILE"
-    fi
-  done <<EOF
+  reprint "$TUNNEL_GIST_FILE" <<EOF
 
-Run the following command to connect:
+cloudflare tunnel running, run the following command to connect securly:
     ssh-keygen -R $TUNNEL_HOSTNAME && echo '$TUNNEL_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $url' $(id -un)@$TUNNEL_HOSTNAME
 
-Run the following command to connect without verification (DANGER!):
+cloudflare tunnel running, run the following command to connect without verification (DANGER!):
     ssh -o ProxyCommand='cloudflared access tcp --hostname $url' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new $(id -un)@$TUNNEL_HOSTNAME
 
 EOF
@@ -90,14 +87,24 @@ EOF
 TUNNEL_HOSTNAME=$TUNNEL_NAME
 [ -z "$TUNNEL_HOSTNAME" ] && TUNNEL_HOSTNAME=$(hostname)
 
-CLOUDFLARE_LOG="${TUNNEL_PREFIX}/log/cloudflared.log"
+# Check dependencies
+[ -z "$TUNNEL_SSH" ] && error "No ssh port provided"
 CLOUDFLARE_BIN=$(find_inpath cloudflared "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
-if [ -n "$TUNNEL_SSH" ] && [ -n "$CLOUDFLARE_BIN" ]; then
-  check_command nc || error "nc is not installed. Please install it first."
-  sshd_wait
-  tunnel_start "$CLOUDFLARE_BIN"
-  tunnel_wait
-  if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'cloudflared'; then
-    exec "${TUNNEL_ROOTDIR}/../orchestration/logger.sh" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG"
-  fi
+[ -z "$CLOUDFLARE_BIN" ] && exit; # Gentle warning, in case not installed on purpose
+TUNNEL_ORCHESTRATION_DIR=${TUNNEL_ROOTDIR}/../orchestration
+TUNNEL_LOGGER=${TUNNEL_ORCHESTRATION_DIR}/logger.sh
+TUNNEL_LWRAP=${TUNNEL_ORCHESTRATION_DIR}/lwrap.sh
+[ -x "$TUNNEL_LOGGER" ] || error "Cannot find logger.sh"
+[ -x "$TUNNEL_LWRAP" ] || error "Cannot find lwrap.sh"
+CLOUDFLARE_LOG=$("$TUNNEL_LWRAP" -L -- "$CLOUDFLARE_BIN")
+
+check_command nc || error "nc is not installed. Please install it first."
+sshd_wait
+
+verbose "Starting cloudflare tunnel using %s, logs at %s" "$CLOUDFLARE_BIN" "$CLOUDFLARE_LOG"
+if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'cloudflared'; then
+  verbose "Forwarding logs from %s" "$CODCLOUDFLARE_LOGE_LOG"
+  "$TUNNEL_LOGGER" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG" &
 fi
+tunnel_start;  # Starts tunnel in the background
+tunnel_wait
