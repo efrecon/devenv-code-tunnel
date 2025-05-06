@@ -71,9 +71,9 @@ tunnel_logged_in() {
 }
 
 # Wrapper around code tunnel. Will log automatically.
-code_tunnel() { "$TUNNEL_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
+code_tunnel() { "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
 code_tunnel_bg() {
-  "$TUNNEL_LWRAP" -- "$CODE_BIN" tunnel "$@" &
+  "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@" &
 }
 
 # Authorize device. This will print out a URL to the console. Open it in a
@@ -122,19 +122,19 @@ fi
 # Check dependencies
 CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
 [ -z "$CODE_BIN" ] && exit; # Gentle warning, in case not installed on purpose
-TUNNEL_ORCHESTRATION_DIR=${TUNNEL_ROOTDIR}/../orchestration
-TUNNEL_LOGGER=${TUNNEL_ORCHESTRATION_DIR}/logger.sh
-TUNNEL_LWRAP=${TUNNEL_ORCHESTRATION_DIR}/lwrap.sh
-[ -x "$TUNNEL_LOGGER" ] || error "Cannot find logger.sh"
-[ -x "$TUNNEL_LWRAP" ] || error "Cannot find lwrap.sh"
-CODE_LOG=$("$TUNNEL_LWRAP" -L -- "$CODE_BIN")
+CODE_ORCHESTRATION_DIR=${TUNNEL_ROOTDIR}/../orchestration
+CODE_LOGGER=${CODE_ORCHESTRATION_DIR}/logger.sh
+CODE_LWRAP=${CODE_ORCHESTRATION_DIR}/lwrap.sh
+[ -x "$CODE_LOGGER" ] || error "Cannot find logger.sh"
+[ -x "$CODE_LWRAP" ] || error "Cannot find lwrap.sh"
+CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.
 tunnel_configure
 verbose "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
 if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
   verbose "Forwarding logs from %s" "$CODE_LOG"
-  "$TUNNEL_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
+  "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
 fi
 tunnel_login
 tunnel_start;  # Starts tunnel in the background
