@@ -35,8 +35,9 @@ done
 # Port of the SSH daemon to listen on
 : "${SSHD_PORT:="${TUNNEL_SSH:-"2222"}"}"
 
-# Type of keys to generate
-: "${SSHD_KEY:="rsa"}"
+# Type of server keys to generate. Must match -t option of ssh-keygen, e.g. dsa,
+# ecdsa, ed25519, or rsa. Keys will not be re-generated if they already exist.
+: "${SSHD_KEY:="ed25519"}"
 
 # Where to store sshd data
 : "${SSHD_CONFIG_DIR:="${SSHD_PREFIX}/etc/ssh"}"
@@ -73,7 +74,7 @@ while getopts "g:k:l:p:u:vh-" opt; do
       SSHD_VERBOSE=$((SSHD_VERBOSE + 1));;
     h) # Show help
       usage 0 SSHD;;
-    -) # End of options
+    -) # End of options, everything else passed to sshd blindly
       break;;
     *)  # Unknown option
       usage 1
