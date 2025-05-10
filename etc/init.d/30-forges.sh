@@ -74,9 +74,11 @@ authorize_github() {
         verbose "Adding %s %s key to %s" "$_domain" "${_crypto}" "${HOME}/.ssh/known_hosts"
         # Compute the fingerprint of the key, see https://serverfault.com/a/701637
         _reported=$(sshkey2sha256 "$_gh_keys" "$_crypto")
+        trace "sha256 sum as reported by the live server is: %s" "$_reported"
         # Extract the official fingerprint from the GitHub API. See
         # https://serverfault.com/a/701637
         _official=$(json2sha256 "$_fingerprints" "$_crypto")
+        trace "GitHub's API reports sha256 sum should be: %s" "$_official"
         # If they match, add the key to the known_hosts file
         if [ "$_reported" = "$_official" ]; then
           grep -F "$(to_lower "${_crypto}")" "$_gh_keys" >> "${HOME}/.ssh/known_hosts"

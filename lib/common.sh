@@ -316,3 +316,27 @@ start_deps() {
     done
   fi
 }
+
+wait_file() {
+  [ -z "${1:-}" ] && error "wait_file: No file path given"
+  while ! test -"${2:-f}" "$1"; do
+    sleep 1
+  done
+  trace "Path at %s tested positive for -%s" "$1" "${2:-f}"
+}
+
+wait_infile() {
+  [ -z "${1:-}" ] && error "wait_infile: No file path given"
+  [ -z "${2:-}" ] && error "wait_infile: No expression provided"
+  wait_file "$1"
+  while ! grep -"${3:-E}" "$2" "$1"; do
+    sleep 1
+  done | head -n 1
+}
+
+wait_process_end() {
+  [ -z "${1:-}" ] && error "wait_process_end: No PID given"
+  while ps -eo pid|sed -E 's/^\s+//g'|grep -q "^${1}$"; do
+    sleep 1
+  done
+}

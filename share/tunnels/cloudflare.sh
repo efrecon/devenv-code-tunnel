@@ -68,8 +68,8 @@ tunnel_start() (
 
 tunnel_wait() {
   debug "Wait for cloudflare tunnel to start..."
-  url=$(while ! grep -o 'https://.*\.trycloudflare.com' "$CLOUDFLARE_LOG"; do sleep 1; done)
-  keyfile=$(find -type f -maxdepth 1 -name 'ssh_host_*_key.pub' "${TUNNEL_PREFIX}/etc" | head -n 1)
+  url=$(wait_infile "$CLOUDFLARE_LOG" 'https://.*\.trycloudflare.com' "o")
+  keyfile=$(find "${TUNNEL_PREFIX}/etc" -type f -maxdepth 1 -name 'ssh_host_*_key.pub' | head -n 1)
   public_key=$(cut -d' ' -f1,2 < "$keyfile")
   verbose "Cloudflare tunnel started at %s" "$url"
 

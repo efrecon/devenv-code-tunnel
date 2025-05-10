@@ -74,15 +74,25 @@ tunnel_logged_in() {
 code_tunnel() { "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
 code_tunnel_bg() {
   "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@" &
+  CODE_PID=$!
 }
+
+tunnel_grant() {
+  verbose "$(wait_infile "$CODE_LOG" 'grant access.*use code')"
+}
+
 
 # Authorize device. This will print out a URL to the console. Open it in a
 # browser and authorize the device.
 tunnel_login() {
   if is_true "$TUNNEL_FORCE"; then
-    code_tunnel user login --provider "$TUNNEL_PROVIDER"
+    code_tunnel_bg user login --provider "$TUNNEL_PROVIDER"
+    tunnel_grant
+    wait_process_end "$CODE_PID"
   elif ! tunnel_logged_in; then
-    code_tunnel user login --provider "$TUNNEL_PROVIDER"
+    code_tunnel_bg user login --provider "$TUNNEL_PROVIDER"
+    tunnel_grant
+    wait_process_end "$CODE_PID"
   fi
 }
 
@@ -98,8 +108,7 @@ tunnel_start() {
 # Wait for the tunnel to be started and print out its URL
 tunnel_wait() {
   debug "Wait for code tunnel to start..."
-  _started=$(while ! grep -F 'Open this link in your browser' "$CODE_LOG"; do sleep 1; done)
-  url=$(printf %s\\n "$_started" | grep -oE 'https?://.*')
+  url=$(wait_infile "$CODE_LOG" 'Open this link in your browser' "F" | grep -oE 'https?://.*')
 
   verbose "Code tunnel started at %s" "$url"
 
