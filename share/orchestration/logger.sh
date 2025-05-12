@@ -53,21 +53,27 @@ unset CODER_BIN
 bin_name "$LOGGER_SOURCE"
 
 # Remove existing log line header from our logs
-no_header() { sed -E 's/^>[><a-z-]+< \[[A-Z]+\] \[[0-9-]+\] //g'; }
+no_header() {
+  if [ -n "${1:-}" ]; then
+    printf %s\\n "$1" | no_header
+  else
+    sed -E 's/^>[><a-z-]+< \[[A-Z]+\] \[[0-9-]+\] //g'
+  fi
+}
 
 # Eat lines and reprint them through our logging library, adding a header.
 relog() {
   while IFS= read -r line; do
-    _log "" "$line"
+    _log "" "$(no_header "$line")"
   done
 }
 
 if [ -z "${1:-}" ]; then
-  no_header|relog
+  relog
 else
   # Eagerly wait for the log file to exist
   while ! [ -f "$1" ]; do sleep 0.1; done
   debug "$1 now present on disk"
 
-  tail -n +0 -F "$1" | no_header | relog
+  tail -n +0 -F "$1" | relog
 fi
