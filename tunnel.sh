@@ -64,13 +64,16 @@ done
 : "${TUNNEL_TUNNELS:=""}"
 
 # List of services which logs we should re-expose to the main container log.
-# When empty, all services will be re-exposed.
-: "${TUNNEL_REEXPOSE:="code"}"
+# When empty, all services will be re-exposed. Set to a dash (-) to disable, for
+# example.
+: "${TUNNEL_REEXPOSE:=""}"
 
+# Gist where to publish tunnel details
+: "${TUNNEL_GIST:=""}"
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
-while getopts "a:fg:k:l:L:n:p:s:S:T:vh" opt; do
+while getopts "a:fg:G:k:l:L:n:p:s:S:T:vh" opt; do
   case "$opt" in
     a) # Alias for the home user
       TUNNEL_ALIAS="$OPTARG";;
@@ -78,6 +81,8 @@ while getopts "a:fg:k:l:L:n:p:s:S:T:vh" opt; do
       TUNNEL_FORCE="1";;
     g) # GitHub user to fetch keys from and restrict ssh access to
       TUNNEL_GITHUB_USER="$OPTARG";;
+    G) # Gist where to publish tunnel details
+      TUNNEL_GIST="$OPTARG";;
     k) # Internet hook to run before starting the tunnel
       TUNNEL_HOOK="$OPTARG";;
     l) # Where to send logs
@@ -151,6 +156,8 @@ TUNNEL_ORIGINAL_NAME=$TUNNEL_NAME
 # Make sure we can access scripts that we will make use of.
 TUNNEL_TUNNELS_DIR=$(pick_dir "share/tunnels")
 TUNNEL_SERVICES_DIR=$(pick_dir "etc/init.d")
+TUNNEL_ORCHESTRATION_DIR=$(pick_dir "share/orchestration")
+LWRAP="$TUNNEL_ORCHESTRATION_DIR/lwrap.sh"
 
 # Pick a name, from hostname or at random
 if [ -z "$TUNNEL_NAME" ]; then
@@ -178,11 +185,69 @@ if [ -n "$TUNNEL_HOOK" ]; then
   internet_script_installer "$TUNNEL_HOOK" hook ""
 fi
 
+# Create a TUNNEL_GIST_FILE variable where to store the tunnel details.
+if [ -n "$TUNNEL_GIST" ]; then
+  if check_command git; then
+    GIST_DIR=$(mktemp -tu 'gist-XXXXXX')
+    if "$LWRAP" git clone "$TUNNEL_GIST" "$GIST_DIR"; then
+      # Decide upon a (good?) name
+      if [ -z "$TUNNEL_NAME" ]; then
+        GIST_FILENAME=tunnel-$(hostname)
+      else
+        GIST_FILENAME=${TUNNEL_NAME}
+      fi
+      TUNNEL_GIST_FILE=${GIST_DIR}/${GIST_FILENAME}.txt
+      # Reset content
+      if [ -f "$TUNNEL_GIST_FILE" ]; then
+        rm -f "$TUNNEL_GIST_FILE"
+      fi
+      verbose "Storing tunnel details in %s" "$TUNNEL_GIST_FILE"
+
+      # TODO: Capture the values from the gist instead, when at github? owner, etc.
+      (
+        cd "$GIST_DIR" || error "Failed to change directory to $GIST_DIR"
+        if ! "$LWRAP" git config get user.name; then
+          if [ -z "$TUNNEL_GITHUB_USER" ]; then
+            verbose "Setting git user.name to %s" "$(id -un)"
+            "$LWRAP" git config user.name "$(id -un)"
+          else
+            verbose "Setting git user.name to %s" "$TUNNEL_GITHUB_USER"
+            "$LWRAP" git config user.name "$TUNNEL_GITHUB_USER"
+          fi
+        fi
+        if ! "$LWRAP" git config get user.email; then
+          if [ -z "$TUNNEL_GITHUB_USER" ]; then
+            verbose "Setting git user.email to %s" "$(id -un)@${GIST_FILENAME}"
+            "$LWRAP" git config user.email "$(id -un)@${GIST_FILENAME}"
+          else
+            verbose "Setting git user.email to %s" "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
+            "$LWRAP" git config user.email "${TUNNEL_GITHUB_USER}@users.noreply.github.com"
+          fi
+        fi
+      )
+    else
+      warn "Failed to clone gist %s" "$TUNNEL_GIST"
+    fi
+  fi
+fi
+[ -n "${TUNNEL_GIST_FILE:-}" ] && export TUNNEL_GIST_FILE
+
 # Start tunnels in the background
 start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
+
+# Push the tunnel details to the gist whenever the TUNNEL_GIST_FILE is changed.
+# Note that cloudflared tunnels will be established soonish, but code tunnels
+# might take time as they might require interaction with the user to authorize
+# the device.
+if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
+  "${TUNNEL_ORCHESTRATION_DIR}/notify.sh" \
+    -f "$TUNNEL_GIST_FILE" \
+    -- \
+      "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" &
+fi
 
 # TODO: Rotate the logs from tunnels and services at regular intervals
 
 while true; do
-  sleep 1
+  sleep 5
 done

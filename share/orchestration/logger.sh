@@ -52,9 +52,19 @@ log_init LOGGER
 unset CODER_BIN
 bin_name "$LOGGER_SOURCE"
 
+# Remove existing log line header from our logs
+no_header() {
+  if [ -n "${1:-}" ]; then
+    printf %s\\n "$1" | no_header
+  else
+    sed -E 's/^>[><a-z-]+< \[[A-Z]+\] \[[0-9-]+\] //g'
+  fi
+}
+
+# Eat lines and reprint them through our logging library, adding a header.
 relog() {
   while IFS= read -r line; do
-    _log "" "$line"
+    _log "" "$(no_header "$line")"
   done
 }
 

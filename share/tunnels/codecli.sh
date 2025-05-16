@@ -30,7 +30,7 @@ done
 : "${TUNNEL_PREFIX:="/usr/local"}"
 : "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 : "${TUNNEL_ALIAS:=}"
-: "${TUNNEL_REEXPOSE:=""}"
+: "${TUNNEL_REEXPOSE:="code"}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -60,6 +60,7 @@ tunnel_configure() {
 }
 
 
+# Check if currently logged in as per the token present on disk.
 tunnel_logged_in() {
   if [ -f "${TUNNEL_STORAGE%/}/token.json" ]; then
     token=$(cat "${TUNNEL_STORAGE%/}/token.json")
@@ -70,27 +71,70 @@ tunnel_logged_in() {
   return 1
 }
 
+# Wrapper around code tunnel. Will log automatically.
+code_tunnel() { "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
+code_tunnel_bg() {
+  "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@" &
+  CODE_PID=$!
+}
+
+# Wait for the message containing URL to grant access to tunnel to appear in the
+# logs.
+tunnel_grant() {
+  # TODO: Rewrite with tail, since new access codes will be generated over time.
+  verbose "$(wait_infile "$CODE_LOG" 'grant access.*use code')"
+}
+
 
 # Authorize device. This will print out a URL to the console. Open it in a
 # browser and authorize the device.
 tunnel_login() {
-  if is_true "$TUNNEL_FORCE"; then
-    "$1" tunnel user login --provider "$TUNNEL_PROVIDER"
-  elif ! tunnel_logged_in; then
-    "$1" tunnel user login --provider "$TUNNEL_PROVIDER"
-  fi
+  # Whenever necessary: start a login at the provider, wait for the URL for
+  # authorization to appear in the logs and reprint them. Then, wait for the
+  # process to end: it will end once the link has been clicked and this device
+  # authorized.
+  verbose "Logging in at %s" "$TUNNEL_PROVIDER"
+
+  # Start reprinting the logs, remember the PID of that process.
+  "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG" &
+  CODE_LOGGER_PID=$!
+
+  # Login at the provider in the background and wait for the process to end.
+  code_tunnel_bg user login --provider "$TUNNEL_PROVIDER"
+  wait "$CODE_PID"
+
+  # Kill the log re-printer tree, we might have children and signals might not
+  # be propagated. Note: we cannot kill the process group, as it would kill too
+  # many processes and the - semantic isn't supported on busybox.
+  verbose "Logged in at %s" "$TUNNEL_PROVIDER"
+  kill_tree "$CODE_LOGGER_PID"
 }
+
 
 # Start the tunnel
 tunnel_start() {
   if [ -z "$TUNNEL_NAME" ]; then
-    "$1" tunnel --accept-server-license-terms --random-name
+    code_tunnel_bg --accept-server-license-terms --random-name
   else
-    "$1" tunnel --accept-server-license-terms --name "$TUNNEL_NAME"
+    code_tunnel_bg --accept-server-license-terms --name "$TUNNEL_NAME"
   fi
 }
 
+# Wait for the tunnel to be started and print out its URL
+tunnel_wait() {
+  # Wait for "ready" message in log and extract URL from it.
+  debug "Wait for code tunnel to start..."
+  url=$(wait_infile "$CODE_LOG" 'Open this link in your browser' 'F' | grep -oE 'https?://.*')
 
+  # Log URL, also make sure it appears in the container output.
+  verbose "Code tunnel started at %s" "$url"
+  reprint "$TUNNEL_GIST_FILE" <<EOF
+
+(vs)code tunnel running, access it from your browser at the following URL:
+    $url
+
+EOF
+}
 
 # Check if the tunnel provider is set and valid.
 if [ -z "$TUNNEL_PROVIDER" ]; then
@@ -100,17 +144,25 @@ if [ "$TUNNEL_PROVIDER" != "github" ] && [ "$TUNNEL_PROVIDER" != "azure" ]; then
   error "Invalid tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
 fi
 
+# Check dependencies
+CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
+[ -z "$CODE_BIN" ] && exit; # Gentle warning, in case not installed on purpose
+CODE_ORCHESTRATION_DIR=${TUNNEL_ROOTDIR}/../orchestration
+CODE_LOGGER=${CODE_ORCHESTRATION_DIR}/logger.sh
+CODE_LWRAP=${CODE_ORCHESTRATION_DIR}/lwrap.sh
+[ -x "$CODE_LOGGER" ] || error "Cannot find logger.sh"
+[ -x "$CODE_LWRAP" ] || error "Cannot find lwrap.sh"
+CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.
-CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
-CODE_LOG="${TUNNEL_PREFIX}/log/code.log"
-if [ -n "$CODE_BIN" ]; then
-  tunnel_configure
-  verbose "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
-  if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
-    verbose "Forwarding logs from %s" "$CODE_LOG"
-    "$TUNNEL_ROOTDIR/../orchestration/logger.sh" -s "$CODE_BIN" -- "$CODE_LOG" &
-  fi
-  tunnel_login "$CODE_BIN" >"$CODE_LOG" 2>&1
-  tunnel_start "$CODE_BIN" >"$CODE_LOG" 2>&1
+tunnel_configure
+verbose "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
+if is_true "$TUNNEL_FORCE" || ! tunnel_logged_in; then 
+  tunnel_login
 fi
+if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
+  verbose "Forwarding logs from %s" "$CODE_LOG"
+  "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
+fi
+tunnel_start;  # Starts tunnel in the background
+tunnel_wait

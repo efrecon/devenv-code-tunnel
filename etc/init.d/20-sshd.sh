@@ -35,6 +35,10 @@ done
 # Port of the SSH daemon to listen on
 : "${SSHD_PORT:="${TUNNEL_SSH:-"2222"}"}"
 
+# Type of server keys to generate. Must match -t option of ssh-keygen, e.g. dsa,
+# ecdsa, ed25519, or rsa. Keys will not be re-generated if they already exist.
+: "${SSHD_KEY:="ed25519"}"
+
 # Where to store sshd data
 : "${SSHD_CONFIG_DIR:="${SSHD_PREFIX}/etc/ssh"}"
 
@@ -54,10 +58,12 @@ done
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
 CODE_DESCR="ssh daemon startup"
-while getopts "g:l:p:u:vh" opt; do
+while getopts "g:k:l:p:u:vh-" opt; do
   case "$opt" in
     g) # GitHub user to fetch keys from
       SSHD_GITHUB_USER="$OPTARG";;
+    k) # Type of key to use, must match -t option of ssh-keygen!
+      SSHD_KEY="$OPTARG";;
     p) # Port to listen on
       SSHD_PORT="$OPTARG";;
     l) # Where to send logs
@@ -67,13 +73,15 @@ while getopts "g:l:p:u:vh" opt; do
     v) # Increase verbosity, repeat to increase
       SSHD_VERBOSE=$((SSHD_VERBOSE + 1));;
     h) # Show help
-      usage 0 SSHD
-      ;;
+      usage 0 SSHD;;
+    -) # End of options, everything else passed to sshd blindly
+      break;;
     *)  # Unknown option
       usage 1
       ;;
   esac
 done
+shift $((OPTIND - 1))
 
 log_init SSHD
 
@@ -87,46 +95,47 @@ make_owned_dir() {
 
 configure_sshd() {
   as_root mkdir -p "${SSHD_CONFIG_DIR}"
-  make_owned_dir "${SSHD_CONFIG_DIR}/user" "$SSHD_USER"
-  make_owned_dir "${SSHD_CONFIG_DIR}/server" "root"
+  SSHD_CONFIG_USER="${SSHD_CONFIG_DIR%/}/user"
+  SSHD_CONFIG_SERVER="${SSHD_CONFIG_DIR%/}/server"
+  make_owned_dir "$SSHD_CONFIG_USER" "$SSHD_USER"
+  make_owned_dir "$SSHD_CONFIG_SERVER" "root"
 
   as_root mkdir -p "${SSHD_PREFIX}/log"
 
   if [ -n "$SSHD_GITHUB_USER" ]; then
     verbose "Collecting public keys from %s" "$SSHD_GITHUB_USER"
-    download "https://github.com/${SSHD_GITHUB_USER}.keys" - > "${SSHD_CONFIG_DIR}/user/authorized_keys"
-    chmod go-rwx "${SSHD_CONFIG_DIR}/user/authorized_keys"
+    download "https://github.com/${SSHD_GITHUB_USER}.keys" - > "${SSHD_CONFIG_USER}/authorized_keys"
+    chmod go-rwx "${SSHD_CONFIG_USER}/authorized_keys"
   fi
 
-  if as_root test -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key" \
-      && as_root test -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key.pub"; then
+  if as_root test -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
+      && as_root test -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key.pub"; then
     verbose "Found existing ssh host keys, skipping generation"
   else
     verbose "Generating ssh host keys"
-    for f in ssh_host_rsa_key ssh_host_rsa_key.pub; do
-      if [ -f "${SSHD_CONFIG_DIR}/server/$f" ]; then
-        verbose "Removing old host key %s" "${SSHD_CONFIG_DIR}/server/$f"
-        as_root rm -f "${SSHD_CONFIG_DIR}/server/$f"
+    for f in "ssh_host_${SSHD_KEY}_key" "ssh_host_${SSHD_KEY}_key.pub"; do
+      if [ -f "${SSHD_CONFIG_SERVER}/$f" ]; then
+        verbose "Removing old host key %s" "${SSHD_CONFIG_SERVER}/$f"
+        as_root rm -f "${SSHD_CONFIG_SERVER}/$f"
       fi
     done
     as_root ssh-keygen \
               -q \
               -C "sshd for $SSHD_USER" \
-              -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key" \
+              -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
               -N '' \
-              -b 4096 \
-              -t rsa
+              -t "$SSHD_KEY"
   fi
-  as_root cp -f "${SSHD_CONFIG_DIR}/server/ssh_host_rsa_key.pub" "${SSHD_PREFIX}/etc/ssh_host_rsa_key.pub"
+  as_root cp -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key.pub" "${SSHD_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
 
-  verbose "Making ssh host public key at %s readable by %s" "${SSHD_PREFIX}/etc/ssh_host_rsa_key.pub" "$SSHD_USER"
-  as_root chown "$SSHD_USER" "${SSHD_PREFIX}/etc/ssh_host_rsa_key.pub"
+  verbose "Making ssh host public key at %s readable by %s" "${SSHD_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub" "$SSHD_USER"
+  as_root chown "$SSHD_USER" "${SSHD_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
 
   SSHD_TEMPLATE=$(mktemp)
   cat <<'EOF' > "$SSHD_TEMPLATE"
 LogLevel $LOGLEVEL
 Port $PORT
-HostKey $PWD/server/ssh_host_rsa_key
+HostKey $PWD/server/ssh_host_$KEY_key
 PidFile $PWD/server/sshd.pid
 
 # PAM is necessary for password authentication on Debian-based systems
@@ -159,6 +168,7 @@ EOF
       -e "s,\$PWD,${SSHD_CONFIG_DIR},g" \
       -e "s,\$USER,${SSHD_USER},g" \
       -e "s,\$PORT,${SSHD_PORT},g" \
+      -e "s,\$KEY,${SSHD_KEY},g" \
       "$SSHD_TEMPLATE" | as_root tee "${SSHD_CONFIG_DIR}/sshd_config" > /dev/null
     as_root chmod go-rwx "${SSHD_CONFIG_DIR}/sshd_config"
     rm -f "$SSHD_TEMPLATE"
@@ -186,6 +196,6 @@ fi
 
 configure_sshd
 touch "$SSHD_LOGFILE"
-as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" &
+as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" "$@" &
 pid_sshd=$!
 verbose "sshd started with pid %s. Logs at %s" "$pid_sshd" "$SSHD_LOGFILE"

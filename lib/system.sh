@@ -212,3 +212,42 @@ get_distro_name() {
 get_distro_version() {
   get_release_info VERSION_ID
 }
+
+
+# Print the item at the index at $1 of the remaining arguments. $1 is 0-indexed.
+_index() {
+  _idx=$1; shift
+  shift "$_idx"
+  printf %s\\n "$1"
+}
+
+
+# Non-entirely portable way to print all the descendants of the process which
+# identifier is passed as a parameter. This uses the content of the /proc file
+# system.
+ps_children() (
+  # This uses a () to force an extra process and have truly local vars.
+  for _f in /proc/[0-9]*/stat; do
+    # The name of the executable appears at the beginning between parenthesis.
+    # Remove it.
+    _stat=$(sed -E 's/\([^)]+\)\s//g' < "$_f")
+    # If the parent process (3rd item) is the process passed as a parameter,
+    # then we should count it.
+    if [ "$(_index 2 $_stat)" = "$1" ]; then
+      # The pid is also part of the stat file list, but also the name of the
+      # directory. The following uses shell built-ins and is quicker.
+      _pid=$(basename "$(dirname "$_f")")
+      # Recurse first so we print the leaves first.
+      ps_children "$_pid"
+      printf %d\\n "$_pid"
+    fi
+  done
+)
+
+kill_tree() {
+  [ -z "${1:-}" ] && error "kill_tree: must pass pid as first arg"
+  for _pid in $(ps_children "$1"); do
+    kill -"${2:-TERM}" "$_pid"
+  done
+  kill -"${2:-TERM}" "$1"
+}

@@ -90,6 +90,15 @@ info() { if [ "${CODER_VERBOSE:-0}" -ge "1" ]; then _log NFO "$@"; fi; }
 warn() { _log WRN "$@"; }
 error() { _log ERR "$@" && exit 1; }
 
+reprint() {
+  while IFS= read -r line; do
+    _log "" "$line"
+    if [ -n "${1:-}" ]; then
+      printf %s\\n "$line" >>"$1"
+    fi
+  done
+}
+
 # Get the content of the variable which name is passed as an argument.
 get_var() { eval printf "%s\\\n" "\$${1:-}" || true; }
 
@@ -306,4 +315,28 @@ start_deps() {
       fi
     done
   fi
+}
+
+wait_file() {
+  [ -z "${1:-}" ] && error "wait_file: No file path given"
+  while ! test -"${2:-f}" "$1"; do
+    sleep 1
+  done
+  trace "Path at %s tested positive for -%s" "$1" "${2:-f}"
+}
+
+wait_infile() {
+  [ -z "${1:-}" ] && error "wait_infile: No file path given"
+  [ -z "${2:-}" ] && error "wait_infile: No expression provided"
+  wait_file "$1"
+  while ! grep -"${3:-E}" "$2" "$1"; do
+    sleep 1
+  done | head -n 1
+}
+
+wait_process_end() {
+  [ -z "${1:-}" ] && error "wait_process_end: No PID given"
+  while kill -0 "$1"; do
+    sleep 1
+  done
 }
