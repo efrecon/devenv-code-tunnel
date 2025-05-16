@@ -75,7 +75,7 @@ tunnel_wait() {
 
   reprint "$TUNNEL_GIST_FILE" <<EOF
 
-cloudflare tunnel running, run the following command to connect securly:
+cloudflare tunnel running, run the following command to connect securely:
     ssh-keygen -R $TUNNEL_HOSTNAME && echo '$TUNNEL_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $url' $(id -un)@$TUNNEL_HOSTNAME
 
 cloudflare tunnel running, run the following command to connect without verification (DANGER!):
