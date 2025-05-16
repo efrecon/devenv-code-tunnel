@@ -104,7 +104,7 @@ sshd_wait
 
 verbose "Starting cloudflare tunnel using %s, logs at %s" "$CLOUDFLARE_BIN" "$CLOUDFLARE_LOG"
 if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'cloudflared'; then
-  verbose "Forwarding logs from %s" "$CODCLOUDFLARE_LOGE_LOG"
+  verbose "Forwarding logs from %s" "$CLOUDFLARE_LOG"
   "$CLOUDFLARE_LOGGER" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG" &
 fi
 tunnel_start;  # Starts tunnel in the background
