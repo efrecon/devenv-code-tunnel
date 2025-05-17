@@ -108,6 +108,7 @@ openssh
 bash
 less
 make
+inotifywait inotify-tools
 - gcompat
 EOF
 
