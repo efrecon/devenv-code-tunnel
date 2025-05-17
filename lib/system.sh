@@ -18,7 +18,7 @@ as_root() {
   if [ "$(id -u)" = 0 ]; then
     "$@"
   elif check_command sudo; then
-    verbose "Running elevated command: %s" "$*"
+    debug "Running elevated command: %s" "$*"
     sudo "$@"
   else
     error "This script requires root privileges"
@@ -56,7 +56,7 @@ as_user() {
 install_packages() {
   state=$(sha256sum "/etc/apk/repositories" | head -c 64)
   if [ "$state" != "$INSTALL_REPOS_SHA256" ]; then
-    verbose "Updating packages cache"
+    debug "Updating packages cache"
     as_root apk update
     INSTALL_REPOS_SHA256=$state
   fi
@@ -70,10 +70,10 @@ install_ondemand() {
   while read -r bin pkg; do
     [ -z "$pkg" ] && pkg=$bin
     if [ "${bin:-}" != "-" ] && ! check_command "${bin:-}"; then
-      verbose "$bin not found, installing $pkg"
+      debug "$bin not found, installing $pkg"
       install_packages "$pkg"
     elif [ "${bin:-}" = "-" ] && [ -n "${pkg:-}" ]; then
-      verbose "Installing $pkg"
+      debug "Installing $pkg"
       install_packages "$pkg"
     fi
   done
@@ -106,7 +106,7 @@ create_user() {
   else
     if ! getent group "$NEW_GROUP" >/dev/null 2>&1; then
       # If the group does not exist, create it.
-      verbose "Creating group %s" "$NEW_GROUP"
+      debug "Creating group %s" "$NEW_GROUP"
       addgroup "$NEW_GROUP"
     fi
     if ! getent passwd "$NEW_USER" >/dev/null 2>&1; then

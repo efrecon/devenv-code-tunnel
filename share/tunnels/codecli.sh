@@ -93,7 +93,7 @@ tunnel_login() {
   # authorization to appear in the logs and reprint them. Then, wait for the
   # process to end: it will end once the link has been clicked and this device
   # authorized.
-  verbose "Logging in at %s" "$TUNNEL_PROVIDER"
+  debug "Logging in at %s" "$TUNNEL_PROVIDER"
 
   # Start reprinting the logs, remember the PID of that process.
   "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG" &
@@ -156,12 +156,12 @@ CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.
 tunnel_configure
-verbose "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
-if is_true "$TUNNEL_FORCE" || ! tunnel_logged_in; then 
+debug "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
+if is_true "$TUNNEL_FORCE" || ! tunnel_logged_in; then
   tunnel_login
 fi
 if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
-  verbose "Forwarding logs from %s" "$CODE_LOG"
+  debug "Forwarding logs from %s" "$CODE_LOG"
   "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
 fi
 tunnel_start;  # Starts tunnel in the background

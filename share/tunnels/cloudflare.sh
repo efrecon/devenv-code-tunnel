@@ -39,16 +39,16 @@ log_init TUNNEL
 
 
 sshd_wait() {
-  debug "Wait for sshd to start..."
+  trace "Wait for sshd to start..."
   while ! nc -z localhost "$TUNNEL_SSH"; do
     sleep 1
     trace "Waiting for sshd to start on port %s..." "$TUNNEL_SSH"
   done
   if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'sshd'; then
-    verbose "sshd responding on port %s, forwarding logs from %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
+    debug "sshd responding on port %s, forwarding logs from %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
     "$CLOUDFLARE_LOGGER" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
   else
-    verbose "sshd responding on port %s" "$TUNNEL_SSH"
+    debug "sshd responding on port %s" "$TUNNEL_SSH"
   fi
 }
 
@@ -102,9 +102,9 @@ CLOUDFLARE_LOG=$("$CLOUDFLARE_LWRAP" -L -- "$CLOUDFLARE_BIN")
 check_command nc || error "nc is not installed. Please install it first."
 sshd_wait
 
-verbose "Starting cloudflare tunnel using %s, logs at %s" "$CLOUDFLARE_BIN" "$CLOUDFLARE_LOG"
+debug "Starting cloudflare tunnel using %s, logs at %s" "$CLOUDFLARE_BIN" "$CLOUDFLARE_LOG"
 if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'cloudflared'; then
-  verbose "Forwarding logs from %s" "$CLOUDFLARE_LOG"
+  debug "Forwarding logs from %s" "$CLOUDFLARE_LOG"
   "$CLOUDFLARE_LOGGER" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG" &
 fi
 tunnel_start;  # Starts tunnel in the background

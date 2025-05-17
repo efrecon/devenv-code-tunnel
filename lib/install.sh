@@ -43,7 +43,7 @@ dir_owner() {
 internet_checksum() {
   [ -z "$1" ] && error "internet_checksum: no remote file name given"
   [ -z "$2" ] && error "internet_checksum: no url given"
-  verbose "Verifying checksum for %s using %s" "$1" "$2"
+  debug "Verifying checksum for %s using %s" "$1" "$2"
   _tmp_sums=$(mktemp)
   download "$2" "$_tmp_sums"
 

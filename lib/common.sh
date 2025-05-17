@@ -115,7 +115,7 @@ log_init() {
 # variables controlling logging (level and output) would have been changed.
 read_envfile() {
   if [ -f "$1" ]; then
-    verbose "Reading environment file: %s" "$1"
+    debug "Reading environment file: %s" "$1"
     # shellcheck source=/dev/null
     . "$1"
     log_init "${2:-}"
@@ -303,10 +303,10 @@ start_deps() {
       if [ -x "$_script" ]; then
         # TODO: Log the output to files?
         if is_true "$_bg_run"; then
-          verbose "Spawning %s using %s" "$_s" "$_script"
+          debug "Spawning %s using %s" "$_s" "$_script"
           ${INSTALL_OPTIMIZE:-} "$_script" "$@" &
         else
-          verbose "Running %s using %s" "$_s" "$_script"
+          debug "Running %s using %s" "$_s" "$_script"
           ${INSTALL_OPTIMIZE:-} "$_script" "$@"
         fi
         printf %s\\n "$_s"

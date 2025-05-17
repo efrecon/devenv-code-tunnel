@@ -34,10 +34,10 @@ fi
 
 # Create the docker group if it does not exist
 if ! getent group "docker" > /dev/null; then
-  verbose "Creating docker group"
+  debug "Creating docker group"
   as_root addgroup "docker" || warn "Cannot create docker group"
 else
-  verbose "Docker group already exists"
+  trace "Docker group already exists"
 fi
 
 # Add the user to the docker group

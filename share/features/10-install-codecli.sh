@@ -38,7 +38,7 @@ log_init INSTALL
 
 # Install the code CLI in the proper directory location, i.e. as per
 # INSTALL_TARGET preference.
-verbose "Installing code CLI"
+debug "Installing code CLI"
 [ "$INSTALL_TARGET" = "user" ] \
   && BINDIR="${INSTALL_USER_PREFIX}/bin" \
   || BINDIR="${INSTALL_PREFIX}/bin"

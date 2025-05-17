@@ -75,16 +75,16 @@ install_sidekicks() {
   verbose "Installing yarm and pnpm %s" "$(printf %s\\n "$*" | tr '_' ' ')"
   if ! check_command corepack; then
     # Upgrade and prepare package managers
-    verbose "Installing and enabling corepack"
+    debug "Installing and enabling corepack"
     "$@" npm install -g corepack
     "$@" corepack enable
   fi
   if ! check_command yarn; then
-    verbose "Installing yarn"
+    debug "Installing yarn"
     "$@" corepack prepare yarn@stable --activate
   fi
   if ! check_command pnpm; then
-    verbose "Installing pnpm"
+    debug "Installing pnpm"
     "$@" corepack prepare pnpm@latest --activate
   fi
 
@@ -94,7 +94,7 @@ install_sidekicks() {
       verbose "Installing %s %s" "$app" "$(printf %s\\n "$*" | tr '_' ' ')"
       "$@" npm install -g "$app"
     else
-      verbose "$app already installed %s" "$(printf %s\\n "$*" | tr '_' ' ')"
+      debug "$app already installed %s" "$(printf %s\\n "$*" | tr '_' ' ')"
     fi
   done
 }
@@ -102,7 +102,7 @@ install_sidekicks() {
 # Building node from source takes a long time, as in several hours when running
 # in GitHub actions.
 build_from_source() {
-  verbose "Downloading and building Node.js %s from source" "$1"
+  debug "Downloading and building Node.js %s from source" "$1"
   curdir=$(pwd)
   builddir=$(mktemp -d)
   cd "$builddir"
@@ -200,7 +200,7 @@ install_from_image() {
   # Extract content of (remote) image to a temporary directory, for the current
   # platform.
   img=${INSTALL_NODE_REGISTRY%/}/${INSTALL_NODE_IMAGE}:$tag
-  verbose "Extracting node v%s from image %s" "$1" "$img"
+  debug "Extracting node v%s from image %s" "$1" "$img"
   imgdir=$(mktemp -d)
   regctl image export --platform local "$img" | tar -C "$imgdir" -xf -
 
@@ -247,19 +247,19 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # Find out the version out of the official ones
   assert_version "$INSTALL_NODE_VERSION"
   latest=$(node_version)
-  verbose "Installing Node $latest"
+  debug "Installing Node $latest"
 
   if [ "$INSTALL_NODE_SOURCE" = "auto" ]; then
     # When using the unofficial builds, we need to add the libc type to the OS.
     if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
       arch=$(get_arch)
-      verbose "Installing Node.js %s for %s %s" "$latest" "$(get_os)" "$arch"
+      debug "Installing Node.js %s for %s %s" "$latest" "$(get_os)" "$arch"
       if is_musl_os; then
         # musl builds are only available for x64
         if [ "$arch" = "x64" ]; then
           INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.gz"
         else
-          verbose "No binaries available for %s and musl, will build from source" "$arch"
+          debug "No binaries available for %s and musl, will build from source" "$arch"
           INSTALL_TGZURL=
         fi
       else
@@ -285,7 +285,7 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     install_packages \
       libstdc++ \
       libgcc
-    verbose "Downloading Node.js from: $INSTALL_TGZURL"
+    debug "Downloading Node.js from: $INSTALL_TGZURL"
     internet_tgz_installer \
       "$INSTALL_TGZURL" \
       "$INSTALL_PREFIX" \
