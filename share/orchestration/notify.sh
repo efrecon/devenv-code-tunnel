@@ -61,9 +61,9 @@ check_int "$NOTIFY_SLEEP" "$NOTIFY_RESPITE"
 
 notify_trigger() {
   if [ "$NOTIFY_RESPITE" -gt 0 ]; then
-    verbose "File %s changed, available at NOTIFY_CHANGE, running command in %d s" "$1" "$NOTIFY_RESPITE"
+    debug "File %s changed, available at NOTIFY_CHANGE, running command in %d s" "$1" "$NOTIFY_RESPITE"
   else
-    verbose "File %s changed, available at NOTIFY_CHANGE, running command" "$1"
+    debug "File %s changed, available at NOTIFY_CHANGE, running command" "$1"
   fi
 
   # Export the path to the file that changed, so that it can be used in the
@@ -121,14 +121,14 @@ notify_inotify() {
     verbose "Watching directory %s with inotifywait" "$NOTIFY_PATH"
     # If the path is a directory, watch for changes in the directory
     NOTIFY_DIR="${NOTIFY_PATH%/}/"
-    inotifywait -mr --format '%w%f' -e delete,close_write "$NOTIFY_DIR" |
+    inotifywait -qmr --format '%w%f' -e delete,close_write "$NOTIFY_DIR" |
     while IFS="$new_line" read -r p; do
       notify_trigger "$p" "$@"
     done
   else
     verbose "Watching file path %s with inotifywait" "$NOTIFY_PATH"
     NOTIFY_DIR="$(dirname "$NOTIFY_PATH")"
-    inotifywait -m --format '%w%f' -e close_write "$NOTIFY_DIR" |
+    inotifywait -qm --format '%w%f' -e close_write "$NOTIFY_DIR" |
     while IFS="$new_line" read -r p; do
       if [ "$p" = "$NOTIFY_PATH" ]; then
         notify_trigger "$p" "$@"
