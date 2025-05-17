@@ -334,6 +334,7 @@ wait_infile() {
   done | head -n 1
 }
 
+# ```
 wait_process_end() {
   [ -z "${1:-}" ] && error "wait_process_end: No PID given"
   while kill -0 "$1"; do
@@ -341,6 +342,22 @@ wait_process_end() {
   done
 }
 
+# Validates that all provided arguments are integers.
+#
+# Arguments:
+#
+# * One or more values to check.
+#
+# Returns:
+#
+# * Exits with an error if any argument is missing or not a valid integer (optionally negative).
+#
+# Example:
+#
+# ```bash
+# check_int 42 -7 0    # succeeds
+# check_int 3.14 foo   # exits with error
+# ```
 check_int() {
   [ -z "${1:-}" ] && error "check_int: No integer argument given"
   while [ "$#" -gt 0 ]; do

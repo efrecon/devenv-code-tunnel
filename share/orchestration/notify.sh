@@ -59,6 +59,7 @@ fi
 check_int "$NOTIFY_SLEEP" "$NOTIFY_RESPITE"
 
 
+# ```
 notify_trigger() {
   if [ "$NOTIFY_RESPITE" -gt 0 ]; then
     debug "File %s changed, available at NOTIFY_CHANGE, running command in %d s" "$1" "$NOTIFY_RESPITE"
@@ -89,6 +90,7 @@ notify_trigger() {
 }
 
 
+# ```
 notify_poll() {
   LAST_WRITE=
   while true; do
@@ -114,6 +116,24 @@ notify_poll() {
 }
 
 
+# Monitors a file or directory for changes using inotifywait and triggers a command on relevant events.
+#
+# Watches the specified path for file modifications or deletions. If monitoring a directory, triggers the command for any file within the directory that is deleted or closed after writing. If monitoring a single file, triggers the command only when that file is closed after writing. The changed file path is passed to the triggered command.
+#
+# Globals:
+#
+# * NOTIFY_PATH: Path to the file or directory to watch.
+# * NOTIFY_DIR: Directory being watched (set within the function).
+#
+# Arguments:
+#
+# * Additional arguments are passed to the triggered command.
+#
+# Example:
+#
+# ```bash
+# notify_inotify echo "File changed: \$NOTIFY_CHANGE"
+# ```
 notify_inotify() {
   new_line=$(printf \\n)
 
