@@ -57,7 +57,7 @@ bin_name "$1"
 # Decide upon location of log
 LWRAP_LOG="${LWRAP_PREFIX}/log/${CODER_BIN}.log"
 if ! [ -d "${LWRAP_PREFIX}/log" ]; then
-  verbose "Creating log directory %s" "${LWRAP_PREFIX}/log"
+  debug "Creating log directory %s" "${LWRAP_PREFIX}/log"
   mkdir -p "${LWRAP_PREFIX}/log"
 fi
 

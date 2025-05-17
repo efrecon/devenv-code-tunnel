@@ -38,10 +38,10 @@ EOF
 
   # If npm is installed, then install the AWS CDK.
   if ! check_command cdk && check_command npm; then
-    verbose "Installing cdk"
+    debug "Installing cdk"
     as_root npm install -g cdk
     verbose "Installed cdk: $(cdk --version)"
   else
-    verbose "cdk already installed"
+    debug "cdk already installed"
   fi
 fi

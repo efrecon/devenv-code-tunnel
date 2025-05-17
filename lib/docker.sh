@@ -16,10 +16,10 @@ is_privileged() {
   max_cap=$(((1 << (last_cap + 1)) - 1))
 
   if [ "${cap_bnd}" -eq "${max_cap}" ]; then
-    verbose "Container is running in privileged mode."
+    debug "Container is running in privileged mode."
     return 0
   else
-    verbose "Container is not running in privileged mode."
+    debug "Container is not running in privileged mode."
     return 1
   fi
 }

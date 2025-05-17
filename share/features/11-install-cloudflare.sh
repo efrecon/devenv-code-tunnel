@@ -37,7 +37,7 @@ done
 log_init INSTALL
 
 
-verbose "Installing cloudflared v%s" "$INSTALL_CLOUDFLARED_VERSION"
+debug "Installing cloudflared v%s" "$INSTALL_CLOUDFLARED_VERSION"
 
 # When started, our cloudflared wrapper will wait for a responding sshd. We will
 # use nc.
