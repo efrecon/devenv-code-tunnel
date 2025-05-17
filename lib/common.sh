@@ -342,7 +342,7 @@ wait_process_end() {
 }
 
 check_int() {
-  [ -z "${1:-}" ] && error "check_int: argument"
+  [ -z "${1:-}" ] && error "check_int: No argument given"
   while [ "$#" -gt 0 ]; do
     if ! printf %s\\n "$1" | grep -qE '^-?[0-9]+$'; then
       error "check_int: %s is not a valid integer" "$1"
