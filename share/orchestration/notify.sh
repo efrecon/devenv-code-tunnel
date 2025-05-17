@@ -141,5 +141,5 @@ notify_inotify() {
 if check_command inotifywait; then
   notify_inotify "$@"
 else
-  inotify_poll "$@"
+  notify_poll "$@"
 fi
