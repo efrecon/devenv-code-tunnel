@@ -53,13 +53,14 @@ for file in "$@"; do
     (
       cd "$(dirname "$file")" || error "Failed to change directory to $(dirname "$file")"
       verbose "Pushing changes to %s to git repository" "$file"
+      "$LWRAP" git pull
       "$LWRAP" git add "$(basename "$file")"
       if git status --porcelain | grep -qF "$(basename "$file")"; then
-        verbose "Changes detected in %s" "$file"
+        debug "Changes detected in %s" "$file"
         "$LWRAP" git commit -m "Update tunnel details at $(date)"
         "$LWRAP" git push
       else
-        verbose "No changes detected in %s" "$file"
+        debug "No changes detected in %s" "$file"
       fi
     )
   fi
