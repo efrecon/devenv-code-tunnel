@@ -94,7 +94,7 @@ install_sidekicks() {
       verbose "Installing %s %s" "$app" "$(printf %s\\n "$*" | tr '_' ' ')"
       "$@" npm install -g "$app"
     else
-      debug "$app already installed %s" "$(printf %s\\n "$*" | tr '_' ' ')"
+      debug "%s already installed %s" "$app" "$(printf %s\\n "$*" | tr '_' ' ')"
     fi
   done
 }
@@ -247,7 +247,7 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # Find out the version out of the official ones
   assert_version "$INSTALL_NODE_VERSION"
   latest=$(node_version)
-  debug "Installing Node $latest"
+  debug "Installing Node %s" "$latest"
 
   if [ "$INSTALL_NODE_SOURCE" = "auto" ]; then
     # When using the unofficial builds, we need to add the libc type to the OS.
@@ -285,7 +285,7 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     install_packages \
       libstdc++ \
       libgcc
-    debug "Downloading Node.js from: $INSTALL_TGZURL"
+    debug "Downloading Node.js from: %s" "$INSTALL_TGZURL"
     internet_tgz_installer \
       "$INSTALL_TGZURL" \
       "$INSTALL_PREFIX" \
