@@ -160,6 +160,7 @@ daemonize() {
   shift
 
   export_varset "$_namespace"
+  export_varset "_$_namespace"
 
   # Restart ourselves in the background, with same arguments.
   (
