@@ -108,6 +108,7 @@ openssh
 bash
 less
 make
+logrotate
 inotifywait inotify-tools
 - gcompat
 EOF

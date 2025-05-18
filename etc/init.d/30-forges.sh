@@ -17,6 +17,9 @@ for lib in common system; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at FORGES_LOG.
@@ -32,7 +35,14 @@ done
 # GitHub user to fetch keys from
 : "${FORGES_GITHUB_USER:="${TUNNEL_GITHUB_USER:-""}"}"
 
+# Environment file to load for reading defaults from.
+: "${FORGES_DEFAULTS:="${FORGES_ROOTDIR}/../${CODER_BIN}.env"}"
+
+
 log_init FORGES
+
+# Load defaults
+[ -n "$FORGES_DEFAULTS" ] && read_envfile "$FORGES_DEFAULTS" FORGES
 
 
 ensure_ownership() {

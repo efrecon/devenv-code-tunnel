@@ -15,6 +15,9 @@ for lib in common system docker; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at DOCKERD_LOG.
@@ -27,6 +30,9 @@ done
 
 # Where the docker daemon listens, defaults to the standard docker socket.
 : "${DOCKERD_SOCK:="/var/run/docker.sock"}"
+
+# Environment file to load for reading defaults from.
+: "${DOCKERD_DEFAULTS:="${DOCKERD_ROOTDIR}/../${CODER_BIN}.env"}"
 
 # Detach in the background
 : "${DOCKERD_DAEMONIZE:=0}"
@@ -53,6 +59,10 @@ while getopts "l:vh" opt; do
 done
 
 log_init DOCKERD
+
+# Load defaults
+[ -n "$DOCKERD_DEFAULTS" ] && read_envfile "$DOCKERD_DEFAULTS" DOCKERD
+
 
 dockerd_start() {
   as_root dockerd 2>&1 | tee -a "$DOCKERD_LOGFILE" > /dev/null &

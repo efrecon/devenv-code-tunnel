@@ -17,6 +17,9 @@ for lib in common system; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at SSHD_LOG.
@@ -48,6 +51,9 @@ done
 # Log level to use in sshd. One of: QUIET, FATAL, ERROR, INFO, VERBOSE, DEBUG,
 # DEBUG1, DEBUG2, and DEBUG3
 : "${SSHD_LOGLEVEL:="INFO"}"
+
+# Environment file to load for reading defaults from.
+: "${SSHD_DEFAULTS:="${SSHD_ROOTDIR}/../${CODER_BIN}.env"}"
 
 # Detach in the background
 : "${SSHD_DAEMONIZE:=0}"
@@ -85,6 +91,8 @@ shift $((OPTIND - 1))
 
 log_init SSHD
 
+# Load defaults
+[ -n "$SSHD_DEFAULTS" ] && read_envfile "$SSHD_DEFAULTS" SSHD
 
 make_owned_dir() {
   as_root mkdir -p "$1"

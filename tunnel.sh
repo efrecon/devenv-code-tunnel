@@ -246,8 +246,6 @@ if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
       "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" &
 fi
 
-# TODO: Rotate the logs from tunnels and services at regular intervals
-
 while true; do
   sleep 5
 done
