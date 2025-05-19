@@ -109,12 +109,10 @@ while true; do
       else
         warn "Command failed"
       fi
+    elif "$CRON_BIN" "$@"; then
+      debug "Command ran successfully"
     else
-      if "$CRON_BIN" "$@"; then
-        debug "Command ran successfully"
-      else
-        warn "Command failed"
-      fi
+      warn "Command failed"
     fi
   else
     trace "$now does not match $CRON_WHEN"
