@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# Shell sanity. Stop on errors and undefined variables.
-set -eu
+# Shell sanity. Stop on errors, undefined variables and pipeline errors.
+# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
+set -euo pipefail
 
 # Absolute location of the script where this script is located.
 SYSTEM_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
