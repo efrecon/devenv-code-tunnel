@@ -28,7 +28,11 @@ bin_name
 # Where to send logs
 : "${CRON_LOG:="${TUNNEL_LOG:-"2"}"}"
 
+# Prefix where things are installed.
 : "${CRON_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
+
+# How often should we check for action
+: "${CRON_INTERVAL:=60}"
 
 # Format of the date to use when checking for action
 : "${CRON_DATE_FORMAT:=%Y-%m-%d %H:%M:%S}"
@@ -82,6 +86,7 @@ if [ -z "$CRON_BIN" ] && [ $# -eq 0 ]; then
   error "No command to run"
   usage 1
 fi
+check_int "$CRON_INTERVAL"
 
 # If we are to daemonize, do it now and exit. Export all our variables to the
 # daemon so it starts the same way this script was started.
