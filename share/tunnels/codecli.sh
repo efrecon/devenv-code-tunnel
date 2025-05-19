@@ -79,13 +79,6 @@ code_tunnel_bg() {
   CODE_PID=$!
 }
 
-# Wait for the message containing URL to grant access to tunnel to appear in the
-# logs.
-tunnel_grant() {
-  # TODO: Rewrite with tail, since new access codes will be generated over time.
-  verbose "$(wait_infile "$CODE_LOG" 'grant access.*use code')"
-}
-
 
 # Authorize device. This will print out a URL to the console. Open it in a
 # browser and authorize the device.
