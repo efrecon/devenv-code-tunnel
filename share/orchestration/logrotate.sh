@@ -103,4 +103,4 @@ find "$LOGROTATE_LOGDIR" -type f -name "*.log" | while IFS="$newline" read -r fi
 done
 
 # Now we have a configuration file, we can run logrotate on it.
-"$LWRAP" logrotate -s "$LOGROTATE_STATUS" "$config" || true
+"$LWRAP" logrotate -s "$LOGROTATE_STATUS" "$config"
