@@ -19,12 +19,18 @@ done
 
 : "${XDG_STATE_HOME:="${HOME}/.local/state"}"
 
-# All following vars have defaults here, but will be set and inherited from
+# All following vars have defaults here, but most will be set and inherited from
 # the calling tunnel.sh script.
 : "${LOGROTATE_VERBOSE:="${TUNNEL_VERBOSE:-"0"}"}"
 : "${LOGROTATE_LOG:="${TUNNEL_LOG:-"2"}"}"
 : "${LOGROTATE_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
+
+# Location of the log files that will be rotated.
 : "${LOGROTATE_LOGDIR:="${LOGROTATE_PREFIX}/log"}"
+
+# Location of the logrotate status file. This is used to keep track of the last
+# time the log files were rotated. It needs to be in a location that is
+# accessible by the user, since logrotate is run as the user.
 : "${LOGROTATE_STATUS:="${XDG_STATE_HOME}/logrotate.status"}"
 
 # shellcheck disable=SC2034 # Used for logging/usage
