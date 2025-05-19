@@ -4,7 +4,7 @@
 set -eu
 
 # Absolute location of the script where this script is located.
-DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
+DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 for lib in common system docker; do
   for d in ../../lib ../lib lib; do
     if [ -d "${DOCKERD_ROOTDIR}/$d" ]; then

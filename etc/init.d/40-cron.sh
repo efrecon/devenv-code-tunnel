@@ -4,7 +4,7 @@
 set -eu
 
 # Absolute location of the script where this script is located.
-CRON_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
+CRON_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
 for lib in common system; do
@@ -67,7 +67,7 @@ while getopts "b:w:vh-" opt; do
       CRON_VERBOSE=$((CRON_VERBOSE + 1));;
     h) # Show help
       usage 0 CRON;;
-    -) # End of options, everything else passed to sshd blindly
+    -) # End of options, everything else passed to binary blindly, or forms command to run.
       break;;
     *)  # Unknown option
       usage 1
