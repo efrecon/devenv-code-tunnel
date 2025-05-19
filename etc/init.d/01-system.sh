@@ -1,10 +1,11 @@
 #!/bin/sh
 
-# Shell sanity. Stop on errors and undefined variables.
-set -eu
+# Shell sanity. Stop on errors, undefined variables and pipeline errors.
+# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
+set -euo pipefail
 
 # Absolute location of the script where this script is located.
-SYSTEM_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
+SYSTEM_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
 for lib in common system; do
@@ -17,6 +18,10 @@ for lib in common system; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
+
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
 # file at SYSTEM_LOG.
@@ -27,6 +32,9 @@ done
 
 # inotify settings (maximum for vscode)
 : "${SYSTEM_INOTIFY_MAX:=524288}"
+
+# Environment file to load for reading defaults from.
+: "${SYSTEM_DEFAULTS:="${SYSTEM_ROOTDIR}/../${CODER_BIN}.env"}"
 
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
@@ -47,6 +55,9 @@ while getopts "l:vh" opt; do
 done
 
 log_init SYSTEM
+
+# Load defaults
+[ -n "$SYSTEM_DEFAULTS" ] && read_envfile "$SYSTEM_DEFAULTS" SYSTEM
 
 current=$(cat /proc/sys/fs/inotify/max_user_watches 2>/dev/null || true)
 if [ "$current" != "$SYSTEM_INOTIFY_MAX" ]; then

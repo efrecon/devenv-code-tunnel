@@ -1,10 +1,11 @@
 #!/bin/sh
 
-# Shell sanity. Stop on errors and undefined variables.
-set -eu
+# Shell sanity. Stop on errors, undefined variables and pipeline errors.
+# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
+set -euo pipefail
 
 # Absolute location of the script where this script is located.
-DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(readlink -f "$0")")")" && pwd -P )
+DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 for lib in common system docker; do
   for d in ../../lib ../lib lib; do
     if [ -d "${DOCKERD_ROOTDIR}/$d" ]; then
@@ -14,6 +15,9 @@ for lib in common system docker; do
     fi
   done
 done
+
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
 
 
 # Level of verbosity, the higher the more verbose. All messages are sent to the
@@ -27,6 +31,9 @@ done
 
 # Where the docker daemon listens, defaults to the standard docker socket.
 : "${DOCKERD_SOCK:="/var/run/docker.sock"}"
+
+# Environment file to load for reading defaults from.
+: "${DOCKERD_DEFAULTS:="${DOCKERD_ROOTDIR}/../${CODER_BIN}.env"}"
 
 # Detach in the background
 : "${DOCKERD_DAEMONIZE:=0}"
@@ -53,6 +60,10 @@ while getopts "l:vh" opt; do
 done
 
 log_init DOCKERD
+
+# Load defaults
+[ -n "$DOCKERD_DEFAULTS" ] && read_envfile "$DOCKERD_DEFAULTS" DOCKERD
+
 
 dockerd_start() {
   as_root dockerd 2>&1 | tee -a "$DOCKERD_LOGFILE" > /dev/null &
