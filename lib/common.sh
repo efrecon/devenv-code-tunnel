@@ -367,7 +367,7 @@ when_infile() {
   ( tail -f -n +1 "$_fpath" & ) | while IFS= read -r _line; do
     _fn=$(_match "$_line" "$_opt" "$@" || true)
     if [ -n "$_fn" ]; then
-      tail "'%s' matches, sending for processing to %s" "$_line" "$_fn"
+      trace "'%s' matches, sending for processing to %s" "$_line" "$_fn"
       if [ "$_fn" = "-" ] || "$_fn" "$_line"; then
         printf %s\\n "$_line"
         return 0
