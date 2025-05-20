@@ -342,7 +342,6 @@ _match() {
 
   while [ "$#" != 0 ]; do
     if printf %s\\n "$_val" | grep -q -$_opt "$1"; then
-      trace "'%s' matches '%s': returning %s" "$_val" "$1" "$2"
       printf %s\\n "$2"
       return 0
     else
@@ -362,10 +361,13 @@ when_infile() {
   _fpath=$1
   _opt=$2
   shift 2
-  tail -f -n +1 "$_fpath" | while IFS= read -r _line; do
+  # We use a sub-shell so the main while loop can run independently and return
+  # as soon as the condition is met but will keep running until it is met. See:
+  # https://superuser.com/a/900134
+  ( tail -f -n +1 "$_fpath" & ) | while IFS= read -r _line; do
     _fn=$(_match "$_line" "$_opt" "$@" || true)
     if [ -n "$_fn" ]; then
-      debug "'%s' matches, sending to %s" "$_fpath" "$_fn"
+      tail "'%s' matches, sending for processing to %s" "$_line" "$_fn"
       if [ "$_fn" = "-" ] || "$_fn" "$_line"; then
         printf %s\\n "$_line"
         return 0
