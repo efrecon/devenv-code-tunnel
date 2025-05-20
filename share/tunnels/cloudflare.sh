@@ -67,14 +67,14 @@ tunnel_start() (
 )
 
 
-tunnel_wait() {
-  debug "Wait for cloudflare tunnel to start..."
-  url=$(wait_infile "$CLOUDFLARE_LOG" 'https://.*\.trycloudflare.com' "o")
+tunnel_info() {
+  url=$(printf %s\\n "$1" | grep -oE 'https://.*\.trycloudflare.com')
   keyfile=$(find "${TUNNEL_PREFIX}/etc" -type f -maxdepth 1 -name 'ssh_host_*_key.pub' | head -n 1)
   public_key=$(cut -d' ' -f1,2 < "$keyfile")
   verbose "Cloudflare tunnel started at %s" "$url"
 
-  reprint "$TUNNEL_GIST_FILE" <<EOF
+  if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
+    reprint "$TUNNEL_GIST_FILE" <<EOF
 
 cloudflare tunnel running, run the following command to connect securely:
     ssh-keygen -R $TUNNEL_HOSTNAME && echo '$TUNNEL_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $url' $(id -un)@$TUNNEL_HOSTNAME
@@ -82,7 +82,26 @@ cloudflare tunnel running, run the following command to connect securely:
 cloudflare tunnel running, run the following command to connect without verification (DANGER!):
     ssh -o ProxyCommand='cloudflared access tcp --hostname $url' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new $(id -un)@$TUNNEL_HOSTNAME
 
+DANGEROUS configuration snippet for \$HOME/.ssh/config:
+
+Host $TUNNEL_HOSTNAME
+  HostName $TUNNEL_HOSTNAME
+  ProxyCommand cloudflared access tcp --hostname $url
+  UserKnownHostsFile /dev/null
+  StrictHostKeyChecking accept-new
+  User $(id -un)
+
 EOF
+  fi
+
+  return 1;  # Keep reading the file, as per convention for when_infile
+}
+
+
+tunnel_wait() {
+  debug "Wait for cloudflare tunnels to start..."
+  when_infile "$CLOUDFLARE_LOG" 'E' \
+    'https://.*\.trycloudflare.com' tunnel_info
 }
 
 

@@ -32,6 +32,11 @@ done
 : "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 : "${TUNNEL_ALIAS:=}"
 : "${TUNNEL_REEXPOSE:="code"}"
+: "${TUNNEL_GIST_FILE:=""}"
+
+# Number of seconds to wait before restarting tunnel when starting did not work.
+# Set to negative to disable.
+: "${TUNNEL_RESTART:=5}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -79,13 +84,6 @@ code_tunnel_bg() {
   CODE_PID=$!
 }
 
-# Wait for the message containing URL to grant access to tunnel to appear in the
-# logs.
-tunnel_grant() {
-  # TODO: Rewrite with tail, since new access codes will be generated over time.
-  verbose "$(wait_infile "$CODE_LOG" 'grant access.*use code')"
-}
-
 
 # Authorize device. This will print out a URL to the console. Open it in a
 # browser and authorize the device.
@@ -121,20 +119,41 @@ tunnel_start() {
   fi
 }
 
+
+# Restart the tunnel when failure has been detected in the logs. This will kill
+# the code tunnel process, sleep and return 1: convention for the caller to know
+# that it should keep processing.
+tunnel_restart() {
+  warn "Error in tunnel: $1"
+  kill_tree "$CODE_PID"
+
+  if [ "$TUNNEL_RESTART" -ge 0 ]; then
+    sleep "$TUNNEL_RESTART"
+    tunnel_start
+  fi
+
+  return 1; # This was an error, continue reading the file
+}
+
+
 # Wait for the tunnel to be started and print out its URL
 tunnel_wait() {
   # Wait for "ready" message in log and extract URL from it.
   debug "Wait for code tunnel to start..."
-  url=$(wait_infile "$CODE_LOG" 'Open this link in your browser' 'F' | grep -oE 'https?://.*')
+  url=$(when_infile "$CODE_LOG" 'F' \
+          'error connecting to tunnel:' tunnel_restart \
+          'Open this link in your browser' - | grep -oE 'https?://.*')
 
   # Log URL, also make sure it appears in the container output.
   verbose "Code tunnel started at %s" "$url"
-  reprint "$TUNNEL_GIST_FILE" <<EOF
+  if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
+    reprint "$TUNNEL_GIST_FILE" <<EOF
 
 (vs)code tunnel running, access it from your browser at the following URL:
     $url
 
 EOF
+  fi
 }
 
 # Check if the tunnel provider is set and valid.
