@@ -34,6 +34,10 @@ done
 : "${TUNNEL_REEXPOSE:="code"}"
 : "${TUNNEL_GIST_FILE:=""}"
 
+# Number of seconds to wait before restarting tunnel when starting did not work.
+# Set to negative to disable.
+: "${TUNNEL_RESTART:=5}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="vscode tunnel starter"
@@ -115,11 +119,27 @@ tunnel_start() {
   fi
 }
 
+
+tunnel_restart() {
+  verbose "Error in tunnel: $1"
+  kill_tree "$CODE_PID"
+
+  if [ "$TUNNEL_RESTART" -gr 0 ]; then
+    sleep $TUNNEL_RESTART
+    tunnel_start
+  fi
+
+  return 1; # This was an error, continue reading the file
+}
+
+
 # Wait for the tunnel to be started and print out its URL
 tunnel_wait() {
   # Wait for "ready" message in log and extract URL from it.
   debug "Wait for code tunnel to start..."
-  url=$(wait_infile "$CODE_LOG" 'Open this link in your browser' 'F' | grep -oE 'https?://.*')
+  url=$(when_infile "$CODE_LOG" 'F' \
+          'error connecting to tunnel:' tunnel_restart \
+          'Open this link in your browser' - | grep -oE 'https?://.*')
 
   # Log URL, also make sure it appears in the container output.
   verbose "Code tunnel started at %s" "$url"
