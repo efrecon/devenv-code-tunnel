@@ -67,9 +67,8 @@ tunnel_start() (
 )
 
 
-tunnel_wait() {
-  debug "Wait for cloudflare tunnel to start..."
-  url=$(wait_infile "$CLOUDFLARE_LOG" 'https://.*\.trycloudflare.com' "o")
+tunnel_info() {
+  url=$(printf %s\\n "$1" | grep -oE 'https://.*\.trycloudflare.com')
   keyfile=$(find "${TUNNEL_PREFIX}/etc" -type f -maxdepth 1 -name 'ssh_host_*_key.pub' | head -n 1)
   public_key=$(cut -d' ' -f1,2 < "$keyfile")
   verbose "Cloudflare tunnel started at %s" "$url"
@@ -94,6 +93,15 @@ Host $TUNNEL_HOSTNAME
 
 EOF
   fi
+
+  return 1;  # Keep reading the file, as per convention for when_infile
+}
+
+
+tunnel_wait() {
+  debug "Wait for cloudflare tunnels to start..."
+  when_infile "$CLOUDFLARE_LOG" 'E' \
+    'https://.*\.trycloudflare.com' tunnel_info
 }
 
 
