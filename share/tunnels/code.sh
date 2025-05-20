@@ -124,7 +124,7 @@ tunnel_start() {
 # the code tunnel process, sleep and return 1: convention for the caller to know
 # that it should keep processing.
 tunnel_restart() {
-  verbose "Error in tunnel: $1"
+  warn "Error in tunnel: $1"
   kill_tree "$CODE_PID"
 
   if [ "$TUNNEL_RESTART" -ge 0 ]; then
