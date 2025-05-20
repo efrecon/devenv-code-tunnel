@@ -62,9 +62,9 @@ check_int "$NOTIFY_SLEEP" "$NOTIFY_RESPITE"
 
 notify_trigger() {
   if [ "$NOTIFY_RESPITE" -gt 0 ]; then
-    debug "File %s changed, available at NOTIFY_CHANGE, running command in %d s" "$1" "$NOTIFY_RESPITE"
+    trace "File %s changed, running command in %d s" "$1" "$NOTIFY_RESPITE"
   else
-    debug "File %s changed, available at NOTIFY_CHANGE, running command" "$1"
+    trace "File %s changed, running command" "$1"
   fi
 
   # Export the path to the file that changed, so that it can be used in the
@@ -82,7 +82,9 @@ notify_trigger() {
       kill -TERM "$NOTIFY_PID" 2>/dev/null || true
     fi
     # Schedule the command to run after the respite time in background
-    sleep "$NOTIFY_RESPITE" && "$@" &
+    sleep "$NOTIFY_RESPITE" && \
+      verbose "File %s changed, available at NOTIFY_CHANGE, running $*" "$NOTIFY_CHANGE" && \
+      "$@" &
     NOTIFY_PID=$!
   else
     "$@"
