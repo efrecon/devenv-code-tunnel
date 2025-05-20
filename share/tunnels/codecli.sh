@@ -120,12 +120,15 @@ tunnel_start() {
 }
 
 
+# Restart the tunnel when failure has been detected in the logs. This will kill
+# the code tunnel process, sleep and return 1: convention for the caller to know
+# that it should keep processing.
 tunnel_restart() {
   verbose "Error in tunnel: $1"
   kill_tree "$CODE_PID"
 
-  if [ "$TUNNEL_RESTART" -gr 0 ]; then
-    sleep $TUNNEL_RESTART
+  if [ "$TUNNEL_RESTART" -ge 0 ]; then
+    sleep "$TUNNEL_RESTART"
     tunnel_start
   fi
 
