@@ -32,6 +32,7 @@ done
 : "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
 : "${TUNNEL_ALIAS:=}"
 : "${TUNNEL_REEXPOSE:="code"}"
+: "${TUNNEL_GIST_FILE:=""}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -122,12 +123,14 @@ tunnel_wait() {
 
   # Log URL, also make sure it appears in the container output.
   verbose "Code tunnel started at %s" "$url"
-  reprint "$TUNNEL_GIST_FILE" <<EOF
+  if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
+    reprint "$TUNNEL_GIST_FILE" <<EOF
 
 (vs)code tunnel running, access it from your browser at the following URL:
     $url
 
 EOF
+  fi
 }
 
 # Check if the tunnel provider is set and valid.
