@@ -48,29 +48,15 @@ log_init INSTALL
   && BINDIR="${INSTALL_USER_PREFIX}/bin" \
   || BINDIR="${INSTALL_PREFIX}/bin"
 
-# Install the github CLI.
-gh=$(internet_bintgz_installer \
-          "$INSTALL_GITHUB_URL" \
-          "$BINDIR" \
-          "gh" \
-          "$INSTALL_GITHUB_SUMS")
-# Verify installation through printing the version.
-verbose "Installed github CLI %s" "$("$gh" --version)"
-
-# Install the gitlab CLI.
-glab=$(internet_bintgz_installer \
-          "$INSTALL_GITLAB_URL" \
-          "$BINDIR" \
-          "glab" \
-          "$INSTALL_GITLAB_SUMS")
-# Verify installation through printing the version.
-verbose "Installed gitlab CLI %s" "$("$glab" --version)"
-
-# Install the gitea CLI.
-tea=$(internet_bin_installer \
-          "$INSTALL_TEA_URL" \
-          "$BINDIR" \
-          "tea" \
-          "$INSTALL_TEA_SUM")
-# Verify installation through printing the version.
-verbose "Installed gitea CLI %s" "$("$tea" --version)"
+# Install the various CLIs using our installation functions.
+for forge in \
+  "github|$INSTALL_GITHUB_URL|$INSTALL_GITHUB_SUMS|internet_bintgz_installer|gh" \
+  "gitlab|$INSTALL_GITLAB_URL|$INSTALL_GITLAB_SUMS|internet_bintgz_installer|glab" \
+  "gitea|$INSTALL_TEA_URL|$INSTALL_TEA_SUM|internet_bin_installer|tea"; do
+  IFS="|" read -r name url sums installer cmd <<EOF
+$forge
+EOF
+  debug "Installing %s CLI in %s..." "$name" "$BINDIR"
+  bin=$($installer "$url" "$BINDIR" "$cmd" "$sums")
+  verbose "Installed %s CLI %s" "$name" "$("$bin" --version)"
+done
