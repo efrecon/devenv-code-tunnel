@@ -196,6 +196,8 @@ get_arch() {
   printf %s\\n "$arch"
 }
 
+get_golang_arch() { get_arch x86_64 amd64 i686 386; }
+
 
 get_os() {
   printf %s\\n "$(uname | to_lower)"
