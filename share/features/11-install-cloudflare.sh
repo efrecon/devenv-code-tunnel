@@ -31,7 +31,7 @@ done
 : "${INSTALL_CLOUDFLARED_VERSION:="2025.4.0"}"
 
 # URL to download the code CLI from.
-: "${INSTALL_CLOUDFLARED_URL:="https://github.com/cloudflare/cloudflared/releases/download/${INSTALL_CLOUDFLARED_VERSION}/cloudflared-$(get_os)-$(get_arch x86_64 amd64 i686 386)"}"
+: "${INSTALL_CLOUDFLARED_URL:="https://github.com/cloudflare/cloudflared/releases/download/${INSTALL_CLOUDFLARED_VERSION}/cloudflared-$(get_os)-$(get_golang_arch)"}"
 : "${INSTALL_CLOUDFLARED_SUMS:="https://github.com/cloudflare/cloudflared/releases/tag/${INSTALL_CLOUDFLARED_VERSION}"}"
 
 
