@@ -27,24 +27,50 @@ done
 : "${INSTALL_USER_PREFIX:="${HOME}/.local"}"
 : "${INSTALL_TARGET:="user"}"
 
-: "${INSTALL_GITHUB_VERSION:="2.71.2"}"
-: "${INSTALL_GITHUB_URL:="https://github.com/cli/cli/releases/download/v${INSTALL_GITHUB_VERSION}/gh_${INSTALL_GITHUB_VERSION}_$(get_os)_$(get_arch x86_64 amd64 i686 386).tar.gz"}"
+: "${INSTALL_GITHUB_VERSION:="2.73.0"}"
+: "${INSTALL_GITHUB_URL:="https://github.com/cli/cli/releases/download/v${INSTALL_GITHUB_VERSION}/gh_${INSTALL_GITHUB_VERSION}_$(get_os)_$(get_golang_arch).tar.gz"}"
 : "${INSTALL_GITHUB_SUMS:="https://github.com/cli/cli/releases/download/v${INSTALL_GITHUB_VERSION}/gh_${INSTALL_GITHUB_VERSION}_checksums.txt"}"
+
+: "${INSTALL_GITLAB_VERSION:="1.57.0"}"
+: "${INSTALL_GITLAB_URL:="https://gitlab.com/gitlab-org/cli/-/releases/v${INSTALL_GITLAB_VERSION}/downloads/glab_${INSTALL_GITLAB_VERSION}_$(get_os)_$(get_golang_arch).tar.gz"}"
+: "${INSTALL_GITLAB_SUMS:="https://gitlab.com/gitlab-org/cli/-/releases/v${INSTALL_GITLAB_VERSION}/downloads/checksums.txt"}"
+
+: "${INSTALL_TEA_VERSION:="0.9.2"}"
+: "${INSTALL_TEA_URL:="https://dl.gitea.com/tea/${INSTALL_TEA_VERSION}/tea-${INSTALL_TEA_VERSION}-$(get_os)-$(get_golang_arch)"}"
+: "${INSTALL_TEA_SUM:="https://dl.gitea.com/tea/${INSTALL_TEA_VERSION}/tea-${INSTALL_TEA_VERSION}-$(get_os)-$(get_golang_arch).sha256"}"
 
 log_init INSTALL
 
 
-# Install the github CLI in the proper directory location, i.e. as per
-# INSTALL_TARGET preference.
+# Decide target directory for the installations, based on the INSTALL_TARGET
+# preference.
 [ "$INSTALL_TARGET" = "user" ] \
   && BINDIR="${INSTALL_USER_PREFIX}/bin" \
   || BINDIR="${INSTALL_PREFIX}/bin"
+
+# Install the github CLI.
 gh=$(internet_bintgz_installer \
           "$INSTALL_GITHUB_URL" \
           "$BINDIR" \
           "gh" \
           "$INSTALL_GITHUB_SUMS")
-
 # Verify installation through printing the version.
 verbose "Installed github CLI %s" "$("$gh" --version)"
 
+# Install the gitlab CLI.
+glab=$(internet_bintgz_installer \
+          "$INSTALL_GITLAB_URL" \
+          "$BINDIR" \
+          "glab" \
+          "$INSTALL_GITLAB_SUMS")
+# Verify installation through printing the version.
+verbose "Installed gitlab CLI %s" "$("$glab" --version)"
+
+# Install the gitea CLI.
+tea=$(internet_bin_installer \
+          "$INSTALL_TEA_URL" \
+          "$BINDIR" \
+          "tea" \
+          "$INSTALL_TEA_SUM")
+# Verify installation through printing the version.
+verbose "Installed gitea CLI %s" "$("$tea" --version)"
