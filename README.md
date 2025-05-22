@@ -46,6 +46,13 @@ following features:
 
   [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 
+Even more in a hurry? Run the following one liner to run `devenv.sh` directly
+from GitHub. This example will only print the help through the `-h` option.
+
+```bash
+curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/heads/main/devenv.sh | sh -s - -h
+```
+
 ### Manually with `docker`
 
 Build using the following command, this will create an image called
