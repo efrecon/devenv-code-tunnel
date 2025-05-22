@@ -1,4 +1,4 @@
-# dev environment in a container, tunneled by vscode
+# Tunneled dev environments in containers
 
 ## Usage
 
