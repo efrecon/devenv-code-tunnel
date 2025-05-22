@@ -38,19 +38,23 @@ error() {
 }
 
 usage() {
-  # This uses the comments behind the options to show the help. Not extremely
-  # correct, but effective and simple.
-  echo "$(basename "$0") -- Devenv Creator" && \
-    grep "[[:space:]].) #" "$0" |
-    sed 's/#//' |
-    sed -r 's/([a-zA-Z-])\)/-\1/'
-  echo
-  echo "options are followed by name of volume or directory to share with the container."
-  echo "If no volume or directory is given, the current directory will be used."
-  echo "Everything else is passed to the container."
-  echo "Examples:"
-  echo "  $(basename "$0") devenv -v;  # Creates and use a devenv volume, passing -v to the container entrypoint."
-  echo "  $(basename "$0") -- -v;      # Mount the current directory, passing -v to the container entrypoint."
+  cat <<EOF
+Usage: $(basename "$0") [options] [volume|directory] [--] [args...]
+Options:
+  -i <path>   Path to private SSH key to pass to container. Default to best guess from .ssh directory.
+  -I <image>  Docker image to use. Default to latest full image.
+  -n <name>   Name of the container to use. Default based on volume or directory name mounted.
+  -o <name>   Container orchestrator to use. Default picks first of podman or docker.
+  -t <name>   Name of the tunnel to use. Default to hostname-containername.
+  -h          Show this help message and exit.
+
+First argument is the name of a volume or directory to share with the container.
+If no volume or directory is given, the current directory will be used.
+Everything else is passed to the container, as is.
+Examples:
+  $(basename "$0") devenv -v;  # Creates and use a devenv volume, passing -v to the container entrypoint.
+  $(basename "$0") -- -v;      # Mount the current directory, passing -v to the container entrypoint.
+EOF
 
   exit "${1:-0}"
 }
@@ -113,8 +117,6 @@ if [ "$#" -gt 0 ]; then
     # First argument is an option, so we don't use it as the root
     # directory/volume name.
     root="$(pwd)"
-    # automatically shift the first argument
-    [ "$1" = "--" ] && shift
   elif [ -n "$1" ]; then
     # We had a first argument, use it as the root (can be a volume or a
     # directory)
@@ -128,6 +130,9 @@ if [ "$#" -gt 0 ]; then
 else
   root="$(pwd)"
 fi
+
+# Shift over the double dash, if present.
+[ -n "${1:-}" ] && [ "$1" = "--" ] && shift
 
 # When no container name is given, use the name of the volume or the directory
 # name.
