@@ -65,7 +65,7 @@ log_init INSTALL
 node_version() {
   download "${INSTALL_ROOTURL}/index.tab" |
     grep "^v${INSTALL_NODE_VERSION}" |
-    awk '/^v[0-9]/{ print $1; exit }'
+    awk '/^v[0-9]/{ print $1; exit }' || true
 }
 
 
@@ -248,6 +248,9 @@ if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # Find out the version out of the official ones
   assert_version "$INSTALL_NODE_VERSION"
   latest=$(node_version)
+  if [ -z "$latest" ]; then
+    error "No latest version of Node.js matching %s found" "$INSTALL_NODE_VERSION"
+  fi
   debug "Installing Node %s" "$latest"
 
   if [ "$INSTALL_NODE_SOURCE" = "auto" ]; then
