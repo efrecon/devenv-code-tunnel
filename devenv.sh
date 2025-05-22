@@ -38,7 +38,7 @@ error() {
 }
 
 usage() {
-  # This uses the comments behind the options to show the help. Not extremly
+  # This uses the comments behind the options to show the help. Not extremely
   # correct, but effective and simple.
   echo "$(basename "$0") -- Devenv Creator" && \
     grep "[[:space:]].) #" "$0" |
@@ -169,11 +169,10 @@ fi
 set -- \
     -d \
     --name "$DEVENV_NAME" \
+    --hostname "$DEVENV_TUNNEL" \
     -v "$root:/home/coder:Z" \
     -v "$DEVENV_IDENTITY:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY"):Z,ro" \
     -v "${DEVENV_IDENTITY}.pub:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY").pub:Z,ro" \
-    --hostname "$DEVENV_TUNNEL" \
-    --name "$DEVENV_NAME" \
     --privileged \
     --restart unless-stopped \
     "$DEVENV_IMAGE" \
