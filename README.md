@@ -18,6 +18,34 @@ from your browser.
 You can set the environment variable `TUNNEL_NAME` to choose the name of your
 tunnel.
 
+### Using the Standalone Helper
+
+The standalone helper aims at quickly creating containerized development
+environments based on the images created by this project. It uses sensible
+defaults. Start by making sure [`devenv.sh`](devenv.sh) is accessible from your
+`$PATH`. Run the following to create a development environment with the
+all-inclusive official [image].
+
+```bash
+devenv.sh devenv -v
+```
+
+This will create a (privileged) container, running in the background with the
+following features:
+
++ A volume named after the first argument, `devenv` will be created, if
+  necessary and mounted into the development environment as the home directory
+  for the user `coder`.
++ The local container will also be named `devenv`. If there was an existing
+  container running under that name, it will be removed.
++ The vscode tunnel will be called after `<hostname>-devenv`, where `<hostname>`
+  will be the actual name of the host that the command is run on.
++ The `-v` option will be passed to the entrypoint of the container, providing
+  for more information in the logs of the container. You can pass any
+  [option](#quick-options-tunnelsh-run-down) recognized by the entrypoint.
+
+  [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
+
 ### Manually with `docker`
 
 Build using the following command, this will create an image called
@@ -75,6 +103,17 @@ the following options.
   your environment and dotfiles, for example. To run this [gist], give its raw
   URL as a value, i.e.
   `https://gist.githubusercontent.com/efrecon/a9addf9f5812212366ede103bfc211f6/raw`
++ `-g` is the name of a GitHub user (you?!) to allow for connecting into the
+  cloudflare tunnel via SSH.
++ `-G` is the URL to a GIST that will be updated with details about the created
+  tunnels. Under the root of that GIST, a file named after the name of the
+  tunnel, with the `.txt` extension will be maintained with access content. For
+  additional security, you should make that GIST private. This requires the
+  `git` feature to be installed.
++ `-T` selects the tunnels that are to be started, provided they have been
+  installed in the image. The default is to start all tunnels.
++ `-L` selects the logs to reprint inside the main container logs. Specify a `-`
+  to not reprint anything.
 
   [gist]: https://gist.github.com/efrecon/a9addf9f5812212366ede103bfc211f6
 
