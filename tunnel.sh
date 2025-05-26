@@ -67,7 +67,7 @@ done
 # List of services which logs we should re-expose to the main container log.
 # When empty, all services will be re-exposed. Set to a dash (-) to disable, for
 # example.
-: "${TUNNEL_REEXPOSE:=""}"
+: "${TUNNEL_REEXPOSE:="-"}"
 
 # Gist where to publish tunnel details
 : "${TUNNEL_GIST:=""}"

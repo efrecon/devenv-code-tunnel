@@ -45,12 +45,6 @@ sshd_wait() {
     sleep 1
     trace "Waiting for sshd to start on port %s..." "$TUNNEL_SSH"
   done
-  if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'sshd'; then
-    debug "sshd responding on port %s, forwarding logs from %s" "$TUNNEL_SSH" "${TUNNEL_PREFIX}/log/sshd.log"
-    "$CLOUDFLARE_LOGGER" -s "sshd" -- "${TUNNEL_PREFIX}/log/sshd.log" &
-  else
-    debug "sshd responding on port %s" "$TUNNEL_SSH"
-  fi
 }
 
 

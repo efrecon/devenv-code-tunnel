@@ -31,6 +31,8 @@ bin_name
 
 : "${SSHD_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
 
+: "${SSHD_REEXPOSE:="${TUNNEL_REEXPOSE:-"sshd"}"}"
+
 : "${SSHD_USER:=""}"
 
 # GitHub user to fetch keys from
@@ -194,6 +196,10 @@ if [ -z "$SSHD_USER" ]; then
   verbose "Restricting sshd to user %s" "$SSHD_USER"
 fi
 
+SSHD_ORCHESTRATION_DIR=${SSHD_ROOTDIR}/../../share/orchestration
+SSHD_LOGGER=${SSHD_ORCHESTRATION_DIR}/logger.sh
+[ -x "$SSHD_LOGGER" ] || error "Cannot find logger.sh"
+
 # If we are to daemonize, do it now and exit. Export all our variables to the
 # daemon so it starts the same way this script was started.
 if ! is_true "$_SSHD_PREVENT_DAEMONIZATION" && is_true "$SSHD_DAEMONIZE"; then
@@ -207,4 +213,9 @@ configure_sshd
 touch "$SSHD_LOGFILE"
 as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" "$@" &
 pid_sshd=$!
-verbose "sshd started with pid %s. Logs at %s" "$pid_sshd" "$SSHD_LOGFILE"
+if [ -z "$SSHD_REEXPOSE" ] || printf %s\\n "$SSHD_REEXPOSE" | grep -qF 'sshd'; then
+  verbose "sshd started with pid %s, forwarding logs from %s" "$pid_sshd" "$SSHD_LOGFILE"
+  "$SSHD_LOGGER" -s "sshd" -- "$SSHD_LOGFILE" &
+else
+  verbose "sshd started with pid %s. Logs at %s" "$pid_sshd" "$SSHD_LOGFILE"
+fi

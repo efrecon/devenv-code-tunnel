@@ -29,6 +29,8 @@ bin_name
 
 : "${DOCKERD_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
 
+: "${DOCKERD_REEXPOSE:="${TUNNEL_REEXPOSE:-"dockerd"}"}"
+
 # Where the docker daemon listens, defaults to the standard docker socket.
 : "${DOCKERD_SOCK:="/var/run/docker.sock"}"
 
@@ -103,11 +105,15 @@ if ! is_true "$_DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; 
 fi
 
 DOCKERD_LOGFILE="${DOCKERD_PREFIX}/log/dockerd.log"
+DOCKERD_ORCHESTRATION_DIR=${DOCKERD_ROOTDIR}/../../share/orchestration
+DOCKERD_LOGGER=${DOCKERD_ORCHESTRATION_DIR}/logger.sh
+[ -x "$DOCKERD_LOGGER" ] || error "Cannot find logger.sh"
+
 dockerd_start
 dockerd_wait
-if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'dockerd'; then
+if [ -z "$DOCKERD_REEXPOSE" ] || printf %s\\n "$DOCKERD_REEXPOSE" | grep -qF 'dockerd'; then
   verbose "Docker daemon responding on socket %s, forwarding logs from %s" "$DOCKERD_SOCK" "$DOCKERD_LOGFILE"
-  "${DOCKERD_ROOTDIR}/../../share/orchestration/logger.sh" -s "dockerd" -- "$DOCKERD_LOGFILE" &
+  "$DOCKERD_LOGGER" -s "dockerd" -- "$DOCKERD_LOGFILE" &
 else
   verbose "Docker daemon responding on socket %s, logs at %s" "$DOCKERD_SOCK" "$DOCKERD_LOGFILE"
 fi
