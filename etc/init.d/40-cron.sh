@@ -8,7 +8,7 @@ set -euo pipefail
 CRON_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in log common delegate system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${CRON_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090

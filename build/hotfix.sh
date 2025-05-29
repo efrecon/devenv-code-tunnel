@@ -2,13 +2,15 @@
 
 # This script is used to apply hotfixes.
 
+# Shell sanity. Stop on errors, undefined variables and pipeline errors.
+# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
 set -euo pipefail
 
 # Absolute location of the script where this script is located.
 HOTFIX_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in log; do
   for d in ../lib lib; do
     if [ -d "${HOTFIX_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
