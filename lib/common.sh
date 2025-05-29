@@ -79,6 +79,8 @@ _logtag() {
     _CODER_BINTAG=">${_CODER_BINTAG}<"
   done
   _CODER_BINTAG=$(printf %s "$_CODER_BINTAG" | cut -c "1-${1:-14}")
+  _CODER_BINTAG=$(printf %s "$_CODER_BINTAG" | sed -E "s/>/$(dark_gray ">")/g")
+  _CODER_BINTAG=$(printf %s "$_CODER_BINTAG" | sed -E "s/</$(dark_gray "<")/g")
 }
 
 # Print a log line. The first argument is a (preferred) 3 letters human-readable
@@ -102,9 +104,9 @@ _logline() {
 
   # shellcheck disable=SC2059 # We want to expand the format string
   printf '%s [%s] [%s] %s\n' \
-    "$(dark_gray "$_CODER_BINTAG")" \
+    "$_CODER_BINTAG" \
     "$_lvl" \
-    "$(date +'%Y%m%d-%H%M%S')" \
+    "$(dark_gray "$(date +'%Y%m%d-%H%M%S')")" \
     "$(printf "$@")"
 }
 
