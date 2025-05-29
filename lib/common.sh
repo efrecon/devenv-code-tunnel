@@ -8,6 +8,15 @@
 # CODER_BIN: The name of the script, used for logging here.
 # CODER_VERBOSE: The verbosity level, the higher the more verbose.
 # CODER_LOG: Where to send logs. 0: none, 1: stdout, 2: stderr, <file>
+# CODER_INTERACTIVE: Whether to use colours in the output. 0: no, 1: yes.
+
+# When run at the terminal, the default is to set MG_INTERACTIVE to be 1,
+# turning on colouring for all calls to the colouring functions contained here.
+if [ -t 1 ]; then
+    CODER_INTERACTIVE=${CODER_INTERACTIVE:-1}
+else
+    CODER_INTERACTIVE=${CODER_INTERACTIVE:-0}
+fi
 
 # Given a path, return it's clean base name, i.e. no extension, and no leading
 # ordering numbers, i.e. 01-xxxx.sh -> xxxx
@@ -29,6 +38,24 @@ bin_name() {
   fi
 }
 
+# Colourisation support for logging and output.
+_colour() {
+  if [ "$CODER_INTERACTIVE" = "1" ]; then
+    # shellcheck disable=SC2086
+    printf '\033[1;31;'${1}'m%b\033[0m' "$2"
+  else
+    printf -- "%b" "$2"
+  fi
+}
+green() { _colour "32" "$1"; }
+red() { _colour "31" "$1"; }
+yellow() { _colour "33" "$1"; }
+blue() { _colour "34" "$1"; }
+magenta() { _colour "35" "$1"; }
+cyan() { _colour "36" "$1"; }
+dark_gray() { _colour "90" "$1"; }
+light_gray() { _colour "37" "$1"; }
+
 # Print usage information and exit. Uses the comments in the script to show the
 # options.
 usage() {
@@ -45,7 +72,6 @@ usage() {
   exit "${1:-0}"
 }
 
-# PML: Poor Man's Logging...
 # shellcheck disable=SC2120 # We just want to use the default value...
 _logtag() {
   _CODER_BINTAG=$CODER_BIN
@@ -59,13 +85,24 @@ _logtag() {
 # log-level. All other arguments are passed blindly to printf, a builtin
 # function.
 _logline() {
-  # Capture level and shift it away, rest will be passed blindly to printf
-  _lvl=${1:-LOG}; shift
+  # Capture level, colorize it and shift it away, rest will be passed blindly to
+  # printf
+  case "${1:-}" in
+    TRC) _lvl=$(dark_gray "TRC") ;;
+    DBG) _lvl=$(light_gray "DBG") ;;
+    NFO) _lvl=$(blue "NFO") ;;
+    WRN) _lvl=$(red "WRN") ;;
+    ERR) _lvl=$(magenta "ERR") ;;
+    *) _lvl=$(light_gray "${1:-LOG}") ;;
+  esac
+  shift
+
   bin_name
   [ -z "${_CODER_BINTAG:-}" ] && _logtag
+
   # shellcheck disable=SC2059 # We want to expand the format string
   printf '%s [%s] [%s] %s\n' \
-    "$_CODER_BINTAG" \
+    "$(dark_gray "$_CODER_BINTAG")" \
     "$_lvl" \
     "$(date +'%Y%m%d-%H%M%S')" \
     "$(printf "$@")"
@@ -79,7 +116,7 @@ _log() {
     1) _logline "$@" >&1;;
     2) _logline "$@" >&2;;
     "") _logline "$@";;
-    *) _logline "$@" >> "$CODER_LOG";;
+    *) CODER_INTERACTIVE=0 _logline "$@" >> "$CODER_LOG";;
   esac
 }
 # log level functions, pass further to _log
