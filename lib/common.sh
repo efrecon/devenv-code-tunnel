@@ -32,7 +32,7 @@ bin_name() {
 
 # Colourisation support for logging and output.
 _colour() {
-  if [ "$CODER_INTERACTIVE" = "1" ]; then
+  if [ "${CODER_INTERACTIVE:-0}" = "1" ]; then
     # shellcheck disable=SC2086
     printf '\033[1;'${1}'m%b\033[0m' "$2"
   else
