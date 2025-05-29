@@ -137,6 +137,7 @@ fi
 # Export all variables that start with INSTALL_ so that they are available
 # to the features that are installed.
 export_varset "INSTALL"
+export CODER_INTERACTIVE
 
 # Find out where the features directory is.
 for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features"; do

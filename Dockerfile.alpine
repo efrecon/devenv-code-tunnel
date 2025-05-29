@@ -54,10 +54,11 @@ RUN chmod a+x ${INSTALL_PREFIX}/bin/*.sh && \
     INSTALL_GITHUB_VERSION=${INSTALL_GITHUB_VERSION} \
     INSTALL_GITLAB_VERSION=${INSTALL_GITLAB_VERSION} \
     INSTALL_TEA_VERSION=${INSTALL_TEA_VERSION} \
+    CODER_INTERACTIVE=1 \
         ${INSTALL_PREFIX}/bin/install.sh \
             -v \
             -u "${INSTALL_USER}:${INSTALL_GROUP}" && \
-    ${INSTALL_PREFIX}/bin/hotfix.sh -v
+    CODER_INTERACTIVE=1 ${INSTALL_PREFIX}/bin/hotfix.sh -v
 
 # Copy the init scripts and other files.
 COPY *.sh ${INSTALL_PREFIX}/bin/
