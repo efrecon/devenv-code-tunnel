@@ -10,14 +10,6 @@
 # CODER_LOG: Where to send logs. 0: none, 1: stdout, 2: stderr, <file>
 # CODER_INTERACTIVE: Whether to use colours in the output. 0: no, 1: yes.
 
-# When run at the terminal, the default is to set MG_INTERACTIVE to be 1,
-# turning on colouring for all calls to the colouring functions contained here.
-if [ -t 1 ]; then
-    CODER_INTERACTIVE=${CODER_INTERACTIVE:-1}
-else
-    CODER_INTERACTIVE=${CODER_INTERACTIVE:-0}
-fi
-
 # Given a path, return it's clean base name, i.e. no extension, and no leading
 # ordering numbers, i.e. 01-xxxx.sh -> xxxx
 cleanname() {
@@ -148,6 +140,16 @@ log_init() {
   bin_name
   CODER_VERBOSE=$(get_var "${1:-"$(to_upper "$CODER_BIN")"}_VERBOSE")
   CODER_LOG=$(get_var "${1:-"$(to_upper "$CODER_BIN")"}_LOG")
+
+  # When run at the terminal, the default is to set CODER_INTERACTIVE to be 1,
+  # turning on colouring for all calls to the colouring functions contained here.
+  if [ -z "${CODER_INTERACTIVE:-}" ]; then
+    if [ -t "$CODER_LOG" ]; then
+        CODER_INTERACTIVE=1
+    else
+        CODER_INTERACTIVE=0
+    fi
+  fi
 }
 
 # Source an environment file. Re-initialise the logging system in case the
