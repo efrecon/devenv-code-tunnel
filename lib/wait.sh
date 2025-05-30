@@ -69,7 +69,7 @@ when_infile() {
 
 wait_process_end() {
   [ -z "${1:-}" ] && error "wait_process_end: No PID given"
-  while kill -0 "$1"; do
+  while kill -0 "$1" 2>/dev/null; do
     sleep 1
   done
 }
