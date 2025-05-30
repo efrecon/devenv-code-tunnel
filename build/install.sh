@@ -148,7 +148,7 @@ for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features";
 done
 
 # Start features to install
-features=$(start_deps "feature" "$FEATURES_DIR" "$INSTALL_FEATURES" '??-install-*.sh')
+features=$(delegate "feature" "$FEATURES_DIR" "$INSTALL_FEATURES" '??-install-*.sh')
 
 # shellcheck disable=SC2043  # On purpose to allow for more "mandatory" features
 for feature in codecli; do

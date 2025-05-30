@@ -179,7 +179,7 @@ export CODER_INTERACTIVE
 
 # Start services from the init.d directory. Services are started in order and in
 # the foreground. Some of these will respawn in the background.
-start_deps "service" "$TUNNEL_SERVICES_DIR" "$TUNNEL_SERVICES" '??-*.sh' >/dev/null
+delegate "service" "$TUNNEL_SERVICES_DIR" "$TUNNEL_SERVICES" '??-*.sh' >/dev/null
 
 # Start the Internet hook to perform extra setup
 if [ -n "$TUNNEL_HOOK" ]; then
@@ -235,7 +235,7 @@ fi
 [ -n "${TUNNEL_GIST_FILE:-}" ] && export TUNNEL_GIST_FILE
 
 # Start tunnels in the background
-start_deps "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
+delegate "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
 
 # Push the tunnel details to the gist whenever the TUNNEL_GIST_FILE is changed.
 # Note that cloudflared tunnels will be established soonish, but code tunnels

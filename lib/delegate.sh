@@ -47,9 +47,9 @@ init_get() {
 # $4 is the pattern to match scripts against, default is *.sh
 # $5 is a boolean wether to start the script in the background or not.
 # Remaining arguments are passed to the scripts, as is.
-start_deps() {
-  [ -z "${1:-}" ] && error "start_deps: No type given"
-  [ -z "${2:-}" ] && error "start_deps: No directory given"
+delegate() {
+  [ -z "${1:-}" ] && error "delegate: No type given"
+  [ -z "${2:-}" ] && error "delegate: No directory given"
 
   _human_t=$1
   _scripts_d=$2
