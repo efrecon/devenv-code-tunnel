@@ -14,8 +14,7 @@ daemonize() {
 
   # Restart ourselves in the background, with same arguments.
   (
-    set -m
-    nohup "$0" -- "$@" </dev/null >/dev/null 2>&1 &
+    nohup "$0" "$@" </dev/null >/dev/null 2>&1 &
   )
 
   exit 0
