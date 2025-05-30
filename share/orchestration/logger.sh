@@ -8,7 +8,7 @@ set -euo pipefail
 LOGGER_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common system; do
+for lib in log common system; do
   for d in ../../lib ../lib lib; do
     if [ -d "${LOGGER_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
