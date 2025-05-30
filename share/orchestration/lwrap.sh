@@ -8,7 +8,7 @@ set -euo pipefail
 LWRAP_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in common; do
+for lib in log common; do
   for d in ../../lib ../lib lib; do
     if [ -d "${LWRAP_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
