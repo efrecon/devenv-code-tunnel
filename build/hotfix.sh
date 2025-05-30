@@ -10,7 +10,7 @@ set -euo pipefail
 HOTFIX_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in log; do
+for lib in log common; do
   for d in ../lib lib; do
     if [ -d "${HOTFIX_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
