@@ -44,8 +44,8 @@ _match_in_pairs() {
 # $2: the grep matching format, e.g. F or E.
 # $3 and further: a pattern, then a function, and so on.
 when_infile() {
-  [ -z "${1:-}" ] && error "wait_infile: No file path given"
-  [ -z "${2:-}" ] && error "wait_infile: No grep matching format given"
+  [ -z "${1:-}" ] && error "when_infile: No file path given"
+  [ -z "${2:-}" ] && error "when_infile: No grep matching format given"
   wait_file "$1"
 
   _fpath=$1
@@ -54,7 +54,7 @@ when_infile() {
   # We use a sub-shell so the main while loop can run independently and return
   # as soon as the condition is met but will keep running until it is met. See:
   # https://superuser.com/a/900134
-  ( tail -f -n +1 "$_fpath" & ) | while IFS= read -r _line; do
+  ( tail -f -- "$_fpath" & ) | while IFS= read -r _line; do
     _fn=$(_match_in_pairs "$_line" "$_opt" "$@" || true)
     if [ -n "$_fn" ]; then
       trace "'%s' matches, sending for processing to %s" "$_line" "$_fn"

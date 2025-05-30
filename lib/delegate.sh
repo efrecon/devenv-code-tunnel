@@ -34,7 +34,7 @@ init_list() {
 
 init_get() {
   [ -z "$1" ] && error "init_get: No directory given"
-  [ -z "$1" ] && error "init_get: No init script given"
+  [ -z "$2" ] && error "init_get: No init script given"
 
   find "$1" -type f -executable -maxdepth 1 -name "*${2}.sh"
 }
