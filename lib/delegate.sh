@@ -7,7 +7,7 @@
 daemonize() {
   bin_name
   _namespace=${1:-$(to_upper "$CODER_BIN")}
-  shift
+  [ "$#" -gt 0 ] && shift
 
   export_varset "$_namespace"
   export_varset "_$_namespace"
