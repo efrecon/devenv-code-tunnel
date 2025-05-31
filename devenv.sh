@@ -24,6 +24,12 @@ set -euo pipefail
 # Name of the tunnel to use.
 : "${DEVENV_TUNNEL:=""}"
 
+# Dry run mode, when set to 1, will not actually run the container, but
+# instead print the command that would be run.
+: "${DEVENV_DRY_RUN:=0}"
+
+# Detach mode, when set to 1, will run the container in the background.
+: "${DEVENV_DETACH:=0}"
 
 info() {
   _fmt="$1"
@@ -41,16 +47,22 @@ usage() {
   cat <<EOF
 Usage: $(basename "$0") [options] [volume|directory] [--] [args...]
 Options:
+  -d          Detach mode, run the container in the background.
   -i <path>   Path to private SSH key to pass to container. Default to best guess from .ssh directory.
   -I <image>  Docker image to use. Default to latest full image.
-  -n <name>   Name of the container to use. Default based on volume or directory name mounted.
+  -n          Dry-run: just print the command that would be run, do not run it.
+  -N <name>   Name of the container to use. Default based on volume or directory name mounted.
   -o <name>   Container orchestrator to use. Default picks first of podman or docker.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
   -h          Show this help message and exit.
 
 First argument is the name of a volume or directory to share with the container.
 If no volume or directory is given, the current directory will be used.
+-  When a volume is given, it will be created if it does not exist.
+-  When a directory is given, it will be mounted inside the container.
+
 Everything else is passed to the container, as is.
+
 Examples:
   $(basename "$0") devenv -v;  # Creates and use a devenv volume, passing -v to the container entrypoint.
   $(basename "$0") -- -v;      # Mount the current directory, passing -v to the container entrypoint.
@@ -59,13 +71,17 @@ EOF
   exit "${1:-0}"
 }
 
-while getopts "i:I:n:o:t:h" opt; do
+while getopts "di:I:N:o:t:nh" opt; do
   case "$opt" in
+    d) # Detach mode, run the container in the background.
+      DEVENV_DETACH=1;;
     i) # Path to private SSH key to pass to container. Default to best guess from .ssh directory
       DEVENV_IDENTITY="$OPTARG";;
     I) # Docker image to use. Default to latest full image.
       DEVENV_IMAGE="$OPTARG";;
-    n) # Name of the container to use. Default based on volume or directory name mounted.
+    n) # Dry-run: just print the command that would be run, do not run it.
+      DEVENV_DRY_RUN=1;;
+    N) # Name of the container to use. Default based on volume or directory name mounted.
       DEVENV_NAME="$OPTARG";;
     o) # Container orchestrator to use. Default picks first of podman or docker.
       DEVENV_ORCHESTRATOR="$OPTARG";;
@@ -79,6 +95,20 @@ while getopts "i:I:n:o:t:h" opt; do
       ;;
   esac
 done
+shift $((OPTIND - 1))
+
+runif() {
+  if [ "$DEVENV_DRY_RUN" = "1" ]; then
+    if [ "$1" = "exec" ]; then
+      # When running in dry-run mode, we don't want to run the command, but
+      # rather print it.
+      shift
+    fi
+    info "Dry-run mode, would run: %s" "$*"
+  else
+    "$@"
+  fi
+}
 
 # Pick container orchestrator. Default to podman, then docker. If neither is
 # found, exit with error.
@@ -150,20 +180,20 @@ fi
 
 # Force pulling of the image, do this early so we can fail fast if the image
 # cannot be pulled.
-"$DEVENV_ORCHESTRATOR" image pull "$DEVENV_IMAGE" || \
+runif "$DEVENV_ORCHESTRATOR" image pull "$DEVENV_IMAGE" || \
   error "Failed to pull image: %s" "$DEVENV_IMAGE"
 
 # Remove the container if it already exists.
 if "$DEVENV_ORCHESTRATOR" container list -qa --filter name="$DEVENV_NAME" | grep -q .; then
-  info "Container %s already exists, removing it." "$DEVENV_NAME"
-  "$DEVENV_ORCHESTRATOR" container rm -f "$DEVENV_NAME" || \
+  info "Container '%s' already exists, removing it." "$DEVENV_NAME"
+  runif "$DEVENV_ORCHESTRATOR" container rm -f "$DEVENV_NAME" || \
     error "Failed to remove container: %s" "$DEVENV_NAME"
 fi
 
 # When using a volume, check if it exists. If not, create it.
 if ! [ -d "$root" ]; then
   if ! "$DEVENV_ORCHESTRATOR" volume ls | grep -Fq "$root"; then
-    "$DEVENV_ORCHESTRATOR" volume create "$root" || \
+    runif "$DEVENV_ORCHESTRATOR" volume create "$root" || \
       error "Failed to create volume: %s" "$root"
   fi
 fi
@@ -172,22 +202,32 @@ fi
 # options/arguments that were passed to this script are passed to the container
 # entrypoint.
 set -- \
-    -d \
     --name "$DEVENV_NAME" \
     --hostname "$DEVENV_TUNNEL" \
     -v "$root:/home/coder:Z" \
     -v "$DEVENV_IDENTITY:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY"):Z,ro" \
     -v "${DEVENV_IDENTITY}.pub:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY").pub:Z,ro" \
     --privileged \
-    --restart unless-stopped \
     "$DEVENV_IMAGE" \
       "$@"
+
+# Detach or not. When not in detach mode, we will run the container in
+# interactive mode, with a terminal attached, and remove the container when it
+# exits.
+if [ "$DEVENV_DETACH" = "1" ]; then
+  info "Starting container '%s' in background" "$DEVENV_NAME"
+  set -- --restart unless-stopped -d "$@"
+else
+  info "Starting self-destructing container '%s' in foreground" "$DEVENV_NAME"
+  set -- -it --rm "$@"
+fi
 
 # Tweak the command to run the container when using podman.
 if [ "$DEVENV_ORCHESTRATOR" = "podman" ]; then
   set -- --userns=keep-id "$@"
 fi
-# Now finalize and run the command to start the container.
+# Now finalize the command to start the container.
 set -- "$DEVENV_ORCHESTRATOR" container run "$@"
-info "Starting container %s in background" "$DEVENV_NAME"
-exec "$@"
+
+# Replace the current shell with the command to run the container.
+runif exec "$@"
