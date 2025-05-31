@@ -180,8 +180,10 @@ fi
 
 # Force pulling of the image, do this early so we can fail fast if the image
 # cannot be pulled.
-runif "$DEVENV_ORCHESTRATOR" image pull "$DEVENV_IMAGE" || \
-  error "Failed to pull image: %s" "$DEVENV_IMAGE"
+if ! printf %s\n "$DEVENV_IMAGE" | grep -qE '^localhost/'; then
+  runif "$DEVENV_ORCHESTRATOR" image pull "$DEVENV_IMAGE" || \
+    error "Failed to pull image: %s" "$DEVENV_IMAGE"
+fi
 
 # Remove the container if it already exists.
 if "$DEVENV_ORCHESTRATOR" container list -qa --filter name="$DEVENV_NAME" | grep -q .; then
