@@ -58,8 +58,8 @@ Options:
 
 First argument is the name of a volume or directory to share with the container.
 If no volume or directory is given, the current directory will be used.
-+ When a volume is given, it will be created if it does not exist.
-+ When a directory is given, it will be mounted inside the container.
+- When a volume is given, it will be created if it does not exist.
+- When a directory is given, it will be mounted inside the container.
 
 Everything else is passed to the container, as is.
 
@@ -104,7 +104,7 @@ runif() {
       # rather print it.
       shift
     fi
-    info "Dry-run mode, would run:: %s" "$*"
+    info "Dry-run mode, would run: %s" "$*"
   else
     "$@"
   fi
