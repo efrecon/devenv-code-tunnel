@@ -26,10 +26,10 @@ set -euo pipefail
 
 # Dry run mode, when set to 1, will not actually run the container, but
 # instead print the command that would be run.
-: "${DEVENV_DRY_RUN:=""}"
+: "${DEVENV_DRY_RUN:=0}"
 
 # Detach mode, when set to 1, will run the container in the background.
-: "${DEVENV_DETACH:=""}"
+: "${DEVENV_DETACH:=0}"
 
 info() {
   _fmt="$1"
@@ -58,8 +58,8 @@ Options:
 
 First argument is the name of a volume or directory to share with the container.
 If no volume or directory is given, the current directory will be used.
-- When a volume is given, it will be created if it does not exist.
-- When a directory is given, it will be mounted inside the container.
+-  When a volume is given, it will be created if it does not exist.
+-  When a directory is given, it will be mounted inside the container.
 
 Everything else is passed to the container, as is.
 
@@ -98,7 +98,7 @@ done
 shift $((OPTIND - 1))
 
 runif() {
-  if [ -n "${DEVENV_DRY_RUN:-}" ] && [ "$DEVENV_DRY_RUN" = "1" ]; then
+  if [ "$DEVENV_DRY_RUN" = "1" ]; then
     if [ "$1" = "exec" ]; then
       # When running in dry-run mode, we don't want to run the command, but
       # rather print it.
@@ -214,7 +214,7 @@ set -- \
 # Detach or not. When not in detach mode, we will run the container in
 # interactive mode, with a terminal attached, and remove the container when it
 # exits.
-if [ -n "${DEVENV_DETACH:-}" ] && [ "$DEVENV_DETACH" = "1" ]; then
+if [ "$DEVENV_DETACH" = "1" ]; then
   info "Starting container '%s' in background" "$DEVENV_NAME"
   set -- --restart unless-stopped -d "$@"
 else
