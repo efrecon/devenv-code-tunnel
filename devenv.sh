@@ -180,7 +180,7 @@ fi
 
 # Force pulling of the image, do this early so we can fail fast if the image
 # cannot be pulled.
-if ! printf %s\n "$DEVENV_IMAGE" | grep -qE '^localhost/'; then
+if ! printf %s\\n "$DEVENV_IMAGE" | grep -qE '^localhost/'; then
   runif "$DEVENV_ORCHESTRATOR" image pull "$DEVENV_IMAGE" || \
     error "Failed to pull image: %s" "$DEVENV_IMAGE"
 fi
