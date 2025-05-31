@@ -67,8 +67,7 @@ tunnel_info() {
   public_key=$(cut -d' ' -f1,2 < "$keyfile")
   verbose "Cloudflare tunnel started at %s" "$url"
 
-  if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
-    reprint "$TUNNEL_GIST_FILE" <<EOF
+  reprint "$TUNNEL_GIST_FILE" <<EOF
 
 cloudflare tunnel running, run the following command to connect securely:
     ssh-keygen -R $TUNNEL_HOSTNAME && echo '$TUNNEL_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $url' $(id -un)@$TUNNEL_HOSTNAME
@@ -86,7 +85,6 @@ Host $TUNNEL_HOSTNAME
   User $(id -un)
 
 EOF
-  fi
 
   return 1;  # Keep reading the file, as per convention for when_infile
 }
