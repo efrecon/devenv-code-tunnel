@@ -30,6 +30,7 @@ bin_name
 : "${SSHD_LOG:="${TUNNEL_LOG:-"2"}"}"
 
 : "${SSHD_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
+: "${SSHD_USER_PREFIX:="${TUNNEL_USER_PREFIX:-"${HOME}/.local"}"}"
 
 : "${SSHD_REEXPOSE:="${TUNNEL_REEXPOSE:-"sshd"}"}"
 
@@ -45,15 +46,12 @@ bin_name
 # ecdsa, ed25519, or rsa. Keys will not be re-generated if they already exist.
 : "${SSHD_KEY:="ed25519"}"
 
-# Where to store sshd data
-: "${SSHD_CONFIG_DIR:="${SSHD_PREFIX}/etc/ssh"}"
-
 # Where to store sshd logs, will be accessible by the user
 : "${SSHD_LOGFILE:="${SSHD_PREFIX}/log/sshd.log"}"
 
 # Log level to use in sshd. One of: QUIET, FATAL, ERROR, INFO, VERBOSE, DEBUG,
 # DEBUG1, DEBUG2, and DEBUG3
-: "${SSHD_LOGLEVEL:="INFO"}"
+: "${SSHD_LOGLEVEL:="DEBUG3"}"
 
 # Environment file to load for reading defaults from.
 : "${SSHD_DEFAULTS:="${SSHD_ROOTDIR}/../${CODER_BIN}.env"}"
@@ -103,93 +101,84 @@ make_owned_dir() {
   as_root chmod go-rwx "$1"
 }
 
-
-configure_sshd() {
-  as_root mkdir -p "${SSHD_CONFIG_DIR}"
-  SSHD_CONFIG_USER="${SSHD_CONFIG_DIR%/}/user"
-  SSHD_CONFIG_SERVER="${SSHD_CONFIG_DIR%/}/server"
-  make_owned_dir "$SSHD_CONFIG_USER" "$SSHD_USER"
-  make_owned_dir "$SSHD_CONFIG_SERVER" "root"
-
-  as_root mkdir -p "${SSHD_PREFIX}/log"
-
+collect_github_keys() {
   if [ -n "$SSHD_GITHUB_USER" ]; then
-    verbose "Collecting public keys from %s" "$SSHD_GITHUB_USER"
-    download "https://github.com/${SSHD_GITHUB_USER}.keys" - > "${SSHD_CONFIG_USER}/authorized_keys"
-    chmod go-rwx "${SSHD_CONFIG_USER}/authorized_keys"
-  fi
-
-  if as_root test -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
-      && as_root test -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key.pub"; then
-    verbose "Found existing ssh host keys, skipping generation"
-  else
-    verbose "Generating ssh host keys"
-    for f in "ssh_host_${SSHD_KEY}_key" "ssh_host_${SSHD_KEY}_key.pub"; do
-      if [ -f "${SSHD_CONFIG_SERVER}/$f" ]; then
-        verbose "Removing old host key %s" "${SSHD_CONFIG_SERVER}/$f"
-        as_root rm -f "${SSHD_CONFIG_SERVER}/$f"
-      fi
-    done
-    as_root ssh-keygen \
-              -q \
-              -C "sshd for $SSHD_USER" \
-              -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
-              -N '' \
-              -t "$SSHD_KEY"
-  fi
-  as_root cp -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key.pub" "${SSHD_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
-
-  verbose "Making ssh host public key at %s readable by %s" "${SSHD_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub" "$SSHD_USER"
-  as_root chown "$SSHD_USER" "${SSHD_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
-
-  SSHD_TEMPLATE=$(mktemp)
-  cat <<'EOF' > "$SSHD_TEMPLATE"
-LogLevel $LOGLEVEL
-Port $PORT
-HostKey $PWD/server/ssh_host_$KEY_key
-PidFile $PWD/server/sshd.pid
-
-# PAM is necessary for password authentication on Debian-based systems
-UsePAM yes
-
-# Allow interactive authentication (default value)
-#KbdInteractiveAuthentication yes
-
-# Same as above but for older SSH versions (default value)
-#ChallengeResponseAuthentication yes
-
-# Allow password authentication (default value)
-PasswordAuthentication no
-
-# Only allow single user
-AllowUsers $USER
-
-# Turns on sftp-server
-Subsystem    sftp    /usr/lib/ssh/sftp-server
-
-# Force the shell for the user
-Match User $USER
-  # Only allow those keys
-  AuthorizedKeysFile $PWD/user/authorized_keys
-EOF
-
-  if [ -f "$SSHD_TEMPLATE" ]; then
-    sed \
-      -e "s,\$LOGLEVEL,${SSHD_LOGLEVEL},g" \
-      -e "s,\$PWD,${SSHD_CONFIG_DIR},g" \
-      -e "s,\$USER,${SSHD_USER},g" \
-      -e "s,\$PORT,${SSHD_PORT},g" \
-      -e "s,\$KEY,${SSHD_KEY},g" \
-      "$SSHD_TEMPLATE" | as_root tee "${SSHD_CONFIG_DIR}/sshd_config" > /dev/null
-    as_root chmod go-rwx "${SSHD_CONFIG_DIR}/sshd_config"
-    rm -f "$SSHD_TEMPLATE"
+    debug "Collecting public keys from %s" "$SSHD_GITHUB_USER"
+    ls -la "$HOME"
+    mkdir -p "$(dirname "$1")"
+    download "https://github.com/${SSHD_GITHUB_USER}.keys" - >> "$1"
+    chmod go-rwx "$1"
+    verbose "Collected public keys from '%s' to: %s" "$SSHD_GITHUB_USER" "$1"
   fi
 }
 
+generate_dropbear_keys() {
+  if [ -f "$2" ] && [ -f "${2}.pub" ]; then
+    verbose "Found existing pair of keys at '%s', skipping generation" "$2"
+  else
+    verbose "Generating dropbear host keys in %s" "${SSHD_CONFIG_SERVER}"
+    for f in "$2" "${2}.pub"; do
+      if [ -f "$f" ]; then
+        verbose "Removing old host key %s" "$f"
+        as_user "$1" rm -f "$f"
+      fi
+    done
+    as_user "$1" dropbearkey \
+                    -t "$SSHD_KEY" \
+                    -f "$2" \
+                    -C "sshd for $SSHD_USER"
+  fi
+}
 
-if ! check_command "sshd"; then
+generate_server_keys() {
+  verbose "Generating ssh host keys in %s" "${SSHD_CONFIG_SERVER}"
+  for f in "ssh_host_${SSHD_KEY}_key" "ssh_host_${SSHD_KEY}_key.pub"; do
+    if [ -f "${SSHD_CONFIG_SERVER}/$f" ]; then
+      verbose "Removing old host key %s" "${SSHD_CONFIG_SERVER}/$f"
+      as_user "$1" rm -f "${SSHD_CONFIG_SERVER}/$f"
+    fi
+  done
+  as_user "$1" ssh-keygen \
+                  -q \
+                  -C "sshd for $SSHD_USER" \
+                  -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
+                  -N '' \
+                  -t "$SSHD_KEY"
+}
+
+# TODO: Keep dropbear, get rid of sshd. Run it as root for ports under 1024. Perhaps pass the user to this function?
+configure_dropbear() {
+  # Create the directories with proper permissions
+  mkdir -p "$SSHD_CONFIG_USER" "$SSHD_CONFIG_SERVER"
+  chmod go-rwx "$SSHD_CONFIG_USER" "$SSHD_CONFIG_SERVER"
+
+  # Ensure we will be able to log
+  mkdir -p "$(dirname "$SSHD_LOGFILE")"
+
+  # Allow the user to login, pick keys from GitHub if given
+  for _crypto in rsa ecdsa ed25519; do
+    if [ -f "$HOME/.ssh/id_${_crypto}.pub" ]; then
+      cat "$HOME/.ssh/id_${_crypto}.pub" >> "${SSHD_CONFIG_USER}/authorized_keys"
+      verbose "Authorized existing %s to login" "$HOME/.ssh/id_${_crypto}.pub"
+    fi
+  done
+  collect_github_keys "${SSHD_CONFIG_USER}/authorized_keys"
+  sort -u -o "${SSHD_CONFIG_USER}/authorized_keys" "${SSHD_CONFIG_USER}/authorized_keys"
+  chmod go-rwx "${SSHD_CONFIG_USER}/authorized_keys"
+
+  # Generate the host keys if they do not exist, copy server public key to known
+  # location.
+  generate_dropbear_keys "$SSHD_USER" "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key"
+  # TODO: remove this, change in dependencies?
+  cp -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key.pub" "${SSHD_USER_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
+}
+
+if ! check_command "dropbear"; then
   exit 0
 fi
+
+
+# TODO: Once done, merge this branch into the feature/use-krun branch.
 
 if [ -z "$SSHD_USER" ]; then
   SSHD_USER=$(id -un)
@@ -209,10 +198,37 @@ if ! is_true "$_SSHD_PREVENT_DAEMONIZATION" && is_true "$SSHD_DAEMONIZE"; then
   daemonize SSHD "$@"
 fi
 
-configure_sshd
-touch "$SSHD_LOGFILE"
-as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" "$@" &
-pid_sshd=$!
+# TODO: "Killer" command for krun is: podman container run -it --rm --runtime=krun --userns=keep-id:uid=1000,gid=1000 --name devenv --hostname blue-devenv -v /home/emmanuel/.ssh/id_ed25519:/home/coder/.ssh/id_ed25519:Z,ro -v /home/emmanuel/.ssh/id_ed25519.pub:/home/coder/.ssh/id_ed25519.pub:Z,ro -v devenv:/home/coder:Z  -e TUNNEL_CLOUDFLARE_PROTOCOL=http2 -p 2222:2222 localhost/code_tunnel_minimal:latest -S 'system dockerd sshd cron' -vv -L sshd -g efrecon
+
+if [ "$SSHD_PORT" -gt 1024 ]; then
+  SSHD_CONFIG_DIR=${SSHD_USER_PREFIX}/etc/ssh
+  SSHD_CONFIG_USER="${SSHD_CONFIG_DIR%/}/user"
+  SSHD_CONFIG_SERVER="${SSHD_CONFIG_DIR%/}/server"
+  SSHD_LOGFILE=${SSHD_PREFIX}/log/sshd.log
+  configure_dropbear
+  touch "$SSHD_LOGFILE"
+  verbose "Starting dropbear sshd for user %s on port %s" "$SSHD_USER" "$SSHD_PORT"
+  # TODO: Restrict to same group as the one of the user?
+  dropbear \
+    -r "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
+    -D "${SSHD_CONFIG_USER}" \
+    -p "$SSHD_PORT" \
+    -G "$(id -gn)" \
+    -s \
+    -g \
+    -P "${SSHD_CONFIG_SERVER}/sshd.pid" \
+    -E \
+    "$@" 2>>"$SSHD_LOGFILE"
+  pid_sshd=$(cat "${SSHD_CONFIG_SERVER}/sshd.pid")
+else
+  # TODO: Rewrite with dropbear
+  SSHD_CONFIG_DIR=${SSHD_PREFIX}/etc/ssh
+  SSHD_LOGFILE=${SSHD_PREFIX}/log/sshd.log
+  configure_sshd_root
+  touch "$SSHD_LOGFILE"
+  as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" "$@" &
+  pid_sshd=$!
+fi
 if [ -z "$SSHD_REEXPOSE" ] || printf %s\\n "$SSHD_REEXPOSE" | grep -qF 'sshd'; then
   verbose "sshd started with pid %s, forwarding logs from %s" "$pid_sshd" "$SSHD_LOGFILE"
   "$SSHD_LOGGER" -s "sshd" -- "$SSHD_LOGFILE" &

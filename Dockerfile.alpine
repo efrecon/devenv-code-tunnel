@@ -1,4 +1,4 @@
-FROM alpine:3.21.3
+FROM alpine:3.22.0
 
 
 # Where to install our own stuff.
@@ -80,4 +80,4 @@ EXPOSE 2222
 # Run behind tini, capturing the entire process group to properly teardown all
 # subprocesses.
 STOPSIGNAL SIGINT
-ENTRYPOINT [ "/sbin/tini", "-v", "--", "tunnel.sh" ]
+ENTRYPOINT [ "/sbin/tini", "-vs", "--", "tunnel.sh" ]

@@ -109,13 +109,13 @@ if ! [ -d "${HOME}/.ssh" ]; then
   chmod go-rwx "${HOME}/.ssh"
   verbose "Created SSH directory in %s" "${HOME}/.ssh"
 fi
-ensure_ownership "${HOME}/.ssh"
+# ensure_ownership "${HOME}/.ssh"
 
 if ! [ -f "${HOME}/.ssh/known_hosts" ]; then
   touch "${HOME}/.ssh/known_hosts"
   chmod go-rwx "${HOME}/.ssh/known_hosts"
   verbose "Created SSH known_hosts file in %s" "${HOME}/.ssh/known_hosts"
 fi
-ensure_ownership "${HOME}/.ssh/known_hosts"
+# ensure_ownership "${HOME}/.ssh/known_hosts"
 
 authorize_github

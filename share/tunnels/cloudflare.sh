@@ -30,6 +30,10 @@ done
 : "${TUNNEL_GITHUB_USER:=""}"
 : "${TUNNEL_REEXPOSE:="cloudflared"}"
 : "${TUNNEL_GIST_FILE:=""}"
+# Protocol to use for the cloudflare tunnel. Force http2 when using krun, since
+# krun has problems with http3/quic.
+: "${TUNNEL_CLOUDFLARE_PROTOCOL:="auto"}"
+
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -48,23 +52,39 @@ sshd_wait() {
 }
 
 
+tunnel_pubkey() {
+  for _dir in "$TUNNEL_PREFIX"/etc "$TUNNEL_USER_PREFIX"/etc; do
+    if [ -d "$_dir" ]; then
+      keyfile=$(find "$_dir" -type f -maxdepth 1 -name 'ssh_host_*_key.pub' | head -n 1)
+      if [ -n "$keyfile" ]; then
+        cut -d' ' -f1,2 < "$keyfile"
+        return 0
+      fi
+    fi
+  done
+}
+
+
 tunnel_start() (
   # Remove all TUNNEL_ variables from the environment, since cloudflared
-  # respects some of them and we force settings through the command line.
+  # respects some of them and we force settings through the command line. Pass
+  # all remaining arguments blindly to the command.
   ssh_port="$TUNNEL_SSH"
+  protocol="$TUNNEL_CLOUDFLARE_PROTOCOL"
   unset_varset TUNNEL
 
   "$CLOUDFLARE_LWRAP" -- \
     "$CLOUDFLARE_BIN" tunnel \
       --no-autoupdate \
-      --url "tcp://localhost:$ssh_port" &
+      --protocol "${protocol}" \
+      --url "tcp://localhost:$ssh_port" \
+      "$@" &
 )
 
 
 tunnel_info() {
   url=$(printf %s\\n "$1" | grep -oE 'https://.*\.trycloudflare.com')
-  keyfile=$(find "${TUNNEL_PREFIX}/etc" -type f -maxdepth 1 -name 'ssh_host_*_key.pub' | head -n 1)
-  public_key=$(cut -d' ' -f1,2 < "$keyfile")
+  public_key=$(tunnel_pubkey)
   verbose "Cloudflare tunnel started at %s" "$url"
 
   reprint "$TUNNEL_GIST_FILE" <<EOF
@@ -119,5 +139,5 @@ if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'clou
   debug "Forwarding logs from %s" "$CLOUDFLARE_LOG"
   "$CLOUDFLARE_LOGGER" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG" &
 fi
-tunnel_start;  # Starts tunnel in the background
+tunnel_start "$@";  # Starts tunnel in the background
 tunnel_wait

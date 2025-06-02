@@ -26,8 +26,24 @@ as_root() {
 }
 
 
+# Create a temporary script that will call the remaining of the arguments.
+# This is because su is evil and -c option only takes a single command...
+su_user() {
+  USR=$1; shift
+  tmpf=$(mktemp)
+  printf '#!%s\n' "/bin/sh" > "$tmpf"
+  printf "exec" >> "$tmpf"
+  for a in "$@"; do
+    [ -n "$a" ] && printf ' "%s"' "$a" >> "$tmpf"
+  done
+  printf \\n >> "$tmpf"
+  chmod a+rx "$tmpf"
+  su -c "$tmpf" "$USR"
+  rm -f "$tmpf"
+}
+
 as_user() {
-  USR=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f1)
+  USR=$(printf %s\\n "${1:-"${INSTALL_USER:-"$TUNNEL_USER"}"}" | cut -d: -f1)
   shift
 
   if [ "$(id -un)" = "$USR" ]; then
@@ -35,18 +51,7 @@ as_user() {
   elif check_command sudo; then
     sudo -u "$USR" -- "$@"
   elif check_command su; then
-    # Create a temporary script that will call the remaining of the arguments.
-    # This is because su is evil and -c option only takes a single command...
-    tmpf=$(mktemp)
-    printf '#!%s\n' "/bin/sh" > "$tmpf"
-    printf "exec" >> "$tmpf"
-    for a in "$@"; do
-      [ -n "$a" ] && printf ' "%s"' "$a" >> "$tmpf"
-    done
-    printf \\n >> "$tmpf"
-    chmod a+rx "$tmpf"
-    su -c "$tmpf" "$USR"
-    rm -f "$tmpf"
+    su_user "$USR" "$@"
   else
     "$@"
   fi

@@ -147,6 +147,16 @@ pick_dir() {
   error "No %s binaries found in hierarchy" "${2:-$(basename "$1")}"
 }
 
+if [ "$(id -u)" = "0" ]; then
+  if [ -z "${TUNNEL_USER:-}" ]; then
+    TUNNEL_USER=$(grep -F '/home' /etc/passwd | head -n 1 | cut -d: -f1)
+    verbose "Guessed tunnel user as %s" "$TUNNEL_USER"
+  fi
+  verbose "Restarting tunnel starter as %s" "$TUNNEL_USER"
+  su_user "$TUNNEL_USER" "$0" "$@"
+fi
+
+verbose "Running tunnel starter as %s" "$(id -un)"
 
 # Create the alias for the home user
 [ -n "$TUNNEL_ALIAS" ] && alias_create "$TUNNEL_ALIAS"
@@ -175,7 +185,7 @@ fi
 # Export all variables that start with TUNNEL_ so that they are available to
 # subprocesses.
 export_varset "TUNNEL"
-export CODER_INTERACTIVE
+export CODER_INTERACTIVE; # Perdure colorization in the logs
 
 # Start services from the init.d directory. Services are started in order and in
 # the foreground. Some of these will respawn in the background.
