@@ -20,23 +20,23 @@ tunnel.
 
 ### Using the Standalone Helper
 
-The standalone helper aims at quickly creating containerized development
-environments based on the images created by this project. It uses sensible
-defaults. Start by making sure [`devenv.sh`](devenv.sh) is accessible from your
-`$PATH`. Run the following to create a development environment with the
-all-inclusive official [image].
+The standalone helper aims at quickly creating isolated development environments
+based on the images created by this project. It uses sensible defaults and, when
+possible, will prefer microVMs using podman's [krun]. Start by making sure
+[`devenv.sh`](devenv.sh) is accessible from your `$PATH`. Run the following to
+create a development environment with the all-inclusive official [image].
 
 ```bash
 devenv.sh devenv -v
 ```
 
-This will create a (privileged) container, running in the background with the
-following features:
+This will create a (privileged) container or VM, running in the background with
+the following features:
 
 + A volume named after the first argument, `devenv` will be created, if
   necessary and mounted into the development environment as the home directory
   for the user `coder`.
-+ The local container will also be named `devenv`. If there was an existing
++ The local container/VM will also be named `devenv`. If there was an existing
   container running under that name, it will be removed.
 + The vscode tunnel will be called after `<hostname>-devenv`, where `<hostname>`
   will be the actual name of the host that the command is run on.
@@ -53,10 +53,13 @@ from GitHub. This example will only print the help through the `-h` option.
 curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/heads/main/devenv.sh | sh -s - -h
 ```
 
+  [krun]: https://github.com/containers/crun/blob/main/krun.1.md
+
 ### Manually with `docker`
 
 Build using the following command, this will create an image called
-`code_tunnel`.
+`code_tunnel`. You can switch `docker` to `podman` if you prefer, both
+containerization technologies work.
 
 ```bash
 docker build -t code_tunnel .
