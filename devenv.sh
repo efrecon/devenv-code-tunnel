@@ -24,6 +24,10 @@ set -euo pipefail
 # Name of the tunnel to use.
 : "${DEVENV_TUNNEL:=""}"
 
+# Runtime to use for the container. When empty, will use default runtime,
+# preferably krun.
+: "${DEVENV_RUNTIME:=""}"
+
 # Dry run mode, when set to 1, will not actually run the container, but
 # instead print the command that would be run.
 : "${DEVENV_DRY_RUN:=0}"
@@ -53,6 +57,7 @@ Options:
   -n          Dry-run: just print the command that would be run, do not run it.
   -N <name>   Name of the container to use. Default based on volume or directory name mounted.
   -o <name>   Container orchestrator to use. Default picks first of podman or docker.
+  -r <name>   Container runtime to use, default is to prefer krun on podman, when possible.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
   -h          Show this help message and exit.
 
@@ -71,7 +76,7 @@ EOF
   exit "${1:-0}"
 }
 
-while getopts "di:I:N:o:t:nh" opt; do
+while getopts "di:I:N:o:t:r:nh" opt; do
   case "$opt" in
     d) # Detach mode, run the container in the background.
       DEVENV_DETACH=1;;
@@ -85,6 +90,8 @@ while getopts "di:I:N:o:t:nh" opt; do
       DEVENV_NAME="$OPTARG";;
     o) # Container orchestrator to use. Default picks first of podman or docker.
       DEVENV_ORCHESTRATOR="$OPTARG";;
+    r) # Runtime to use for the container. Default to krun, if available.
+      DEVENV_RUNTIME="$OPTARG";;
     t) # Name of the tunnel to use. Default to hostname-containername.
       DEVENV_TUNNEL="$OPTARG";;
     h) # Show help
@@ -206,10 +213,9 @@ fi
 set -- \
     --name "$DEVENV_NAME" \
     --hostname "$DEVENV_TUNNEL" \
-    -v "$root:/home/coder:Z" \
     -v "$DEVENV_IDENTITY:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY"):Z,ro" \
     -v "${DEVENV_IDENTITY}.pub:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY").pub:Z,ro" \
-    --privileged \
+    -v "$root:/home/coder:Z" \
     "$DEVENV_IMAGE" \
       "$@"
 
@@ -226,7 +232,23 @@ fi
 
 # Tweak the command to run the container when using podman.
 if [ "$DEVENV_ORCHESTRATOR" = "podman" ]; then
-  set -- --userns=keep-id "$@"
+  set -- --userns=keep-id:uid=1000,gid=1000 "$@"
+  if [ -z "$DEVENV_RUNTIME" ] && command -v krun >/dev/null 2>&1; then
+    DEVENV_RUNTIME=krun
+  fi
+  if [ "${DEVENV_RUNTIME:-}" = "krun" ]; then
+    set -- --runtime=krun --user 0:0 -e TUNNEL_CLOUDFLARE_PROTOCOL=http2 "$@"
+  elif [ -n "$DEVENV_RUNTIME" ]; then
+    set -- --runtime="$DEVENV_RUNTIME" --privileged "$@"
+  else
+    set -- --privileged "$@"
+  fi
+else
+  if [ -n "$DEVENV_RUNTIME" ]; then
+    set -- --runtime="$DEVENV_RUNTIME" --privileged "$@"
+  else
+    set -- --privileged "$@"
+  fi
 fi
 # Now finalize the command to start the container.
 set -- "$DEVENV_ORCHESTRATOR" container run "$@"
