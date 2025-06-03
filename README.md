@@ -30,14 +30,15 @@ create a development environment with the all-inclusive official [image].
 devenv.sh devenv -v
 ```
 
-This will create a (privileged) container or VM, running in the background with
-the following features:
+This will create a (privileged) container or VM, running in the foreground and
+offering these features:
 
 + A volume named after the first argument, `devenv` will be created, if
   necessary and mounted into the development environment as the home directory
   for the user `coder`.
-+ The local container/VM will also be named `devenv`. If there was an existing
-  container running under that name, it will be removed.
++ The local container/VM will also be named after the first argument (e.g.
+  `devenv`). If there was an existing container running under that name, it will
+  be removed.
 + The vscode tunnel will be called after `<hostname>-devenv`, where `<hostname>`
   will be the actual name of the host that the command is run on.
 + The `-v` option will be passed to the entrypoint of the container, providing
@@ -58,8 +59,8 @@ curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/head
 ### Manually with `docker`
 
 Build using the following command, this will create an image called
-`code_tunnel`. You can switch `docker` to `podman` if you prefer, both
-containerization technologies work.
+`code_tunnel`. You can switch `docker` to `podman` if you prefer; both
+containerization technologies work interchangeably.
 
 ```bash
 docker build -t code_tunnel .
