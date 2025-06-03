@@ -88,6 +88,7 @@ shift $((OPTIND - 1))
 
 
 elevate_if () {
+  [ -z "${1:-}" ] && error "elevate_if: no user provided"
   if [ "$(id -un)" = "$1" ]; then
     shift
     "$@"
