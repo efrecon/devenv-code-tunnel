@@ -53,7 +53,7 @@ as_user() {
   elif check_command su; then
     su_user "$USR" "$@"
   else
-    "$@"
+    error "Cannot switch to user $USR: neither sudo nor su is available"
   fi
 }
 
