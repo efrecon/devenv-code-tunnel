@@ -185,7 +185,7 @@ fi
 # Export all variables that start with TUNNEL_ so that they are available to
 # subprocesses.
 export_varset "TUNNEL"
-export CODER_INTERACTIVE; # Perdure colorization in the logs
+export CODER_INTERACTIVE  # Perdure colorization in the logs
 
 # Start services from the init.d directory. Services are started in order and in
 # the foreground. Some of these will respawn in the background.
