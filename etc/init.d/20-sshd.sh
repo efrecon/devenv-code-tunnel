@@ -49,10 +49,6 @@ bin_name
 # Where to store sshd logs, will be accessible by the user
 : "${SSHD_LOGFILE:="${SSHD_PREFIX}/log/sshd.log"}"
 
-# Log level to use in sshd. One of: QUIET, FATAL, ERROR, INFO, VERBOSE, DEBUG,
-# DEBUG1, DEBUG2, and DEBUG3
-: "${SSHD_LOGLEVEL:="DEBUG3"}"
-
 # Environment file to load for reading defaults from.
 : "${SSHD_DEFAULTS:="${SSHD_ROOTDIR}/../${CODER_BIN}.env"}"
 
