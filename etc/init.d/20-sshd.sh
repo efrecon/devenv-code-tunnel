@@ -116,7 +116,6 @@ make_owned_dir() {
 collect_github_keys() {
   if [ -n "$SSHD_GITHUB_USER" ]; then
     debug "Collecting public keys from %s" "$SSHD_GITHUB_USER"
-    ls -la "$HOME"
     mkdir -p "$(dirname "$1")"
     download "https://github.com/${SSHD_GITHUB_USER}.keys" - >> "$1"
     chmod go-rwx "$1"
