@@ -105,12 +105,12 @@ internet_bin_installer() {
     verbose "Installing %s to %s, as root" "$1" "${2%/}/$_tgt_bin"
     as_root mkdir -p "$2"
     as_root cp -f "$_tmp_bin" "${2%/}/$_tgt_bin"
-    as_root chmod a+x "${2%/}/$_tgt_bin"
+    as_root chmod a+rx "${2%/}/$_tgt_bin"
   else
     verbose "Installing %s to %s" "$1" "${2%/}/$_tgt_bin"
     mkdir -p "$2"
     cp -f "$_tmp_bin" "${2%/}/$_tgt_bin"
-    chmod a+x "${2%/}/$_tgt_bin"
+    chmod a+rx "${2%/}/$_tgt_bin"
   fi
 
   # Clean up and return the path to the target binary
@@ -151,12 +151,12 @@ internet_bintgz_installer() {
     verbose "Installing from %s to %s, as root" "$1" "${2%/}/$_tgt_bin"
     as_root mkdir -p "$2"
     as_root find "$_tmp_d" -name "${5:-$_tgt_bin}" -type f -exec mv -f \{\} "${2%/}/$_tgt_bin" \;
-    as_root chmod a+x "${2%/}/$_tgt_bin"
+    as_root chmod a+rx "${2%/}/$_tgt_bin"
   else
     verbose "Installing from %s to %s" "$1" "${2%/}/$_tgt_bin"
     mkdir -p "$2"
     find "$_tmp_d" -name "${5:-$_tgt_bin}" -type f -exec mv -f \{\} "${2%/}/$_tgt_bin" \;
-    chmod a+x "${2%/}/$_tgt_bin"
+    chmod a+rx "${2%/}/$_tgt_bin"
   fi
 
   # Clean up and return the path to the target binary

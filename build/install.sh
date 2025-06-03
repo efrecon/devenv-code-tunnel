@@ -105,7 +105,8 @@ curl
 zip
 jq
 tini
-openssh
+dropbear
+- openssh-client
 bash
 less
 make
