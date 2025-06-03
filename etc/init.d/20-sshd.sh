@@ -201,7 +201,7 @@ if ! is_true "$_SSHD_PREVENT_DAEMONIZATION" && is_true "$SSHD_DAEMONIZE"; then
   daemonize SSHD "$@"
 fi
 
-# TODO: "Killer" command for krun is: podman container run -it --rm --runtime=krun --userns=keep-id:uid=1000,gid=1000 --name devenv --hostname blue-devenv -v /home/emmanuel/.ssh/id_ed25519:/home/coder/.ssh/id_ed25519:Z,ro -v /home/emmanuel/.ssh/id_ed25519.pub:/home/coder/.ssh/id_ed25519.pub:Z,ro -v devenv:/home/coder:Z  -e TUNNEL_CLOUDFLARE_PROTOCOL=http2 -p 2222:2222 localhost/code_tunnel_minimal:latest -S 'system dockerd sshd cron' -vv -L sshd -g efrecon
+# TODO: "Killer" command for krun is: podman container run -it --rm --runtime=krun --userns=keep-id:uid=1000,gid=1000 --user 0:0 --name devenv --hostname blue-devenv -v /home/emmanuel/.ssh/id_ed25519:/home/coder/.ssh/id_ed25519:Z,ro -v /home/emmanuel/.ssh/id_ed25519.pub:/home/coder/.ssh/id_ed25519.pub:Z,ro -v devenv:/home/coder:Z  -e TUNNEL_CLOUDFLARE_PROTOCOL=http2 -p 2222:2222 localhost/code_tunnel_minimal:latest -S 'system dockerd sshd cron' -vv -L sshd -g efrecon
 
 if [ "$SSHD_PORT" -gt 1024 ]; then
   SSHD_CONFIG_DIR=${SSHD_USER_PREFIX}/etc/ssh

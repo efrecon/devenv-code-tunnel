@@ -29,21 +29,22 @@ as_root() {
 # Create a temporary script that will call the remaining of the arguments.
 # This is because su is evil and -c option only takes a single command...
 su_user() {
-  USR=$1; shift
-  tmpf=$(mktemp)
-  printf '#!%s\n' "/bin/sh" > "$tmpf"
-  printf "exec" >> "$tmpf"
+  _USR=$1; shift
+  _tmpf=$(mktemp)
+  printf '#!%s\n' "/bin/sh" > "$_tmpf"
+  printf "exec" >> "$_tmpf"
   for a in "$@"; do
-    [ -n "$a" ] && printf ' "%s"' "$a" >> "$tmpf"
+    [ -n "$a" ] && printf ' "%s"' "$a" >> "$_tmpf"
   done
-  printf \\n >> "$tmpf"
-  chmod a+rx "$tmpf"
-  su -c "$tmpf" "$USR"
-  rm -f "$tmpf"
+  printf \\n >> "$_tmpf"
+  chmod a+rx "$_tmpf"
+  su -c "$_tmpf" "$_USR"
+  rm -f "$_tmpf"
 }
 
 as_user() {
   USR=$(printf %s\\n "${1:-"${INSTALL_USER:-"$TUNNEL_USER"}"}" | cut -d: -f1)
+  [ -z "$USR" ] && error "as_user: no user given"
   shift
 
   if [ "$(id -un)" = "$USR" ]; then

@@ -109,7 +109,7 @@ if ! [ -d "${HOME}/.ssh" ]; then
   chmod go-rwx "${HOME}/.ssh"
   verbose "Created SSH directory in %s" "${HOME}/.ssh"
 fi
-# ensure_ownership "${HOME}/.ssh"
+ensure_ownership "${HOME}/.ssh"
 
 if ! [ -f "${HOME}/.ssh/known_hosts" ]; then
   touch "${HOME}/.ssh/known_hosts"

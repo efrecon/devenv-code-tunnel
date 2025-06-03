@@ -37,7 +37,10 @@ if [ -n "$INSTALL_USER" ]; then
   verbose "Ensure $USR can sudo without password"
   printf '%s ALL=(ALL) NOPASSWD: ALL\n' "$USR" > "/etc/sudoers.d/$USR"
   chmod a+r /etc/sudoers
-  chmod a+rx -R /etc/sudoers.d
+  # Ensure sudoers.d directory is accessible, and only the new file is
+  # world-readable
+  chmod 755 /etc/sudoers.d
+  chmod 644 "/etc/sudoers.d/$USR"
 else
   warn "No user specified, sudo will not be configured"
 fi

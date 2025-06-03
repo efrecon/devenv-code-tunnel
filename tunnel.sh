@@ -153,7 +153,7 @@ if [ "$(id -u)" = "0" ]; then
     verbose "Guessed tunnel user as %s" "$TUNNEL_USER"
   fi
   verbose "Restarting tunnel starter as %s" "$TUNNEL_USER"
-  su_user "$TUNNEL_USER" "$0" "$@"
+  su_user "$TUNNEL_USER" "$0" "$@" && exit $?
 fi
 
 verbose "Running tunnel starter as %s" "$(id -un)"
