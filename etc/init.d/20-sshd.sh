@@ -90,16 +90,28 @@ while getopts "g:k:l:p:u:vh-" opt; do
 done
 shift $((OPTIND - 1))
 
-log_init SSHD
 
-# Load defaults
-[ -n "$SSHD_DEFAULTS" ] && read_envfile "$SSHD_DEFAULTS" SSHD
+elevate_if () {
+  if [ "$(id -un)" = "$1" ]; then
+    shift
+    "$@"
+  elif [ "$1" = "root" ]; then
+    shift
+    as_root "$@"
+  else
+    _usr=$1
+    shift
+    as_user "$_usr" "$@"
+  fi
+}
+
 
 make_owned_dir() {
-  as_root mkdir -p "$1"
-  as_root chown "$2" "$1"
-  as_root chmod go-rwx "$1"
+  elevate_if "$2" mkdir -p "$1"
+  elevate_if "$2" chmod go-rwx "$1"
+  elevate_if "$2" chown "$2" "$1"
 }
+
 
 collect_github_keys() {
   if [ -n "$SSHD_GITHUB_USER" ]; then
@@ -112,6 +124,7 @@ collect_github_keys() {
   fi
 }
 
+
 generate_dropbear_keys() {
   if [ -f "$2" ] && [ -f "${2}.pub" ]; then
     verbose "Found existing pair of keys at '%s', skipping generation" "$2"
@@ -120,37 +133,21 @@ generate_dropbear_keys() {
     for f in "$2" "${2}.pub"; do
       if [ -f "$f" ]; then
         verbose "Removing old host key %s" "$f"
-        as_user "$1" rm -f "$f"
+        elevate_if "$1" rm -f "$f"
       fi
     done
-    as_user "$1" dropbearkey \
+    elevate_if "$1" dropbearkey \
                     -t "$SSHD_KEY" \
                     -f "$2" \
                     -C "sshd for $SSHD_USER"
   fi
 }
 
-generate_server_keys() {
-  verbose "Generating ssh host keys in %s" "${SSHD_CONFIG_SERVER}"
-  for f in "ssh_host_${SSHD_KEY}_key" "ssh_host_${SSHD_KEY}_key.pub"; do
-    if [ -f "${SSHD_CONFIG_SERVER}/$f" ]; then
-      verbose "Removing old host key %s" "${SSHD_CONFIG_SERVER}/$f"
-      as_user "$1" rm -f "${SSHD_CONFIG_SERVER}/$f"
-    fi
-  done
-  as_user "$1" ssh-keygen \
-                  -q \
-                  -C "sshd for $SSHD_USER" \
-                  -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
-                  -N '' \
-                  -t "$SSHD_KEY"
-}
 
-# TODO: Keep dropbear, get rid of sshd. Run it as root for ports under 1024. Perhaps pass the user to this function?
 configure_dropbear() {
   # Create the directories with proper permissions
-  mkdir -p "$SSHD_CONFIG_USER" "$SSHD_CONFIG_SERVER"
-  chmod go-rwx "$SSHD_CONFIG_USER" "$SSHD_CONFIG_SERVER"
+  make_owned_dir "$SSHD_CONFIG_USER" "$1"
+  make_owned_dir "$SSHD_CONFIG_SERVER" "$1"
 
   # Ensure we will be able to log
   mkdir -p "$(dirname "$SSHD_LOGFILE")"
@@ -165,20 +162,27 @@ configure_dropbear() {
   collect_github_keys "${SSHD_CONFIG_USER}/authorized_keys"
   sort -u -o "${SSHD_CONFIG_USER}/authorized_keys" "${SSHD_CONFIG_USER}/authorized_keys"
   chmod go-rwx "${SSHD_CONFIG_USER}/authorized_keys"
+  elevate_if "$1" chown "$1" "${SSHD_CONFIG_USER}/authorized_keys"
 
   # Generate the host keys if they do not exist, copy server public key to known
   # location.
-  generate_dropbear_keys "$SSHD_USER" "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key"
-  # TODO: remove this, change in dependencies?
-  cp -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key.pub" "${SSHD_USER_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
+  generate_dropbear_keys "$1" "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key"
+
+  # Make public key available to the user, so that it can be used elsewhere.
+  elevate_if "$1" cp -f "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key.pub" "${SSHD_USER_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
+  elevate_if "$1" chown "$(id -un)" "${SSHD_USER_PREFIX}/etc/ssh_host_${SSHD_KEY}_key.pub"
 }
+
+
+
+log_init SSHD
+# Load defaults
+[ -n "$SSHD_DEFAULTS" ] && read_envfile "$SSHD_DEFAULTS" SSHD
+
 
 if ! check_command "dropbear"; then
   exit 0
 fi
-
-
-# TODO: Once done, merge this branch into the feature/use-krun branch.
 
 if [ -z "$SSHD_USER" ]; then
   SSHD_USER=$(id -un)
@@ -202,33 +206,29 @@ fi
 
 if [ "$SSHD_PORT" -gt 1024 ]; then
   SSHD_CONFIG_DIR=${SSHD_USER_PREFIX}/etc/ssh
-  SSHD_CONFIG_USER="${SSHD_CONFIG_DIR%/}/user"
-  SSHD_CONFIG_SERVER="${SSHD_CONFIG_DIR%/}/server"
-  SSHD_LOGFILE=${SSHD_PREFIX}/log/sshd.log
-  configure_dropbear
-  touch "$SSHD_LOGFILE"
-  verbose "Starting dropbear sshd for user %s on port %s" "$SSHD_USER" "$SSHD_PORT"
-  # TODO: Restrict to same group as the one of the user?
-  dropbear \
-    -r "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
-    -D "${SSHD_CONFIG_USER}" \
-    -p "$SSHD_PORT" \
-    -G "$(id -gn)" \
-    -s \
-    -g \
-    -P "${SSHD_CONFIG_SERVER}/sshd.pid" \
-    -E \
-    "$@" 2>>"$SSHD_LOGFILE"
-  pid_sshd=$(cat "${SSHD_CONFIG_SERVER}/sshd.pid")
+  _USER=$SSHD_USER
 else
-  # TODO: Rewrite with dropbear
   SSHD_CONFIG_DIR=${SSHD_PREFIX}/etc/ssh
-  SSHD_LOGFILE=${SSHD_PREFIX}/log/sshd.log
-  configure_sshd_root
-  touch "$SSHD_LOGFILE"
-  as_root /usr/sbin/sshd -D -f "${SSHD_CONFIG_DIR}/sshd_config" -E "$SSHD_LOGFILE" "$@" &
-  pid_sshd=$!
+  _USER="root"
 fi
+SSHD_LOGFILE=${SSHD_PREFIX}/log/sshd.log
+SSHD_CONFIG_USER="${SSHD_CONFIG_DIR%/}/user"
+SSHD_CONFIG_SERVER="${SSHD_CONFIG_DIR%/}/server"
+
+configure_dropbear "$_USER"
+touch "$SSHD_LOGFILE"
+verbose "Starting dropbear sshd for user %s on port %s" "$_USER" "$SSHD_PORT"
+elevate_if "$_USER" dropbear \
+                      -r "${SSHD_CONFIG_SERVER}/ssh_host_${SSHD_KEY}_key" \
+                      -D "${SSHD_CONFIG_USER}" \
+                      -p "$SSHD_PORT" \
+                      -s \
+                      -g \
+                      -P "${SSHD_CONFIG_SERVER}/sshd.pid" \
+                      -E \
+                      "$@" 2>>"$SSHD_LOGFILE"
+pid_sshd=$(elevate_if "$_USER" cat "${SSHD_CONFIG_SERVER}/sshd.pid")
+
 if [ -z "$SSHD_REEXPOSE" ] || printf %s\\n "$SSHD_REEXPOSE" | grep -qF 'sshd'; then
   verbose "sshd started with pid %s, forwarding logs from %s" "$pid_sshd" "$SSHD_LOGFILE"
   "$SSHD_LOGGER" -s "sshd" -- "$SSHD_LOGFILE" &
