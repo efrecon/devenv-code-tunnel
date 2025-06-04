@@ -43,7 +43,7 @@ fi
 log_init INSTALL
 
 
-if ! check_command "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
+if ! command_present "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
   if [ "$(get_arch)" = "arm64" ] && is_musl_os; then
     warn "No Powershell for arm64 musl available. Skipping installation."
     return 0

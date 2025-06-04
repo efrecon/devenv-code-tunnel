@@ -12,12 +12,19 @@ check_command() {
   fi
 }
 
+command_present() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    debug "Command not found: %s" "$1"
+    return 1
+  fi
+}
+
 # Run the command passed as arguments as root, i.e. with sudo if
 # available/necessary. Generate an error if not possible.
 as_root() {
   if [ "$(id -u)" = 0 ]; then
     "$@"
-  elif check_command sudo; then
+  elif command_present sudo; then
     debug "Running elevated command: %s" "$*"
     sudo "$@"
   else
@@ -49,9 +56,9 @@ as_user() {
 
   if [ "$(id -un)" = "$USR" ]; then
     "$@"
-  elif check_command sudo; then
+  elif command_present sudo; then
     sudo -u "$USR" -- "$@"
-  elif check_command su; then
+  elif command_present su; then
     su_user "$USR" "$@"
   else
     error "Cannot switch to user $USR: neither sudo nor su is available"
@@ -75,7 +82,7 @@ install_packages() {
 install_ondemand() {
   while read -r bin pkg; do
     [ -z "$pkg" ] && pkg=$bin
-    if [ "${bin:-}" != "-" ] && ! check_command "${bin:-}"; then
+    if [ "${bin:-}" != "-" ] && ! command_present "${bin:-}"; then
       debug "$bin not found, installing $pkg"
       install_packages "$pkg"
     elif [ "${bin:-}" = "-" ] && [ -n "${pkg:-}" ]; then

@@ -41,7 +41,7 @@ done
 log_init INSTALL
 
 
-if ! check_command "dotnet" && [ -n "$INSTALL_DOTNET_CHANNEL" ]; then
+if ! command_present "dotnet" && [ -n "$INSTALL_DOTNET_CHANNEL" ]; then
   # Install dependencies as per
   # https://learn.microsoft.com/en-us/dotnet/core/install/linux-alpine?tabs=dotnet8#dependencies
   install_packages libgcc libssl3 libstdc++ zlib icu-libs icu-data-full

@@ -29,7 +29,7 @@ log_init INSTALL
 
 
 verbose "installing docker"
-if ! check_command "docker"; then
+if ! command_present "docker"; then
   install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
 fi
 

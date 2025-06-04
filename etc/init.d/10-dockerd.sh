@@ -86,7 +86,7 @@ if as_root test -S "$DOCKERD_SOCK"; then
   exit 0
 fi
 
-if ! check_command "dockerd"; then
+if ! command_present "dockerd"; then
   exit 0
 fi
 
