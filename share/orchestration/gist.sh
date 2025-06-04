@@ -18,11 +18,17 @@ for lib in log common system; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # All following vars have defaults here, but will be set and inherited from
 # the calling tunnel.sh script.
 : "${GIST_VERBOSE:="${TUNNEL_VERBOSE:-"0"}"}"
 : "${GIST_LOG:="${TUNNEL_LOG:-"2"}"}"
+# Environment file to load for reading defaults from.
+: "${GIST_DEFAULTS:="${GIST_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="gist updater"
@@ -45,21 +51,25 @@ shift $((OPTIND - 1))
 
 log_init GIST
 
+# Load defaults
+[ -n "$GIST_DEFAULTS" ] && read_envfile "$GIST_DEFAULTS" GIST
+
+
 check_command git || exit 1
 
-LWRAP="$GIST_ROOTDIR/lwrap.sh"
+GIST_LWRAP="$GIST_ROOTDIR/lwrap.sh"
 
 for file in "$@"; do
   if [ -f "$file" ]; then
     (
       cd "$(dirname "$file")" || error "Failed to change directory to $(dirname "$file")"
       verbose "Pushing changes to %s to git repository" "$file"
-      "$LWRAP" git pull
-      "$LWRAP" git add "$(basename "$file")"
+      "$GIST_LWRAP" git pull
+      "$GIST_LWRAP" git add "$(basename "$file")"
       if git status --porcelain | grep -qF "$(basename "$file")"; then
         debug "Changes detected in %s" "$file"
-        "$LWRAP" git commit -m "Update tunnel details at $(date)"
-        "$LWRAP" git push
+        "$GIST_LWRAP" git commit -m "Update tunnel details at $(date)"
+        "$GIST_LWRAP" git push
       else
         debug "No changes detected in %s" "$file"
       fi

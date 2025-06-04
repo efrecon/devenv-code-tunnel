@@ -18,6 +18,9 @@ for lib in log common; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # All following vars have defaults here, but will be set and inherited from
 # the calling tunnel.sh script.
@@ -25,6 +28,9 @@ done
 : "${LWRAP_LOG:=2}"
 : "${LWRAP_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
 : "${LWRAP_PRINT:=0}"
+# Environment file to load for reading defaults from.
+: "${LWRAP_DEFAULTS:="${LWRAP_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Auto logger wrapper"
@@ -52,6 +58,8 @@ shift $((OPTIND - 1))
 # Initialize. Play ugly with the logging system to fake being the process that
 # we are eating output from.
 log_init LWRAP
+# Load defaults
+[ -n "$LWRAP_DEFAULTS" ] && read_envfile "$LWRAP_DEFAULTS" LWRAP
 unset CODER_BIN
 bin_name "$1"
 

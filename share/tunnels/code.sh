@@ -5,49 +5,45 @@
 set -euo pipefail
 
 # Absolute location of the script where this script is located.
-TUNNEL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
+CODE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
 for lib in log common wait system; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${TUNNEL_ROOTDIR}/$d" ]; then
+    if [ -d "${CODE_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
-      . "${TUNNEL_ROOTDIR}/$d/${lib}.sh"
+      . "${CODE_ROOTDIR}/$d/${lib}.sh"
       break
     fi
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # All following vars have defaults here, but will be set and inherited from
 # the calling tunnel.sh script.
-: "${TUNNEL_VERBOSE:=0}"
-: "${TUNNEL_LOG:=2}"
-: "${TUNNEL_STORAGE:="${HOME}/.vscode-tunnel"}"
-: "${TUNNEL_PROVIDER:="github"}"
-: "${TUNNEL_NAME:=""}"
-: "${TUNNEL_HOOK:=""}"
-: "${TUNNEL_FORCE:="0"}"
-: "${TUNNEL_PREFIX:="/usr/local"}"
-: "${TUNNEL_USER_PREFIX:="${HOME}/.local"}"
-: "${TUNNEL_ALIAS:=}"
-: "${TUNNEL_REEXPOSE:="code"}"
-: "${TUNNEL_GIST_FILE:=""}"
+: "${CODE_VERBOSE:=${TUNNEL_VERBOSE:-0}}"
+: "${CODE_LOG:=${TUNNEL_LOG:-2}}"
+: "${CODE_NAME:="${TUNNEL_NAME:-""}"}"
+: "${CODE_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
+: "${CODE_USER_PREFIX:="${TUNNEL_USER_PREFIX:-"${HOME}/.local"}"}"
+: "${CODE_SSH:=${TUNNEL_SSH:-2222}}"
+: "${CODE_GITHUB_USER:="${TUNNEL_GITHUB_USER:-""}"}"
+: "${CODE_REEXPOSE:="${TUNNEL_REEXPOSE:-"code"}"}"
+: "${CODE_GIST_FILE:="${TUNNEL_GIST_FILE:-""}"}"
+: "${CODE_PROVIDER:="${TUNNEL_PROVIDER:-"github"}"}"
+: "${CODE_FORCE:="${TUNNEL_FORCE:-"0"}"}"
+
+: "${CODE_STORAGE:="${TUNNEL_CODE_STORAGE:-"${HOME}/.vscode-tunnel"}"}"
+: "${CODE_ORIGINAL_NAME:="${TUNNEL_ORIGINAL_NAME:-""}"}"
 
 # Number of seconds to wait before restarting tunnel when starting did not work.
 # Set to negative to disable.
-: "${TUNNEL_RESTART:=5}"
-
-
-# shellcheck disable=SC2034 # Used for logging/usage
-CODER_DESCR="vscode tunnel starter"
-
-# Initialize
-log_init TUNNEL
-
-# Enforce storage location for vscode tunnel
-VSCODE_CLI_DATA_DIR=$TUNNEL_STORAGE
-export VSCODE_CLI_DATA_DIR
+: "${CODE_RESTART:="${TUNNEL_CODE_RESTART:-5}"}"
+# Environment file to load for reading defaults from.
+: "${CODE_DEFAULTS:="${CODE_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
 
 
 # Try using the name of the tunnel for the hostname, whenever relevant. This
@@ -55,11 +51,11 @@ export VSCODE_CLI_DATA_DIR
 # uses the hostname to detect if the device where the tunnel is running is the
 # same.
 tunnel_configure() {
-  if [ -n "$TUNNEL_ORIGINAL_NAME" ] && [ -n "$TUNNEL_NAME" ]; then
+  if [ -n "$CODE_ORIGINAL_NAME" ] && [ -n "$CODE_NAME" ]; then
     # If the hostname is generated, override it with the tunnel name if possible.
     # This will only work if the container was run with --privileged.
     if hostname | grep -qE '[a-f0-9]{12}'; then
-      as_root hostname "$TUNNEL_NAME" ||
+      as_root hostname "$CODE_NAME" ||
         warn "Using a generated hostname: %s. Force hostname of container to avoid having to re-authorize the device!" "$(hostname)"
     fi
   fi
@@ -68,8 +64,8 @@ tunnel_configure() {
 
 # Check if currently logged in as per the token present on disk.
 tunnel_logged_in() {
-  if [ -f "${TUNNEL_STORAGE%/}/token.json" ]; then
-    token=$(cat "${TUNNEL_STORAGE%/}/token.json")
+  if [ -f "${CODE_STORAGE%/}/token.json" ]; then
+    token=$(cat "${CODE_STORAGE%/}/token.json")
     if [ "$token" != "null" ]; then
       return 0
     fi
@@ -92,30 +88,30 @@ tunnel_login() {
   # authorization to appear in the logs and reprint them. Then, wait for the
   # process to end: it will end once the link has been clicked and this device
   # authorized.
-  debug "Logging in at %s" "$TUNNEL_PROVIDER"
+  debug "Logging in at %s" "$CODE_PROVIDER"
 
   # Start reprinting the logs, remember the PID of that process.
   "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG" &
   CODE_LOGGER_PID=$!
 
   # Login at the provider in the background and wait for the process to end.
-  code_tunnel_bg user login --provider "$TUNNEL_PROVIDER"
+  code_tunnel_bg user login --provider "$CODE_PROVIDER"
   wait "$CODE_PID"
 
   # Kill the log re-printer tree, we might have children and signals might not
   # be propagated. Note: we cannot kill the process group, as it would kill too
   # many processes and the - semantic isn't supported on busybox.
-  verbose "Logged in at %s" "$TUNNEL_PROVIDER"
+  verbose "Logged in at %s" "$CODE_PROVIDER"
   kill_tree "$CODE_LOGGER_PID"
 }
 
 
 # Start the tunnel
 tunnel_start() {
-  if [ -z "$TUNNEL_NAME" ]; then
+  if [ -z "$CODE_NAME" ]; then
     code_tunnel_bg --accept-server-license-terms --random-name
   else
-    code_tunnel_bg --accept-server-license-terms --name "$TUNNEL_NAME"
+    code_tunnel_bg --accept-server-license-terms --name "$CODE_NAME"
   fi
 }
 
@@ -127,8 +123,8 @@ tunnel_restart() {
   warn "Error in tunnel: $1"
   kill_tree "$CODE_PID"
 
-  if [ "$TUNNEL_RESTART" -ge 0 ]; then
-    sleep "$TUNNEL_RESTART"
+  if [ "$CODE_RESTART" -ge 0 ]; then
+    sleep "$CODE_RESTART"
     tunnel_start
   fi
 
@@ -146,7 +142,7 @@ tunnel_wait() {
 
   # Log URL, also make sure it appears in the container output.
   verbose "Code tunnel started at %s" "$url"
-  reprint "$TUNNEL_GIST_FILE" <<EOF
+  reprint "$CODE_GIST_FILE" <<EOF
 
 (vs)code tunnel running, access it from your browser at the following URL:
     $url
@@ -154,18 +150,33 @@ tunnel_wait() {
 EOF
 }
 
+# shellcheck disable=SC2034 # Used for logging/usage
+CODER_DESCR="vscode tunnel starter"
+
+# Initialize
+log_init TUNNEL
+
+# Load defaults
+[ -n "$CODE_DEFAULTS" ] && read_envfile "$CODE_DEFAULTS" CODE
+
+
+# Enforce storage location for vscode tunnel
+VSCODE_CLI_DATA_DIR=$CODE_STORAGE
+export VSCODE_CLI_DATA_DIR
+
+
 # Check if the tunnel provider is set and valid.
-if [ -z "$TUNNEL_PROVIDER" ]; then
+if [ -z "$CODE_PROVIDER" ]; then
   error "No tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
 fi
-if [ "$TUNNEL_PROVIDER" != "github" ] && [ "$TUNNEL_PROVIDER" != "azure" ]; then
+if [ "$CODE_PROVIDER" != "github" ] && [ "$CODE_PROVIDER" != "azure" ]; then
   error "Invalid tunnel provider specified. Please set TUNNEL_PROVIDER to github or azure."
 fi
 
 # Check dependencies
-CODE_BIN=$(find_inpath code "$TUNNEL_USER_PREFIX" "$TUNNEL_PREFIX")
+CODE_BIN=$(find_inpath code "$CODE_USER_PREFIX" "$CODE_PREFIX")
 [ -z "$CODE_BIN" ] && exit; # Gentle warning, in case not installed on purpose
-CODE_ORCHESTRATION_DIR=${TUNNEL_ROOTDIR}/../orchestration
+CODE_ORCHESTRATION_DIR=${CODE_ROOTDIR}/../orchestration
 CODE_LOGGER=${CODE_ORCHESTRATION_DIR}/logger.sh
 CODE_LWRAP=${CODE_ORCHESTRATION_DIR}/lwrap.sh
 [ -x "$CODE_LOGGER" ] || error "Cannot find logger.sh"
@@ -175,10 +186,10 @@ CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 # configure, login and start the tunnel if the vscode CLI is installed.
 tunnel_configure
 debug "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
-if is_true "$TUNNEL_FORCE" || ! tunnel_logged_in; then
+if is_true "$CODE_FORCE" || ! tunnel_logged_in; then
   tunnel_login
 fi
-if [ -z "$TUNNEL_REEXPOSE" ] || printf %s\\n "$TUNNEL_REEXPOSE" | grep -qF 'code'; then
+if [ -z "$CODE_REEXPOSE" ] || printf %s\\n "$CODE_REEXPOSE" | grep -qF 'code'; then
   debug "Forwarding logs from %s" "$CODE_LOG"
   "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
 fi
