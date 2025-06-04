@@ -28,7 +28,7 @@ done
 log_init INSTALL
 
 
-if ! check_command "aws"; then
+if ! command_present "aws"; then
   # Install the AWS CLI. This will bring a large number of python
   # dependencies...
   install_packages aws-cli
@@ -38,7 +38,7 @@ mandoc
 EOF
 
   # If npm is installed, then install the AWS CDK.
-  if ! check_command cdk && check_command npm; then
+  if ! command_present cdk && command_present npm; then
     debug "Installing cdk"
     as_root npm install -g cdk
     verbose "Installed cdk: $(cdk --version)"

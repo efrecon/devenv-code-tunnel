@@ -199,7 +199,7 @@ fi
 
 # Create a TUNNEL_GIST_FILE variable where to store the tunnel details.
 if [ -n "$TUNNEL_GIST" ]; then
-  if check_command git; then
+  if command_present git; then
     GIST_DIR=$(mktemp -tu 'gist-XXXXXX')
     if "$LWRAP" git clone "$TUNNEL_GIST" "$GIST_DIR"; then
       # Decide upon a (good?) name

@@ -74,24 +74,24 @@ node_version() {
 # relevant.
 install_sidekicks() {
   verbose "Installing yarm and pnpm %s" "$(printf %s\\n "$*" | tr '_' ' ')"
-  if ! check_command corepack; then
+  if ! command_present corepack; then
     # Upgrade and prepare package managers
     debug "Installing and enabling corepack"
     "$@" npm install -g corepack
     "$@" corepack enable
   fi
-  if ! check_command yarn; then
+  if ! command_present yarn; then
     debug "Installing yarn"
     "$@" corepack prepare yarn@stable --activate
   fi
-  if ! check_command pnpm; then
+  if ! command_present pnpm; then
     debug "Installing pnpm"
     "$@" corepack prepare pnpm@latest --activate
   fi
 
   # Install the node-based apps
   for app in $INSTALL_NODE_APPS; do
-    if ! check_command "$app"; then
+    if ! command_present "$app"; then
       verbose "Installing %s %s" "$app" "$(printf %s\\n "$*" | tr '_' ' ')"
       "$@" npm install -g "$app"
     else
@@ -196,7 +196,7 @@ install_from_image() {
   tag="${1}-${os_tag}"
 
   # install regctl if not already installed
-  check_command "regctl" || install_regclient
+  command_present "regctl" || install_regclient
 
   # Extract content of (remote) image to a temporary directory, for the current
   # platform.
@@ -231,7 +231,7 @@ install_from_image() {
 }
 
 
-if ! check_command "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
+if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   # Find out where to get the tarball from. This will switch to the unofficial
   # builds when running on musl.
   if [ -z "$INSTALL_NODE_DOMAIN" ]; then
