@@ -18,6 +18,10 @@ for lib in log common system; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
+
 : "${XDG_STATE_HOME:="${HOME}/.local/state"}"
 
 # All following vars have defaults here, but most will be set and inherited from
@@ -33,6 +37,9 @@ done
 # time the log files were rotated. It needs to be in a location that is
 # accessible by the user, since logrotate is run as the user.
 : "${LOGROTATE_STATUS:="${XDG_STATE_HOME}/logrotate.status"}"
+# Environment file to load for reading defaults from.
+: "${LOGROTATE_DEFAULTS:="${LOGROTATE_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="logrotate updater"
@@ -59,10 +66,14 @@ shift $((OPTIND - 1))
 
 log_init LOGROTATE
 
+# Load defaults
+[ -n "$LOGROTATE_DEFAULTS" ] && read_envfile "$LOGROTATE_DEFAULTS" LOGROTATE
+
+
 check_command logrotate || error "logrotate not found, please install it"
 mkdir -p "$(dirname "$LOGROTATE_STATUS")" || error "Cannot create directory for logrotate status file %s" "$LOGROTATE_STATUS"
 
-LWRAP="$LOGROTATE_ROOTDIR/lwrap.sh"
+LOGROTATE_LWRAP="$LOGROTATE_ROOTDIR/lwrap.sh"
 
 # Create a temporary file for the logrotate configuration, arrange to remove it
 # when we are done.
@@ -104,4 +115,4 @@ find "$LOGROTATE_LOGDIR" -type f -name "*.log" | while IFS="$newline" read -r fi
 done
 
 # Now we have a configuration file, we can run logrotate on it.
-"$LWRAP" logrotate -s "$LOGROTATE_STATUS" "$config"
+"$LOGROTATE_LWRAP" logrotate -s "$LOGROTATE_STATUS" "$config"

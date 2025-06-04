@@ -18,6 +18,9 @@ for lib in log common system; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # All following vars have defaults here, but will be set and inherited from
 # the calling tunnel.sh script.
@@ -27,6 +30,9 @@ done
 : "${NOTIFY_PATH:=""}"
 : "${NOTIFY_SLEEP:="1"}"
 : "${NOTIFY_RESPITE:="2"}"
+# Environment file to load for reading defaults from.
+: "${NOTIFY_DEFAULTS:="${NOTIFY_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Trigger commands on changes"
@@ -51,13 +57,6 @@ while getopts "f:s:r:vh-" opt; do
   esac
 done
 shift $((OPTIND - 1))
-
-log_init NOTIFY
-
-if [ -z "$NOTIFY_PATH" ]; then
-  error "No path to watch given"
-fi
-check_int "$NOTIFY_SLEEP" "$NOTIFY_RESPITE"
 
 
 notify_trigger() {
@@ -139,6 +138,18 @@ notify_inotify() {
     done
   fi
 }
+
+
+log_init NOTIFY
+
+# Load defaults
+[ -n "$NOTIFY_DEFAULTS" ] && read_envfile "$NOTIFY_DEFAULTS" NOTIFY
+
+
+if [ -z "$NOTIFY_PATH" ]; then
+  error "No path to watch given"
+fi
+check_int "$NOTIFY_SLEEP" "$NOTIFY_RESPITE"
 
 
 if command_present inotifywait; then

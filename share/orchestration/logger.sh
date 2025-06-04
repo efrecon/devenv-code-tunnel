@@ -18,11 +18,16 @@ for lib in log common system; do
   done
 done
 
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
 
 # All following vars have defaults here, but will be set and inherited from
 # the calling tunnel.sh script.
 : "${LOGGER_VERBOSE:=0}"
 : "${LOGGER_LOG:=2}"
+# Environment file to load for reading defaults from.
+: "${LOGGER_DEFAULTS:="${LOGGER_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
 
 : "${LOGGER_SOURCE:=""}"
 
@@ -47,14 +52,6 @@ done
 shift $((OPTIND - 1))
 
 
-# Initialize. Play ugly with the logging system to fake being the process that
-# we are eating output from.
-log_init LOGGER
-unset CODER_BIN
-bin_name "$LOGGER_SOURCE"
-
-_ESC=$(printf '\033')
-
 # Remove existing log line header from our logs
 no_header() {
   if [ -n "${1:-}" ]; then
@@ -70,6 +67,17 @@ relog() {
     _log "" "$(no_header "$line")"
   done
 }
+
+# Initialize. Play ugly with the logging system to fake being the process that
+# we are eating output from.
+log_init LOGGER
+# Load defaults
+[ -n "$LOGGER_DEFAULTS" ] && read_envfile "$LOGGER_DEFAULTS" LOGGER
+unset CODER_BIN
+bin_name "$LOGGER_SOURCE"
+
+# escape character for ANSI colors removal
+_ESC=$(printf '\033')
 
 if [ -z "${1:-}" ]; then
   relog
