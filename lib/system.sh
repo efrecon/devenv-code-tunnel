@@ -3,6 +3,8 @@
 # Note: This is a library, not a standalone script. It is meant to be sourced
 # from other scripts.
 
+INSTALL_REPOS_SHA256=
+
 # Check if a command is available. If not, print a warning and return 1.
 check_command() {
   trace "Checking $1 is an accessible command"
@@ -66,7 +68,7 @@ as_user() {
 }
 
 
-install_packages() {
+install_packages_alpine() {
   state=$(sha256sum "/etc/apk/repositories" | head -c 64)
   if [ "$state" != "$INSTALL_REPOS_SHA256" ]; then
     debug "Updating packages cache"
@@ -76,6 +78,35 @@ install_packages() {
   verbose "Installing packages: $*"
   # shellcheck disable=SC2086 # We want to expand the arguments
   as_root ${INSTALL_OPTIMIZE:-} apk add "$@"
+}
+
+
+install_packages_debian() {
+  state=$(sha256sum "/etc/apt/sources.list" | head -c 64)
+  if [ "$state" != "$INSTALL_REPOS_SHA256" ]; then
+    # Avoid questons about interactive prompts
+    # See: https://askubuntu.com/a/1036630
+    DEBIAN_FRONTEND=noninteractive
+    export DEBIAN_FRONTEND
+
+    debug "Updating packages cache"
+    as_root apt-get update
+    INSTALL_REPOS_SHA256=$state
+  fi
+  verbose "Installing packages: $*"
+  # shellcheck disable=SC2086 # We want to expand the arguments
+  as_root ${INSTALL_OPTIMIZE:-} apt-get install -y "$@"
+}
+
+
+install_packages() {
+  if is_os_family alpine; then
+    install_packages_alpine "$@"
+  elif is_os_family debian; then
+    install_packages_debian "$@"
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
 }
 
 
@@ -93,8 +124,23 @@ install_ondemand() {
 }
 
 
+install_clear_cache() {
+  if is_os_family alpine; then
+    as_root apk cache clean
+    as_root rm -rf /var/cache/apk/*
+  elif is_os_family debian; then
+    as_root apt-get -y clean
+    as_root apt-get -y autoremove
+    as_root rm -rf /var/lib/apt/lists/*
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
+  INSTALL_REPOS_SHA256=
+}
+
+
 make_owned_dir() {
-  [ -z "$1" ] && error "make_owned_dir: no dir given"
+  [ -z "${1:-}" ] && error "make_owned_dir: no dir given"
   if ! [ -d "$1" ]; then
     mkdir -p "$1"
   fi
@@ -236,6 +282,11 @@ get_distro_version() {
   get_release_info VERSION_ID
 }
 
+is_os_family() {
+  [ -z "$1" ] && error "is_os_family: must pass family name, e.g. alpine, debian, etc."
+  [ get_distro_name = "$1" ] || get_release_info ID_LIKE | grep -q "$1"
+}
+
 
 # Print the item at the index at $1 of the remaining arguments. $1 is 0-indexed.
 _index() {
@@ -256,6 +307,7 @@ ps_children() (
     _stat=$(sed -E 's/\([^)]+\)\s//g' < "$_f")
     # If the parent process (3rd item) is the process passed as a parameter,
     # then we should count it.
+    # shellcheck disable=SC2086 # We want to expand the arguments
     if [ "$(_index 2 $_stat)" = "$1" ]; then
       # The pid is also part of the stat file list, but also the name of the
       # directory. The following uses shell built-ins and is quicker.
