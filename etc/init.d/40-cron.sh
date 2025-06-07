@@ -49,7 +49,7 @@ bin_name
 # by default.
 : "${CRON_BIN:=""}"
 
-# Detach in the background
+# Detach in the background (but the default will be to daemonize via env file)
 : "${CRON_DAEMONIZE:=0}"
 
 # Prevent detaching in the background (RESERVED for use by ourselves)

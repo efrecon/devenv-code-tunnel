@@ -52,12 +52,6 @@ bin_name
 # Environment file to load for reading defaults from.
 : "${SSHD_DEFAULTS:="${SSHD_ROOTDIR}/../${CODER_BIN}.env"}"
 
-# Detach in the background
-: "${SSHD_DAEMONIZE:=0}"
-
-# Prevent detaching in the background (RESERVED for use by ourselves)
-: "${_SSHD_PREVENT_DAEMONIZATION:=0}"
-
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
 CODE_DESCR="ssh daemon startup"
@@ -188,16 +182,6 @@ fi
 SSHD_ORCHESTRATION_DIR=${SSHD_ROOTDIR}/../../share/orchestration
 SSHD_LOGGER=${SSHD_ORCHESTRATION_DIR}/logger.sh
 [ -x "$SSHD_LOGGER" ] || error "Cannot find logger.sh"
-
-# If we are to daemonize, do it now and exit. Export all our variables to the
-# daemon so it starts the same way this script was started.
-if ! is_true "$_SSHD_PREVENT_DAEMONIZATION" && is_true "$SSHD_DAEMONIZE"; then
-  # Do not daemonize the daemon!
-  _SSHD_PREVENT_DAEMONIZATION=1
-  SSHD_DAEMONIZE=0
-  daemonize SSHD "$@"
-fi
-
 
 if [ "$SSHD_PORT" -gt 1024 ]; then
   SSHD_CONFIG_DIR=${SSHD_USER_PREFIX}/etc/ssh

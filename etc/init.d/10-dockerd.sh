@@ -37,12 +37,6 @@ bin_name
 # Environment file to load for reading defaults from.
 : "${DOCKERD_DEFAULTS:="${DOCKERD_ROOTDIR}/../${CODER_BIN}.env"}"
 
-# Detach in the background
-: "${DOCKERD_DAEMONIZE:=0}"
-
-# Prevent detaching in the background (RESERVED for use by the daemon)
-: "${_DOCKERD_PREVENT_DAEMONIZATION:=0}"
-
 
 # shellcheck disable=SC2034 # Used from functions in common.sh
 CODE_DESCR="Docker daemon startup"
@@ -93,15 +87,6 @@ fi
 if ! is_privileged; then
   warn "DinD can only be run in a privileged container."
   exit 0
-fi
-
-# If we are to daemonize, do it now and exit. Export all our variables to the
-# daemon so it starts the same way this script was started.
-if ! is_true "$_DOCKERD_PREVENT_DAEMONIZATION" && is_true "$DOCKERD_DAEMONIZE"; then
-  # Do not daemonize the daemon!
-  _DOCKERD_PREVENT_DAEMONIZATION=1
-  DOCKERD_DAEMONIZE=0
-  daemonize DOCKERD "$@"
 fi
 
 DOCKERD_LOGFILE="${DOCKERD_PREFIX}/log/dockerd.log"
