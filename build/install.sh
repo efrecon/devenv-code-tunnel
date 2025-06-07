@@ -53,9 +53,6 @@ done
 # all features will be installed. When a dash, no feature will be installed.
 : "${INSTALL_FEATURES:=""}"
 
-# Declared here, used in common.sh library.
-# shellcheck disable=SC2034 # Used in common.sh
-INSTALL_REPOS_SHA256=
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="code container installer"
@@ -94,8 +91,8 @@ if [ "$INSTALL_OPTIMIZE" = "-" ]; then
   # When dash, do not try to optimize disk access
   INSTALL_OPTIMIZE=""
 elif [ -z "$INSTALL_OPTIMIZE" ]; then
-  install_packages libeatmydata
-  INSTALL_OPTIMIZE="eatmydata"
+  is_os_family alpine && install_packages libeatmydata && INSTALL_OPTIMIZE="eatmydata" || true
+  is_os_family debian && install_packages eatmydata && INSTALL_OPTIMIZE="eatmydata" || true
 fi
 
 # Install package that we need ourselves. Trigger installation based on the
@@ -112,8 +109,13 @@ less
 make
 logrotate
 inotifywait inotify-tools
+EOF
+
+if is_os_family alpine; then
+  install_ondemand<<EOF
 - gcompat
 EOF
+fi
 
 if [ -z "$INSTALL_USER" ]; then
   if [ "${INSTALL_TARGET:-}" = "user" ]; then
@@ -160,5 +162,4 @@ done
 
 
 # Clean repository cache
-apk cache clean
-rm -rf /var/cache/apk/*
+install_clear_cache

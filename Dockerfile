@@ -1,4 +1,5 @@
-FROM alpine:3.22.0
+ARG INSTALL_IMAGE=alpine:3.22.0
+FROM ${INSTALL_IMAGE}
 
 
 # Where to install our own stuff.
@@ -56,7 +57,7 @@ RUN chmod a+x ${INSTALL_PREFIX}/bin/*.sh && \
     INSTALL_TEA_VERSION=${INSTALL_TEA_VERSION} \
     CODER_INTERACTIVE=1 \
         ${INSTALL_PREFIX}/bin/install.sh \
-            -v \
+            -vvv \
             -u "${INSTALL_USER}:${INSTALL_GROUP}" && \
     CODER_INTERACTIVE=1 ${INSTALL_PREFIX}/bin/hotfix.sh -v
 
