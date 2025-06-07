@@ -51,7 +51,13 @@ code=$(internet_bintgz_installer \
           "code*")
 
 # Install the code CLI dependencies.
-as_root install_packages "libstdc++"
+if is_os_family alpine; then
+  install_packages "libstdc++"
+elif is_os_family debian; then
+  install_packages "libstdc++6"
+else
+  error "Unsupported OS family: %s" "$(get_distro_name)"
+fi
 
 # Verify dependencies through printing the version.
 verbose "Installed code CLI %s" "$("$code" --version)"
