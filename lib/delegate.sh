@@ -55,7 +55,10 @@ delegate() {
   [ -z "${3:-}" ] && _deps="$(init_list "$_scripts_d" "${4:-"*.sh"}")" || _deps="$3"
   _bg_run=${5:-"0"}
 
-  shift 5 || shift "$#"
+  # Jump to arguments to be passed to the scripts.
+  if [ "$#" -gt 5 ]; then
+    shift 5
+  fi
   if [ "$_deps" = "-" ]; then
     verbose "Starting of %s scripts disabled" "$_human_t"
   else
