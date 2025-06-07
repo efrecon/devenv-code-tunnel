@@ -30,6 +30,7 @@ log_init INSTALL
 
 verbose "installing docker"
 if ! command_present "docker"; then
+  # TODO: On anything else than alpine, run the CI install script, see: https://github.com/docker/docker-install
   install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
 fi
 
