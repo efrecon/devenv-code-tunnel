@@ -8,7 +8,7 @@ set -euo pipefail
 INSTALL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in log common system; do
+for lib in log common system install; do
   for d in ../../lib ../lib lib; do
     if [ -d "${INSTALL_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -25,13 +25,19 @@ done
 : "${INSTALL_LOG:=2}"
 : "${INSTALL_USER:="coder"}"
 
+: "${INSTALL_DOCKER_URL:="https://get.docker.com"}"
+: "${INSTALL_DOCKER_SHA512:="ace4855360705722cd3ef40d7db0c81495f2ed99405a22ac06ba6fe30c543d92f739efa4315235aced7d600086c3dcba0517fb3433bb23e387b2b67f9ae813d0"}"
+
 log_init INSTALL
 
 
 verbose "installing docker"
 if ! command_present "docker"; then
-  # TODO: On anything else than alpine, run the CI install script, see: https://github.com/docker/docker-install
-  install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
+  if is_os_family alpine; then
+    install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
+  else
+    as_root internet_script_installer "$INSTALL_DOCKER_URL" docker "$INSTALL_DOCKER_SHA512"
+  fi
 fi
 
 # Create the docker group if it does not exist
@@ -45,7 +51,11 @@ fi
 # Add the user to the docker group
 if [ -n "$INSTALL_USER" ]; then
   USR=$(printf %s\\n "$INSTALL_USER" | cut -d: -f1)
-  as_root addgroup "$USR" "docker"
+  if is_os_family alpine; then
+    as_root addgroup "$USR" "docker"
+  else
+    groupmod -aU "$USR" docker || warn "Cannot add user $USR to docker group"
+  fi
 else
   warn "No user specified, docker will not be configured"
 fi
