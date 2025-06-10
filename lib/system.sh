@@ -72,12 +72,12 @@ install_packages_alpine() {
   state=$(sha256sum "/etc/apk/repositories" | head -c 64)
   if [ "$state" != "$INSTALL_REPOS_SHA256" ]; then
     debug "Updating packages cache"
-    as_root apk update
+    as_root apk update -q
     INSTALL_REPOS_SHA256=$state
   fi
   verbose "Installing packages: $*"
   # shellcheck disable=SC2086 # We want to expand the arguments
-  as_root ${INSTALL_OPTIMIZE:-} apk add "$@"
+  as_root ${INSTALL_OPTIMIZE:-} apk add -q "$@"
 }
 
 
