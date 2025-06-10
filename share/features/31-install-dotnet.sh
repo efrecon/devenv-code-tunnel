@@ -40,11 +40,38 @@ done
 
 log_init INSTALL
 
+install_runtime_dependencies() {
+  if is_os_family alpine; then
+    # Install dependencies as per
+    # https://learn.microsoft.com/en-us/dotnet/core/install/linux-alpine?tabs=dotnet8#dependencies
+    install_packages libgcc libssl3 libstdc++ zlib icu-libs icu-data-full
+  elif [ "$(get_distro_name)" = "debian" ]; then
+    install_packages \
+      libc6 \
+      libgcc-s1 \
+      libgssapi-krb5-2 \
+      libicu72 \
+      libssl3 \
+      libstdc++6 \
+      zlib1g
+  elif [ "$(get_distro_name)" = "ubuntu" ]; then
+    install_packages \
+      ca-certificates \
+      libc6 \
+      libgcc-s1 \
+      libicu76 \
+      liblttng-ust1 \
+      libssl3 \
+      libstdc++6 \
+      libunwind8 \
+      zlib1g
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
+}
 
 if ! command_present "dotnet" && [ -n "$INSTALL_DOTNET_CHANNEL" ]; then
-  # Install dependencies as per
-  # https://learn.microsoft.com/en-us/dotnet/core/install/linux-alpine?tabs=dotnet8#dependencies
-  install_packages libgcc libssl3 libstdc++ zlib icu-libs icu-data-full
+  install_runtime_dependencies
 
   INSTALL_DIR="${INSTALL_PREFIX}/share/dotnet"
   as_root mkdir -p "${INSTALL_DIR}"
