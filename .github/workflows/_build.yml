@@ -169,7 +169,7 @@ jobs:
           file: Dockerfile
           build-args: |
             ${{ inputs.build-args }}
-            INSTALL_IMAGE=${{ steps.platform.outputs.image }}
+            INSTALL_IMAGE=${{ needs.prepare.outputs.image }}
       -
         name: Export digest
         run: |
