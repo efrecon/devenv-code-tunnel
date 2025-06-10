@@ -95,7 +95,7 @@ install_packages_debian() {
   fi
   verbose "Installing packages: $*"
   # shellcheck disable=SC2086 # We want to expand the arguments
-  as_root ${INSTALL_OPTIMIZE:-} apt-get install -y "$@"
+  as_root ${INSTALL_OPTIMIZE:-} apt-get install -y -qq "$@"
 }
 
 
