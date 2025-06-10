@@ -7,11 +7,11 @@ on:
         description: 'Base image to build'
         required: true
         type: string
-      file:
-        description: 'Dockerfile to use'
+      os:
+        description: 'Operating system to build for: alpine, debian, ubuntu, etc.'
         required: false
         type: string
-        default: 'Dockerfile'
+        default: 'alpine'
       context:
         description: 'Build context'
         required: false
@@ -82,7 +82,24 @@ jobs:
     outputs:
       platforms: ${{ steps.convert.outputs.platforms }}
       run-id: ${{ steps.run-id.outputs.run-id }}
+      image: ${{ steps.base.outputs.image }}
     steps:
+      -
+        name: Select base image
+        id: base
+        run: |
+          os=${{ inputs.os }}
+          if printf %s\\n "$os" | grep -q 'alpine'; then
+            image=${os}:latest
+          elif printf %s\\n "$os" | grep -q 'debian'; then
+            image=${os}:testing
+          elif printf %s\\n "$os" | grep -q 'ubuntu'; then
+            image=${os}:rolling
+          else
+            echo "Unsupported OS: $os, exiting."
+            exit 1
+          fi
+          printf 'image=%s\n' "$image" >> $GITHUB_OUTPUT
       -
         name: Convert Platforms
         id: convert
@@ -98,6 +115,7 @@ jobs:
             LC_ALL=C tr -dc 'a-zA-Z0-9' < /dev/urandom | head -c "${1:-12}"
           }
           printf 'run-id=%s\n' "$(random_string)" >> $GITHUB_OUTPUT
+
 
   build:
     runs-on: ${{ inputs.runs-on }}
@@ -148,8 +166,10 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-          file: ${{ inputs.file }}
-          build-args: ${{ inputs.build-args }}
+          file: Dockerfile
+          build-args: |
+            ${{ inputs.build-args }}
+            INSTALL_IMAGE=${{ steps.platform.outputs.image }}
       -
         name: Export digest
         run: |
