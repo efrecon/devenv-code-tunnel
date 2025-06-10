@@ -284,7 +284,7 @@ get_distro_version() {
 
 is_os_family() {
   [ -z "$1" ] && error "is_os_family: must pass family name, e.g. alpine, debian, etc."
-  [ get_distro_name = "$1" ] || get_release_info ID_LIKE | grep -q "$1"
+  [ "$(get_distro_name)" = "$1" ] || get_release_info ID_LIKE | grep -q "$1"
 }
 
 
