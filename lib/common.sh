@@ -65,7 +65,7 @@ find_exec() {
 download() {
   [ -z "$1" ] && error "download: no url given"
   debug "Downloading $1"
-  ${INSTALL_OPTIMIZE:-} curl -sSL "$1" --output "${2:-"-"}"
+  ${INSTALL_OPTIMIZE:-} curl -fsSL "$1" --output "${2:-"-"}"
 }
 
 
