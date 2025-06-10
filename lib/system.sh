@@ -90,12 +90,12 @@ install_packages_debian() {
     export DEBIAN_FRONTEND
 
     debug "Updating packages cache"
-    as_root apt-get update -qq
+    as_root apt-get update -qq >/dev/null
     INSTALL_REPOS_SHA256=$state
   fi
   verbose "Installing packages: $*"
   # shellcheck disable=SC2086 # We want to expand the arguments
-  as_root ${INSTALL_OPTIMIZE:-} apt-get install -y -qq "$@"
+  as_root ${INSTALL_OPTIMIZE:-} apt-get install -y -qq "$@" >/dev/null
 }
 
 
