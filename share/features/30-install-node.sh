@@ -254,9 +254,9 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   debug "Installing Node %s" "$latest"
 
   if [ "$INSTALL_NODE_SOURCE" = "auto" ]; then
+    arch=$(get_arch)
     # When using the unofficial builds, we need to add the libc type to the OS.
     if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
-      arch=$(get_arch)
       debug "Installing Node.js %s for %s %s" "$latest" "$(get_os)" "$arch"
       if is_musl_os; then
         # musl builds are only available for x64
@@ -286,9 +286,17 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     fi
   else
     # Install dependencies
-    install_packages \
-      libstdc++ \
-      libgcc
+    if is_os_family alpine; then
+      install_packages \
+        libstdc++ \
+        libgcc
+    elif is_os_family debian; then
+      install_packages \
+        libstdc++6
+    else
+      error "Unsupported OS family: %s" "$(get_distro_name)"
+    fi
+
     debug "Downloading Node.js from: %s" "$INSTALL_TGZURL"
     internet_tgz_installer \
       "$INSTALL_TGZURL" \
