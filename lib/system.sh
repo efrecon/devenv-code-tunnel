@@ -90,7 +90,7 @@ install_packages_debian() {
     export DEBIAN_FRONTEND
 
     debug "Updating packages cache"
-    as_root apt-get update
+    as_root apt-get update -qq
     INSTALL_REPOS_SHA256=$state
   fi
   verbose "Installing packages: $*"
