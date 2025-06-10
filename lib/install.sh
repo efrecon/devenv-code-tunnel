@@ -205,3 +205,39 @@ internet_tgz_installer() {
   # Clean up
   rm -f "$_tmp_tgz"
 }
+
+
+# $1 is the URL to download from.
+# $2 is the target directory. Ownership will be respected.
+# $3 is the name of the target package. Empty->basename of the URL.
+# $4 is the checksum (or URL to) to verify. Empty->no verification.
+internet_deb_installer() {
+  [ -z "$1" ] && error "internet_deb_installer: no url given"
+  [ -z "$2" ] && error "internet_deb_installer: no target directory given"
+
+  # declare shortcuts for the arguments and download the file
+  _tgt=${3:-"$(basename "$1")"}
+  _tmp_deb=$(mktemp -t "${_tgt}.XXXXXX")
+  download "$1" "$_tmp_deb"
+
+  # Verify checksum if provided
+  if [ -n "${4:-}" ]; then
+    checksum "$_tmp_deb" "$4" "$_tgt"
+  fi
+
+  # Install the deb package, respecting ownership
+  if [ "$(dir_owner "$2")" = "0" ]; then
+    verbose "Installing from %s to %s, as root" "$1" "${2}"
+    as_root mkdir -p "$2"
+    as_root dpkg -i --force-depends --force-confold --force-confdef --instdir="${2%/}" "$_tmp_deb"
+    as_root apt-get -y --no-install-recommends --allow-downgrades --allow-remove-essential --allow-change-held-packages install -f
+  else
+    verbose "Installing from %s to %s" "$1" "${2%/}/$_tgt"
+    mkdir -p "$2"
+    dpkg -i --force-depends --force-confold --force-confdef --instdir="${2%/}" "$_tmp_deb"
+    as_root apt-get -y --no-install-recommends --allow-downgrades --allow-remove-essential --allow-change-held-packages install -f
+  fi
+
+  # Clean up and return the path to the target binary
+  rm -f "$_tmp_deb"
+}
