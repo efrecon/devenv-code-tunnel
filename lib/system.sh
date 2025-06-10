@@ -82,7 +82,13 @@ install_packages_alpine() {
 
 
 install_packages_debian() {
-  state=$(sha256sum "/etc/apt/sources.list" | head -c 64)
+  if [ "$(get_distro_name)" = "ubuntu" ]; then
+    state=$(sha256sum "/etc/apt/sources.list" | head -c 64)
+  elif [ "$(get_distro_name)" = "debian" ]; then
+    state=$(sha256sum "/etc/apt/sources.list.d/debian.sources" | sha256sum | head -c 64)
+  else
+    error "Unsupported OS: %s" "$(get_distro_name)"
+  fi
   if [ "$state" != "$INSTALL_REPOS_SHA256" ]; then
     # Avoid questons about interactive prompts
     # See: https://askubuntu.com/a/1036630
