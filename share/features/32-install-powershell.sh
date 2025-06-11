@@ -66,20 +66,22 @@ install_runtime_dependencies() {
       lttng-ust \
       openssh-client
   elif [ "$(get_distro_name)" = "debian" ]; then
+    libicu=$(as_root apt-cache search libicu | grep -o 'libicu[0-9][0-9]' | head -n 1)
     install_packages \
       libc6 \
       libgcc-s1 \
       libgssapi-krb5-2 \
-      libicu72 \
+      "$libicu" \
       libssl3 \
       libstdc++6 \
       zlib1g
   elif [ "$(get_distro_name)" = "ubuntu" ]; then
+    libicu=$(as_root apt-cache search libicu | grep -o 'libicu[0-9][0-9]' | head -n 1)
     install_packages \
       ca-certificates \
       libc6 \
       libgcc-s1 \
-      libicu76 \
+      "$libicu" \
       liblttng-ust1 \
       libssl3 \
       libstdc++6 \
