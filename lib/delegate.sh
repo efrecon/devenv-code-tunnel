@@ -23,7 +23,7 @@ daemonize() {
 init_list() {
   [ -z "$1" ] && error "init_list: No directory given"
 
-  find "$1" -type f -executable -maxdepth 1 -name "${2:-"*.sh"}" |
+  find "$1" -maxdepth 1 -type f -executable -name "${2:-"*.sh"}" |
     sed -E -e 's|^.*/(.*\.sh)|\1|g' |
     sort |
     sed -E -e 's|^[0-9]+-||g' -e 's|\.sh$||g' |
@@ -35,7 +35,7 @@ init_get() {
   [ -z "$1" ] && error "init_get: No directory given"
   [ -z "$2" ] && error "init_get: No init script given"
 
-  find "$1" -type f -executable -maxdepth 1 -name "*${2}.sh"
+  find "$1" -maxdepth 1 -type f -executable -name "*${2}.sh"
 }
 
 
