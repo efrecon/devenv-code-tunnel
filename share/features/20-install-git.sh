@@ -65,7 +65,17 @@ else
   error "Unsupported OS family: %s" "$(get_distro_name)"
 fi
 
-as_root internet_script_installer "$INSTALL_GIT_LEFTHOOK_URL" lefthook "$INSTALL_GIT_LEFTHOOK_SHA512"
-install_packages lefthook
-PREFIX="$INSTALL_PREFIX" as_root internet_script_installer "$INSTALL_GIT_EXTRAS_URL" git-extras "$INSTALL_GIT_EXTRAS_SHA512"
-
+if as_root internet_script_installer \
+    "$INSTALL_GIT_LEFTHOOK_URL" \
+    lefthook \
+    "$INSTALL_GIT_LEFTHOOK_SHA512"; then
+  install_packages lefthook
+else
+  warn "Failed to install lefthook using script at %s, skipping" "$INSTALL_GIT_LEFTHOOK_URL"
+fi
+if ! PREFIX="$INSTALL_PREFIX" as_root internet_script_installer \
+      "$INSTALL_GIT_EXTRAS_URL" \
+      git-extras \
+      "$INSTALL_GIT_EXTRAS_SHA512"; then
+  warn "Failed to install git-extras using script at %s, skipping" "$INSTALL_GIT_EXTRAS_URL"
+fi

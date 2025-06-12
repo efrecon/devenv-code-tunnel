@@ -73,8 +73,27 @@ internet_script_installer() {
   fi
   verbose "Running downloaded script $_tmp_script"
   shift 3
-  ${INSTALL_OPTIMIZE:-} bash -- "$_tmp_script" "$@"
+  _ret=0
+  if head -n 1 "$_tmp_script" | grep -qE '^#!'; then
+    # If the script starts with a shebang, run it directly
+    chmod a+rx "$_tmp_script"
+    if ${INSTALL_OPTIMIZE:-} "$_tmp_script" "$@"; then
+      trace "Script at %s executed successfully" "$_tmp_script"
+    else
+      _ret=$?
+      warn "Script at %s failed to execute, returned %d" "$_tmp_script" "$_ret"
+    fi
+  else
+    debug "Running downloaded script $_tmp_script with bash"
+    if ${INSTALL_OPTIMIZE:-} bash -- "$_tmp_script" "$@"; then
+      trace "Script at %s executed successfully" "$_tmp_script"
+    else
+      _ret=$?
+      warn "Script at %s failed to execute, returned %d" "$_tmp_script" "$_ret"
+    fi
+  fi
   rm -f "$_tmp_script"
+  return $_ret
 }
 
 
