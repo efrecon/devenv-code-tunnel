@@ -48,7 +48,7 @@ internet_checksum() {
   download "$2" "$_tmp_sums"
 
   # Note we pick the first checksum we find and do not enforce it to be at the
-  # beginning. This allows to support checksums that would be empbedded in HTML
+  # beginning. This allows to support checksums that would be embedded in HTML
   # (release) notes, e.g. cloudflared.
   _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{64}')
   [ -z "$_sum" ] && _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{128}')
@@ -63,7 +63,7 @@ internet_checksum() {
 
 
 # Install a script from the internet. This is a convenience function that
-# generates a log line to make this more appearent.
+# generates a log line to make this more apparent.
 internet_script_installer() {
   [ -z "$1" ] && error "internet_script_installer: no url given"
   _tmp_script=$(mktemp -t "${2:-"$(basename "$1")"}.XXXXXX")
