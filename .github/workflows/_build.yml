@@ -90,11 +90,11 @@ jobs:
         run: |
           os=${{ inputs.os }}
           if printf %s\\n "$os" | grep -q 'alpine'; then
-            image=${os}:latest
+            image=${os}:3.22
           elif printf %s\\n "$os" | grep -q 'debian'; then
-            image=${os}:testing
+            image=${os}:sid-slim
           elif printf %s\\n "$os" | grep -q 'ubuntu'; then
-            image=${os}:rolling
+            image=${os}:questing
           else
             echo "Unsupported OS: $os, exiting."
             exit 1
