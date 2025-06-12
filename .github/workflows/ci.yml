@@ -27,7 +27,9 @@ jobs:
       packages: write
     strategy:
       matrix:
-        os: [alpine, debian, ubuntu]
+        # We also have support for ubuntu, but for the time being, it comes with
+        # an old version of dropbear.
+        os: [alpine, debian]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
       os: ${{ matrix.os }}
@@ -43,7 +45,9 @@ jobs:
       packages: write
     strategy:
       matrix:
-        os: [alpine, debian, ubuntu]
+        # We also have support for ubuntu, but for the time being, it comes with
+        # an old version of dropbear.
+        os: [alpine, debian]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
       os: ${{ matrix.os }}

@@ -28,7 +28,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        os: [alpine, ubuntu]
+        os: [alpine, debian]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
       os: ${{ matrix.os }}
@@ -45,7 +45,7 @@ jobs:
       packages: write
     strategy:
       matrix:
-        os: [alpine, ubuntu]
+        os: [alpine, debian]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
       platforms: linux/amd64
