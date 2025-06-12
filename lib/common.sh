@@ -137,6 +137,7 @@ check_int() {
 }
 
 retry() {
+  OPTIND=1
   _max_retries=5
   _wait_time=2
   while getopts "m:w:" opt; do
