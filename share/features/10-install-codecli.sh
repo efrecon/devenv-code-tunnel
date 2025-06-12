@@ -55,6 +55,9 @@ if is_os_family alpine; then
   install_packages "libstdc++"
 elif is_os_family debian; then
   install_packages "libstdc++6"
+  if [ "$(get_distro_name)" = "debian" ]; then
+    install_packages procps; # For sysctl
+  fi
 else
   error "Unsupported OS family: %s" "$(get_distro_name)"
 fi
