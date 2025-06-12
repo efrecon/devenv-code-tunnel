@@ -65,7 +65,7 @@ find_exec() {
 download() {
   [ -z "$1" ] && error "download: no url given"
   debug "Downloading $1"
-  ${INSTALL_OPTIMIZE:-} curl -sSL "$1" --output "${2:-"-"}"
+  ${INSTALL_OPTIMIZE:-} curl -fsSL "$1" --output "${2:-"-"}"
 }
 
 
@@ -134,4 +134,31 @@ check_int() {
     fi
     shift
   done
+}
+
+retry() {
+  OPTIND=1
+  _max_retries=5
+  _wait_time=2
+  while getopts "m:w:" opt; do
+    case $opt in
+      m) _max_retries="$OPTARG";;
+      w) _wait_time="$OPTARG";;
+      *) error "Invalid option: -$OPTARG";;
+    esac
+  done
+  shift $((OPTIND - 1))
+  [ "$#" -eq 0 ] && error "retry: No command given to retry"
+
+  _count=0
+  while [ "$_count" -lt "$_max_retries" ]; do
+    if "$@"; then
+      return 0
+    fi
+    _count=$((_count + 1))
+    debug "Command failed, retrying (%d/%d) in %d seconds..." "$_count" "$_max_retries" "$_wait_time"
+    sleep "$_wait_time"
+  done
+
+  error "Command '%s' failed after %d retries" "$*" "$_max_retries"
 }

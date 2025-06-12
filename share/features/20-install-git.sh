@@ -28,8 +28,16 @@ done
 : "${INSTALL_TARGET:="user"}"
 
 
-: "${INSTALL_GIT_LEFTHOOK_URL:="https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.alpine.sh"}"
-: "${INSTALL_GIT_LEFTHOOK_SHA512:="6c2b28a84501c4761a7a49dc4e4b71b580d8bf644675baa057928ff567bc611bdada62f7d2cbf2cd0150af62d2e94d2db0f3767ad9beadeb6ddf0e3a527313c4"}"
+if is_os_family alpine; then
+  : "${INSTALL_GIT_LEFTHOOK_URL:="https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.alpine.sh"}"
+  : "${INSTALL_GIT_LEFTHOOK_SHA512:="6c2b28a84501c4761a7a49dc4e4b71b580d8bf644675baa057928ff567bc611bdada62f7d2cbf2cd0150af62d2e94d2db0f3767ad9beadeb6ddf0e3a527313c4"}"
+elif is_os_family debian; then
+  : "${INSTALL_GIT_LEFTHOOK_URL:="https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh"}"
+  : "${INSTALL_GIT_LEFTHOOK_SHA512:="ea55d4e4034dc0b3403d90cd17c7ee847214913db461cdf1f52596ea042bde738f6f77350078646a2793537133aca8895b90bf24cf45fa326e40d1997667b70e"}"
+else
+  : "${INSTALL_GIT_LEFTHOOK_URL:=""}"
+  : "${INSTALL_GIT_LEFTHOOK_SHA512:=""}"
+fi
 
 : "${INSTALL_GIT_EXTRAS_URL:="https://raw.githubusercontent.com/tj/git-extras/main/install.sh"}"
 : "${INSTALL_GIT_EXTRAS_SHA512:="915def79bb2f86448d5fad8542ceb3265cf4a99d95f2da4c6d9d07f1c16d1c26928f1579fa916ad20efe05f6cf55dbcc1c027cd753f1091f0aeb7e084ddf1c71"}"
@@ -42,9 +50,32 @@ git
 git-lfs
 pre-commit
 git-annex
-- util-linux-misc
 EOF
 
-as_root internet_script_installer "$INSTALL_GIT_LEFTHOOK_URL" lefthook "$INSTALL_GIT_LEFTHOOK_SHA512"
-PREFIX="$INSTALL_PREFIX" as_root internet_script_installer "$INSTALL_GIT_EXTRAS_URL" git-extras "$INSTALL_GIT_EXTRAS_SHA512"
+# Dependencies of git-extras
+if is_os_family alpine; then
+  install_ondemand<<EOF
+- util-linux-misc
+EOF
+elif is_os_family debian; then
+  install_ondemand<<EOF
+- bsdmainutils
+EOF
+else
+  error "Unsupported OS family: %s" "$(get_distro_name)"
+fi
 
+if as_root internet_script_installer \
+    "$INSTALL_GIT_LEFTHOOK_URL" \
+    lefthook \
+    "$INSTALL_GIT_LEFTHOOK_SHA512"; then
+  install_packages lefthook
+else
+  warn "Failed to install lefthook using script at %s, skipping" "$INSTALL_GIT_LEFTHOOK_URL"
+fi
+if ! PREFIX="$INSTALL_PREFIX" as_root internet_script_installer \
+      "$INSTALL_GIT_EXTRAS_URL" \
+      git-extras \
+      "$INSTALL_GIT_EXTRAS_SHA512"; then
+  warn "Failed to install git-extras using script at %s, skipping" "$INSTALL_GIT_EXTRAS_URL"
+fi

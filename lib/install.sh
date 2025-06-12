@@ -48,7 +48,7 @@ internet_checksum() {
   download "$2" "$_tmp_sums"
 
   # Note we pick the first checksum we find and do not enforce it to be at the
-  # beginning. This allows to support checksums that would be empbedded in HTML
+  # beginning. This allows to support checksums that would be embedded in HTML
   # (release) notes, e.g. cloudflared.
   _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{64}')
   [ -z "$_sum" ] && _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{128}')
@@ -63,7 +63,7 @@ internet_checksum() {
 
 
 # Install a script from the internet. This is a convenience function that
-# generates a log line to make this more appearent.
+# generates a log line to make this more apparent.
 internet_script_installer() {
   [ -z "$1" ] && error "internet_script_installer: no url given"
   _tmp_script=$(mktemp -t "${2:-"$(basename "$1")"}.XXXXXX")
@@ -73,8 +73,27 @@ internet_script_installer() {
   fi
   verbose "Running downloaded script $_tmp_script"
   shift 3
-  ${INSTALL_OPTIMIZE:-} bash -- "$_tmp_script" "$@"
+  _ret=0
+  if head -n 1 "$_tmp_script" | grep -qE '^#!'; then
+    # If the script starts with a shebang, run it directly
+    chmod a+rx "$_tmp_script"
+    if ${INSTALL_OPTIMIZE:-} "$_tmp_script" "$@"; then
+      trace "Script at %s executed successfully" "$_tmp_script"
+    else
+      _ret=$?
+      warn "Script at %s failed to execute, returned %d" "$_tmp_script" "$_ret"
+    fi
+  else
+    debug "Running downloaded script $_tmp_script with bash"
+    if ${INSTALL_OPTIMIZE:-} bash -- "$_tmp_script" "$@"; then
+      trace "Script at %s executed successfully" "$_tmp_script"
+    else
+      _ret=$?
+      warn "Script at %s failed to execute, returned %d" "$_tmp_script" "$_ret"
+    fi
+  fi
   rm -f "$_tmp_script"
+  return $_ret
 }
 
 
@@ -204,4 +223,44 @@ internet_tgz_installer() {
 
   # Clean up
   rm -f "$_tmp_tgz"
+}
+
+
+# $1 is the URL to download from.
+# $2 is the target directory. Ownership will be respected.
+# $3 is the name of the target package. Empty->basename of the URL.
+# $4 is the checksum (or URL to) to verify. Empty->no verification.
+internet_deb_installer() {
+  [ -z "$1" ] && error "internet_deb_installer: no url given"
+  [ -z "$2" ] && error "internet_deb_installer: no target directory given"
+
+  # declare shortcuts for the arguments and download the file
+  _tgt=${3:-"$(basename "$1")"}
+  _tmp_deb=$(mktemp -t "${_tgt}.XXXXXX")
+  download "$1" "$_tmp_deb"
+
+  # Verify checksum if provided
+  if [ -n "${4:-}" ]; then
+    if printf %s\\n "$4" | grep -qE '^https?://'; then
+      internet_checksum "$(basename "$1")" "$4" "$_tmp_deb" "$_tgt"
+    else
+      checksum "$_tmp_deb" "$4" "$_tgt"
+    fi
+  fi
+
+  # Install the deb package, respecting ownership
+  if [ "$(dir_owner "$2")" = "0" ]; then
+    verbose "Installing from %s to %s, as root" "$1" "${2}"
+    as_root mkdir -p "$2"
+    as_root dpkg -i --force-depends --force-confold --force-confdef --instdir="${2%/}" "$_tmp_deb"
+    as_root apt-get -y --no-install-recommends --allow-downgrades --allow-remove-essential --allow-change-held-packages install -f
+  else
+    verbose "Installing from %s to %s" "$1" "${2%/}/$_tgt"
+    mkdir -p "$2"
+    dpkg -i --force-depends --force-confold --force-confdef --instdir="${2%/}" "$_tmp_deb"
+    as_root apt-get -y --no-install-recommends --allow-downgrades --allow-remove-essential --allow-change-held-packages install -f
+  fi
+
+  # Clean up and return the path to the target binary
+  rm -f "$_tmp_deb"
 }

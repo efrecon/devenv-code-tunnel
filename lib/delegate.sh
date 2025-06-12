@@ -23,7 +23,7 @@ daemonize() {
 init_list() {
   [ -z "$1" ] && error "init_list: No directory given"
 
-  find "$1" -type f -executable -maxdepth 1 -name "${2:-"*.sh"}" |
+  find "$1" -maxdepth 1 -type f -executable -name "${2:-"*.sh"}" |
     sed -E -e 's|^.*/(.*\.sh)|\1|g' |
     sort |
     sed -E -e 's|^[0-9]+-||g' -e 's|\.sh$||g' |
@@ -35,7 +35,7 @@ init_get() {
   [ -z "$1" ] && error "init_get: No directory given"
   [ -z "$2" ] && error "init_get: No init script given"
 
-  find "$1" -type f -executable -maxdepth 1 -name "*${2}.sh"
+  find "$1" -maxdepth 1 -type f -executable -name "*${2}.sh"
 }
 
 
@@ -55,7 +55,12 @@ delegate() {
   [ -z "${3:-}" ] && _deps="$(init_list "$_scripts_d" "${4:-"*.sh"}")" || _deps="$3"
   _bg_run=${5:-"0"}
 
-  shift 5 || shift "$#"
+  # Jump to arguments to be passed to the scripts.
+  if [ "$#" -gt 5 ]; then
+    shift 5
+  else
+    shift "$#"
+  fi
   if [ "$_deps" = "-" ]; then
     verbose "Starting of %s scripts disabled" "$_human_t"
   else
@@ -74,7 +79,9 @@ delegate() {
           ${INSTALL_OPTIMIZE:-} "$_script" "$@" &
         else
           debug "Running %s using %s" "$_s" "$_script"
-          ${INSTALL_OPTIMIZE:-} "$_script" "$@"
+          if ! ${INSTALL_OPTIMIZE:-} "$_script" "$@"; then
+            error "%s %s failed" "$_human_t" "$_script"
+          fi
         fi
         printf %s\\n "$_s"
       else

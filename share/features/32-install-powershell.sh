@@ -42,6 +42,58 @@ fi
 
 log_init INSTALL
 
+install_runtime_dependencies() {
+  if is_os_family alpine; then
+    # Install dependencies as per
+    # https://learn.microsoft.com/en-us/powershell/scripting/install/install-alpine?view=powershell-7.5#installation-steps
+    install_packages \
+      ca-certificates \
+      less \
+      ncurses-terminfo-base \
+      krb5-libs \
+      libgcc \
+      libintl \
+      libssl3 \
+      libstdc++ \
+      tzdata \
+      userspace-rcu \
+      zlib \
+      icu-libs \
+      curl
+    install_packages \
+      --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
+      --no-cache \
+      lttng-ust \
+      openssh-client
+  elif is_os_family debian; then
+    libicu=$(as_root apt-cache search libicu | grep -o 'libicu[0-9][0-9]' | head -n 1)
+    if [ "$(get_distro_name)" = "debian" ]; then
+      install_packages \
+        libc6 \
+        libgcc-s1 \
+        libgssapi-krb5-2 \
+        "$libicu" \
+        libssl3 \
+        libstdc++6 \
+        zlib1g
+    elif [ "$(get_distro_name)" = "ubuntu" ]; then
+      install_packages \
+        ca-certificates \
+        libc6 \
+        libgcc-s1 \
+        "$libicu" \
+        liblttng-ust1 \
+        libssl3 \
+        libstdc++6 \
+        libunwind8 \
+        zlib1g
+    else
+      error "Unsupported Debian/Ubuntu distribution: %s" "$(get_distro_name)"
+    fi
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
+}
 
 if ! command_present "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
   if [ "$(get_arch)" = "arm64" ] && is_musl_os; then
@@ -49,27 +101,8 @@ if ! command_present "pwsh" && [ -n "$INSTALL_POWERSHELL_VERSION" ]; then
     return 0
   fi
 
-  # Install dependencies as per
-  # https://learn.microsoft.com/en-us/powershell/scripting/install/install-alpine?view=powershell-7.5#installation-steps
-  install_packages \
-    ca-certificates \
-    less \
-    ncurses-terminfo-base \
-    krb5-libs \
-    libgcc \
-    libintl \
-    libssl3 \
-    libstdc++ \
-    tzdata \
-    userspace-rcu \
-    zlib \
-    icu-libs \
-    curl
-  install_packages \
-    --repository https://dl-cdn.alpinelinux.org/alpine/edge/main \
-    --no-cache \
-    lttng-ust \
-    openssh-client
+  # install runtime dependencies
+  install_runtime_dependencies
 
   # Download and install
   internet_tgz_installer \

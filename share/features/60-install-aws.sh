@@ -31,7 +31,13 @@ log_init INSTALL
 if ! command_present "aws"; then
   # Install the AWS CLI. This will bring a large number of python
   # dependencies...
-  install_packages aws-cli
+  if is_os_family alpine; then
+    install_packages aws-cli
+  elif is_os_family debian; then
+    install_packages awscli
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
   verbose "Installed aws CLI: $(aws --version)"
   install_ondemand<<EOF
 mandoc

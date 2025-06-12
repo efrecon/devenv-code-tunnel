@@ -27,10 +27,12 @@ jobs:
       packages: write
     strategy:
       matrix:
-        os: [alpine]
+        # We also have support for ubuntu, but for the time being, it comes with
+        # an old version of dropbear.
+        os: [alpine, debian]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
-      file: Dockerfile.${{ matrix.os }}
+      os: ${{ matrix.os }}
       username: ${{ github.actor }}
     secrets:
       password: ${{ secrets.GITHUB_TOKEN }}
@@ -43,10 +45,12 @@ jobs:
       packages: write
     strategy:
       matrix:
-        os: [alpine]
+        # We also have support for ubuntu, but for the time being, it comes with
+        # an old version of dropbear.
+        os: [alpine, debian]
     with:
       image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
-      file: Dockerfile.${{ matrix.os }}
+      os: ${{ matrix.os }}
       build-args: |
         INSTALL_FEATURES=sudo codecli cloudflare git
       username: ${{ github.actor }}

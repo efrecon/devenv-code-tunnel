@@ -46,6 +46,11 @@ bin_name
 # ecdsa, ed25519, or rsa. Keys will not be re-generated if they already exist.
 : "${SSHD_KEY:="ed25519"}"
 
+# Minimum version of dropbear to use, defaults to 87, which is the minimum that
+# supports the -D option. Dropbear uses <year>.<version> format, this variable
+# is matched against the version.
+: "${SSHD_DROPBEAR_VERSION_MIN:="87"}"
+
 # Where to store sshd logs, will be accessible by the user
 : "${SSHD_LOGFILE:="${SSHD_PREFIX}/log/sshd.log"}"
 
@@ -172,6 +177,11 @@ log_init SSHD
 
 if ! check_command "dropbear"; then
   exit 0
+fi
+
+DROPBEAR_VERSION=$(dropbear -V 2>&1 | grep -o '[0-9.]*')
+if [ "$(printf %s\\n "$DROPBEAR_VERSION" | cut -d. -f2)" -lt "$SSHD_DROPBEAR_VERSION_MIN" ]; then
+  error "Dropbear version %s is too old, please update to at least %s" "$DROPBEAR_VERSION" "xxxx.$SSHD_DROPBEAR_VERSION_MIN"
 fi
 
 if [ -z "$SSHD_USER" ]; then

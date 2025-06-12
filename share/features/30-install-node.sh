@@ -69,6 +69,22 @@ node_version() {
 }
 
 
+install_runtime_dependencies() {
+  # Install dependencies
+  if is_os_family alpine; then
+    install_packages \
+      libstdc++ \
+      libgcc
+  elif is_os_family debian; then
+    install_packages \
+      libstdc++6 \
+      libgcc-s1
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
+}
+
+
 # Install package managers and node-based applications. The arguments are
 # prepended, and should be one of the as_* functions, with arguments if
 # relevant.
@@ -113,7 +129,8 @@ build_from_source() {
   download "https://nodejs.org/dist/v${1}/SHASUMS256.txt.asc" "SHASUMS256.txt.asc"
 
   # Add build dependencies
-  as_root apk add --no-cache --virtual .build-deps-full \
+  if is_os_family alpine; then
+    as_root apk add --no-cache --virtual .build-deps-full \
       binutils-gold \
       g++ \
       gcc \
@@ -123,6 +140,18 @@ build_from_source() {
       make \
       python3 \
       py-setuptools
+  elif is_os_family debian; then
+    install_packages \
+      build-essential \
+      g++ \
+      gcc \
+      gnupg \
+      make \
+      python3 \
+      python3-setuptools
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
 
   # use pre-existing gpg directory, see https://github.com/nodejs/docker-node/pull/1895#issuecomment-1550389150
   GNUPGHOME="$(mktemp -d)"
@@ -158,7 +187,22 @@ build_from_source() {
   ./configure --prefix="$INSTALL_PREFIX"
   make -j"$(getconf _NPROCESSORS_ONLN)" V=
   as_root make install
-  as_root apk del .build-deps-full
+  if is_os_family alpine; then
+    as_root apk del .build-deps-full
+  elif is_os_family debian; then
+    as_root apt-get remove --purge -y \
+      build-essential \
+      g++ \
+      gcc \
+      gnupg \
+      make \
+      python3 \
+      python3-setuptools
+    as_root apt-get autoremove --purge -y
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
+  install_runtime_dependencies
 
   cd "$curdir"
   rm -rf "$builddir"
@@ -181,18 +225,17 @@ install_regclient() {
 install_from_image() {
   # Find out the part of the tag that matches the current OS, if possible.
   distro=$(get_distro_name)
-  case "$distro" in
-    alpine)
-      # Tags only use major.minor for the version of alpine.
-      os_tag="${distro}$(printf %s\\n "$(get_distro_version)"|grep -Eo '^[0-9]+\.[0-9]+')";;
-    debian)
-      # Pick the slim version for debian, as we just want to copy as little as
-      # possible.
-      os_tag="$(get_release_info VERSION_CODENAME)-slim";;
-    *)
-      # Can we do something about debian-derivatives?
-      error "Unsupported distribution: %s" "$distro";;
-  esac
+  if is_os_family alpine; then
+    # Tags only use major.minor for the version of alpine.
+    os_tag="${distro}$(printf %s\\n "$(get_distro_version)"|grep -Eo '^[0-9]+\.[0-9]+')"
+  elif is_os_family debian; then
+    # Pick the slim version for debian, as we just want to copy as little as
+    # possible.
+    os_tag="$(get_release_info VERSION_CODENAME)-slim"
+  else
+    error "Unsupported OS family: %s" "$distro"
+  fi
+
   tag="${1}-${os_tag}"
 
   # install regctl if not already installed
@@ -221,9 +264,7 @@ install_from_image() {
   as_root cp -r "$layerdir"/usr/local/* "$INSTALL_PREFIX"
 
   # Install dependencies
-  install_packages \
-    libstdc++ \
-    libgcc
+  install_runtime_dependencies
 
   # Clean up
   rm -rf "$layerdir"
@@ -254,9 +295,9 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   debug "Installing Node %s" "$latest"
 
   if [ "$INSTALL_NODE_SOURCE" = "auto" ]; then
+    arch=$(get_arch)
     # When using the unofficial builds, we need to add the libc type to the OS.
     if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
-      arch=$(get_arch)
       debug "Installing Node.js %s for %s %s" "$latest" "$(get_os)" "$arch"
       if is_musl_os; then
         # musl builds are only available for x64
@@ -286,9 +327,8 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     fi
   else
     # Install dependencies
-    install_packages \
-      libstdc++ \
-      libgcc
+    install_runtime_dependencies
+
     debug "Downloading Node.js from: %s" "$INSTALL_TGZURL"
     internet_tgz_installer \
       "$INSTALL_TGZURL" \
