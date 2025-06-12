@@ -77,7 +77,8 @@ install_runtime_dependencies() {
       libgcc
   elif is_os_family debian; then
     install_packages \
-      libstdc++6
+      libstdc++6 \
+      libgcc-s1
   else
     error "Unsupported OS family: %s" "$(get_distro_name)"
   fi

@@ -91,8 +91,23 @@ if [ "$INSTALL_OPTIMIZE" = "-" ]; then
   # When dash, do not try to optimize disk access
   INSTALL_OPTIMIZE=""
 elif [ -z "$INSTALL_OPTIMIZE" ]; then
-  is_os_family alpine && install_packages libeatmydata && INSTALL_OPTIMIZE="eatmydata" || true
-  is_os_family debian && install_packages eatmydata && INSTALL_OPTIMIZE="eatmydata" || true
+  if is_os_family alpine; then
+    if install_packages libeatmydata; then
+      INSTALL_OPTIMIZE="eatmydata"
+    else
+      warn "eatmydata not available, will not optimize disk access"
+      INSTALL_OPTIMIZE=""
+    fi
+  elif is_os_family debian; then
+    if install_packages eatmydata; then
+      INSTALL_OPTIMIZE="eatmydata"
+    else
+      warn "eatmydata not available, will not optimize disk access"
+      INSTALL_OPTIMIZE=""
+    fi
+  else
+    error "Unsupported OS family: %s" "$(get_distro_name)"
+  fi
 fi
 
 # Install package that we need ourselves. Trigger installation based on the

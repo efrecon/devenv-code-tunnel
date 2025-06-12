@@ -241,7 +241,11 @@ internet_deb_installer() {
 
   # Verify checksum if provided
   if [ -n "${4:-}" ]; then
-    checksum "$_tmp_deb" "$4" "$_tgt"
+    if printf %s\\n "$4" | grep -qE '^https?://'; then
+      internet_checksum "$(basename "$1")" "$4" "$_tmp_deb" "$_tgt"
+    else
+      checksum "$_tmp_deb" "$4" "$_tgt"
+    fi
   fi
 
   # Install the deb package, respecting ownership
