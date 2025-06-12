@@ -35,8 +35,8 @@ elif is_os_family debian; then
   : "${INSTALL_GIT_LEFTHOOK_URL:="https://dl.cloudsmith.io/public/evilmartians/lefthook/setup.deb.sh"}"
   : "${INSTALL_GIT_LEFTHOOK_SHA512:="ea55d4e4034dc0b3403d90cd17c7ee847214913db461cdf1f52596ea042bde738f6f77350078646a2793537133aca8895b90bf24cf45fa326e40d1997667b70e"}"
 else
-  : "${INSTALL_GIT_LEFTHOOK_URL}"
-  : "${INSTALL_GIT_LEFTHOOK_SHA512}"
+  : "${INSTALL_GIT_LEFTHOOK_URL:=""}"
+  : "${INSTALL_GIT_LEFTHOOK_SHA512:=""}"
 fi
 
 : "${INSTALL_GIT_EXTRAS_URL:="https://raw.githubusercontent.com/tj/git-extras/main/install.sh"}"
