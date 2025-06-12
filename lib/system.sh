@@ -77,7 +77,7 @@ install_packages_alpine() {
   fi
   verbose "Installing packages: $*"
   # shellcheck disable=SC2086 # We want to expand the arguments
-  as_root ${INSTALL_OPTIMIZE:-} apk add -q "$@"
+  retry as_root ${INSTALL_OPTIMIZE:-} apk add -q "$@"
 }
 
 
