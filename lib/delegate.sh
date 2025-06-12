@@ -58,6 +58,8 @@ delegate() {
   # Jump to arguments to be passed to the scripts.
   if [ "$#" -gt 5 ]; then
     shift 5
+  else
+    shift "$#"
   fi
   if [ "$_deps" = "-" ]; then
     verbose "Starting of %s scripts disabled" "$_human_t"
@@ -77,7 +79,9 @@ delegate() {
           ${INSTALL_OPTIMIZE:-} "$_script" "$@" &
         else
           debug "Running %s using %s" "$_s" "$_script"
-          ${INSTALL_OPTIMIZE:-} "$_script" "$@"
+          if ! ${INSTALL_OPTIMIZE:-} "$_script" "$@"; then
+            error "%s %s failed" "$_human_t" "$_script"
+          fi
         fi
         printf %s\\n "$_s"
       else
