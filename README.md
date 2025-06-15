@@ -5,22 +5,21 @@ containers or microVMs. Environments are designed to be accessed through tunnels
 from, e.g. visual studio code. Provided you have `docker` or `podman` installed
 on a host, and perhaps [`krun`][krun], the following one-liner will create a
 volume called `devenv` and restrict access to the `efrecon` user at GitHub --
-feel free to change to your username!
+feel free to change to your username! You can audit the wrapper script
+[here](./devenv.sh).
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/heads/main/devenv.sh | \
   sh -s - devenv -- -g efrecon
 ```
 
-The environment will automatically establish two tunnels, one vscode
-[tunnel][vscode] and one [cloudflare] quick tunnel. To access your new
-environment, follow the instructions from the logs. For access from [vscode],
-you will have to follow the link to authorize the tunnel while logged in as
-`efrecon` at GitHub. Access from [cloudflare] is restricted to the public SSH
-keys registered under the `efrecon` account.
+The environment will automatically establish two tunnels and provide access
+instructions in the logs:
 
-  [vscode]: https://code.visualstudio.com/docs/remote/tunnels
-  [cloudflare]: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
+- one vscode [tunnel][vscode]. For access, you will have to follow the link to
+authorize the tunnel while logged in as `efrecon` at GitHub.
+- one [cloudflare] quick tunnel. Access from [cloudflare] is restricted
+to the public SSH keys registered under the `efrecon` account.
 
 The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully
 encapsulated microVM with `podman` and `krun`, but will gracefully downgrade to
@@ -29,6 +28,16 @@ container solution is installed and accessible. The containers need to be
 privileged in order for the user inside the development environment to be able
 to run `docker`, a.k.a. [DinD] or docker in docker.
 
+The [`devenv.sh`](./devenv.sh) wrapper script automatically uses a "fat" image
+based on Alpine linux. The content of this image is controlled through a set of
+high-level [features](./share/features/README.md). To tune the content of your
+environment, for example to remove features or change the base image, you can
+control its content through build arguments by the way of the
+[command-line](#manually-with-docker) or [compose](#with-compose).
+
+  [krun]: https://github.com/containers/crun/blob/main/krun.1.md
+  [vscode]: https://code.visualstudio.com/docs/remote/tunnels
+  [cloudflare]: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
   [DinD]: https://www.docker.com/resources/docker-in-docker-containerized-ci-workflows-dockercon-2023/
 
 ## Usage
@@ -84,8 +93,6 @@ from GitHub. This example will only print the help through the `-h` option.
 ```bash
 curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/heads/main/devenv.sh | sh -s - -h
 ```
-
-  [krun]: https://github.com/containers/crun/blob/main/krun.1.md
 
 ### Manually with `docker`
 
