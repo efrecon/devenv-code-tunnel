@@ -1,5 +1,36 @@
 # Tunneled dev environments in containers or microVMs
 
+This project implements encapsulated development environments to be run in
+containers or microVMs. Environments are designed to be accessed through tunnels
+from, e.g. visual studio code. Provided you have `docker` or `podman` installed
+on a host, and perhaps [`krun`][krun], the following one-liner will create a
+volume called `devenv` and restrict access to the `efrecon` user at GitHub --
+feel free to change to your username!
+
+```bash
+curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/heads/main/devenv.sh | \
+  sh -s - devenv -- -g efrecon
+```
+
+The environment will automatically establish two tunnels, one vscode
+[tunnel][vscode] and one [cloudflare] quick tunnel. To access your new
+environment, follow the instructions from the logs. For access from [vscode],
+you will have to follow the link to authorize the tunnel while logged in as
+`efrecon` at GitHub. Access from [cloudflare] is restricted to the public SSH
+keys registered under the `efrecon` account.
+
+  [vscode]: https://code.visualstudio.com/docs/remote/tunnels
+  [cloudflare]: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
+
+The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully
+encapsulated microVM with `podman` and `krun`, but will gracefully downgrade to
+privileged containers on top of `podman` or `docker`, depending on the type of
+container solution is installed and accessible. The containers need to be
+privileged in order for the user inside the development environment to be able
+to run `docker`, a.k.a. [DinD] or docker in docker.
+
+  [DinD]: https://www.docker.com/resources/docker-in-docker-containerized-ci-workflows-dockercon-2023/
+
 ## Usage
 
 ### With `compose`
