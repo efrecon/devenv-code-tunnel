@@ -2,14 +2,14 @@
 
 This project implements encapsulated development environments to be run in
 containers or microVMs. Environments are designed to be accessed through tunnels
-from, e.g. visual studio code. Provided you have `docker` or `podman` installed
-on a host, and perhaps [`krun`][krun], the following one-liner will create a
-volume called `devenv` and restrict access to the `efrecon` user at GitHub --
-feel free to change to your username! You can audit the wrapper script
+from, e.g. Visual Studio Code. Provided you have `docker` or `podman` installed
+on a host -- and perhaps [`krun`][krun] -- the following one-liner will create a
+volume called `devenv` and restrict access to the `efrecon` user at GitHub. Feel
+free to change to your username! You can audit the wrapper script
 [here](./devenv.sh).
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/heads/main/devenv.sh | \
+curl -fsSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/main/devenv.sh | \
   sh -s - devenv -- -g efrecon
 ```
 
@@ -23,22 +23,22 @@ to the public SSH keys registered under the `efrecon` account.
 
 The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully
 encapsulated microVM with `podman` and `krun`, but will gracefully downgrade to
-privileged containers on top of `podman` or `docker`, depending on the type of
+privileged containers on top of `podman` or `docker`, depending on which
 container solution is installed and accessible. The containers need to be
 privileged in order for the user inside the development environment to be able
 to run `docker`, a.k.a. [DinD] or docker in docker.
 
 The [`devenv.sh`](./devenv.sh) wrapper script automatically uses a "fat" image
-based on Alpine linux. The content of this image is controlled through a set of
+based on Alpine Linux. The content of this image is controlled through a set of
 high-level [features](./share/features/README.md). To tune the content of your
 environment, for example to remove features or change the base image, you can
-control its content through build arguments by the way of the
+control its content through build arguments via the
 [command-line](#manually-with-docker) or [compose](#with-compose).
 
-  [krun]: https://github.com/containers/crun/blob/main/krun.1.md
-  [vscode]: https://code.visualstudio.com/docs/remote/tunnels
-  [cloudflare]: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
-  [DinD]: https://www.docker.com/resources/docker-in-docker-containerized-ci-workflows-dockercon-2023/
+[krun]: https://github.com/containers/crun/blob/main/krun.1.md
+[vscode]: https://code.visualstudio.com/docs/remote/tunnels
+[cloudflare]: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
+[DinD]: https://www.docker.com/resources/docker-in-docker-containerized-ci-workflows-dockercon-2023/
 
 ## Usage
 
@@ -85,7 +85,7 @@ offering these features:
   for more information in the logs of the container. You can pass any
   [option](#quick-options-tunnelsh-run-down) recognized by the entrypoint.
 
-  [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
+[image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 
 Even more in a hurry? Run the following one liner to run `devenv.sh` directly
 from GitHub. This example will only print the help through the `-h` option.
@@ -164,7 +164,7 @@ the following options.
 + `-L` selects the logs to reprint inside the main container logs. Specify a `-`
   to not reprint anything.
 
-  [gist]: https://gist.github.com/efrecon/a9addf9f5812212366ede103bfc211f6
+[gist]: https://gist.github.com/efrecon/a9addf9f5812212366ede103bfc211f6
 
 ## Official Images
 
@@ -178,4 +178,4 @@ images:
   (opinionated) software onto the image. The entire list is as per the content
   of the [features](./share/features/) directory.
 
-  [registry]: https://github.com/efrecon/devenv-code-tunnel/pkgs/container/devenv-code-tunnel-alpine
+[registry]: https://github.com/efrecon/devenv-code-tunnel/pkgs/container/devenv-code-tunnel-alpine
