@@ -3,9 +3,9 @@
 This project implements encapsulated development environments to be run in
 containers or microVMs. Environments are designed to be accessed through tunnels
 from, e.g., Visual Studio Code. Provided you have `docker` or `podman` installed
-on a host—and perhaps [`krun`][krun]—the following one-liner will create a
-volume called `devenv` and restrict access to the `efrecon` user at GitHub. Feel
-free to change to your username! You can audit the wrapper script
+on a host, and optionally [`krun`][krun]. The following one-liner will create a
+volume called `devenv` and restrict access to the `efrecon` user at GitHub.
+Replace `efrecon` with your GitHub username. Audit the wrapper script
 [here](./devenv.sh).
 
 ```bash
@@ -26,7 +26,7 @@ encapsulated microVM with `podman` and `krun`, but will fall back to privileged
 containers on top of `podman` or `docker`, depending on which container solution
 is installed and accessible. Containers need to be privileged in order for the
 user inside the development environment to be able to run `docker`, a.k.a.
-[DinD] or docker in docker.
+Docker-in-Docker ([DinD]).
 
 The [`devenv.sh`](./devenv.sh) wrapper script automatically uses a "fat" image
 based on Alpine Linux. The content of this image is controlled through a set of
@@ -129,11 +129,11 @@ to access your container from your browser.
 
 Notes:
 
-- `--privileged` is necessary so the environment will be able to easily run
-  Docker in Docker.
-- `--hostname` is necessary in order to avoid to have to re-authorize the device
-  tunnel each time the container starts -- as long as you use the same hostname.
-  By default, the name of the tunnel will then be the same as the hostname.
+- `--privileged` is necessary so the environment can easily run
+  Docker-in-Docker ([DinD]).
+- `--hostname` is required to avoid having to re-authorize the device tunnel
+  each time the container starts -- as long as you use the same hostname. By
+  default, the name of the tunnel will then be the same as the hostname.
 
 ### Quick Options `tunnel.sh` run-down
 
@@ -149,7 +149,7 @@ the following options.
 - `-f` to force authorization of the device at the provider
 - `-p` to change the provider away from the `github` default.
 - `-k` to specify a hook that will automatically be downloaded and executed
-  before the tunnel is started. You can use this to run a gist that would setup
+  before the tunnel is started. You can use this to run a gist that would set up
   your environment and dotfiles, for example. To run this [gist], give its raw
   URL as a value, i.e.
   `https://gist.githubusercontent.com/efrecon/a9addf9f5812212366ede103bfc211f6/raw`
@@ -160,6 +160,12 @@ the following options.
   tunnel, with the `.txt` extension will be maintained with access content. For
   additional security, you should make that GIST private. This requires the
   `git` feature to be installed.
+- `-s` is the port for the SSH server inside the container. The default is `2222`.
+  This port will be used to connect to the container via SSH, and also to
+  connect to the cloudflare tunnel.
+- `-S` contains a space-separated list of [services](./share/services/README.md)
+  to start inside the container. The default is to start all services. Specify a
+  `-` to not start any service.
 - `-T` selects the tunnels that are to be started, provided they have been
   installed in the image. The default is to start all tunnels.
 - `-L` selects the logs to reprint inside the main container logs. Specify a `-`
@@ -169,12 +175,13 @@ the following options.
 
 ## Official Images
 
-Official images are published to the GitHub container [registry]. There are two
-images:
+Official images are published to the GitHub container [registry]. There are 4
+images in total, based on either Alpine Linux or Debian. For the debian images,
+replace `alpine` with `debian` in the image name below. The images are:
 
 - `ghcr.io/efrecon/devenv-code-tunnel-alpine-minimal:main` provides a user
-  called `coder`. The user is able to `sudo` without password. Only the vscode
-  CLI is installed.
+  called `coder`. The user can `sudo` without a password. Only the VS code CLI
+  is installed.
 - `ghcr.io/efrecon/devenv-code-tunnel-alpine:main` adds a number of
   (opinionated) software onto the image. The entire list is as per the content
   of the [features](./share/features/) directory.
