@@ -2,8 +2,8 @@
 
 This project implements encapsulated development environments to be run in
 containers or microVMs. Environments are designed to be accessed through tunnels
-from, e.g., Visual Studio Code. Provided you have `docker` or `podman` installed
-on a host, and optionally [`krun`][krun]. The following one-liner will create a
+(e.g., Visual Studio Code) and require `docker` or `podman` on the host, with
+optional support for [`krun`][krun]. The following one-liner will create a
 volume called `devenv` and restrict access to the `efrecon` user at GitHub.
 Replace `efrecon` with your GitHub username. Audit the wrapper script
 [here](./devenv.sh).
@@ -73,22 +73,24 @@ devenv.sh devenv -v
 This will create a (privileged) container or VM, running in the foreground and
 offering these features:
 
-- A volume named after the first argument, `devenv` will be created, if
+- A volume named after the first argument (`devenv`) will be created, if
   necessary and mounted into the development environment as the home directory
   for the user `coder`.
-- The local container/VM will also be named after the first argument (e.g.
+- The local container/VM will also be named after the first argument (e.g.,
   `devenv`). If there was an existing container running under that name, it will
   be removed.
-- The vscode tunnel will be called after `<hostname>-devenv`, where `<hostname>`
-  will be the actual name of the host that the command is run on.
+- The VS Code tunnel will be called after `<hostname>-devenv`, where
+  `<hostname>` will be the actual name of the host that the command is run on.
 - The `-v` option will be passed to the entrypoint of the container, providing
   for more information in the logs of the container. You can pass any
   [option](#quick-options-tunnelsh-run-down) recognized by the entrypoint.
 
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 
-Even more in a hurry? Run the following one liner to run `devenv.sh` directly
-from GitHub. This example will only print the help through the `-h` option.
+If you’re in a hurry, run this one-liner to fetch `devenv.sh` directly from
+GitHub. This example will only print the help through the `-h` option, but you
+can specify any of the options described in the
+[options](#quick-options-tunnelsh-run-down) section below.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/main/devenv.sh | \
@@ -157,8 +159,8 @@ the following options.
   cloudflare tunnel via SSH.
 - `-G` is the URL to a GIST that will be updated with details about the created
   tunnels. Under the root of that GIST, a file named after the name of the
-  tunnel, with the `.txt` extension will be maintained with access content. For
-  additional security, you should make that GIST private. This requires the
+  tunnel (with a `.txt` extension) will be maintained to store access details.
+  For additional security, you should make that GIST private. This requires the
   `git` feature to be installed.
 - `-s` is the port for the SSH server inside the container. The default is `2222`.
   This port will be used to connect to the container via SSH, and also to
