@@ -24,9 +24,9 @@ to the public SSH keys registered under the `efrecon` account.
 The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully
 encapsulated microVM with `podman` and `krun`, but will gracefully downgrade to
 privileged containers on top of `podman` or `docker`, depending on which
-container solution is installed and accessible. The containers need to be
-privileged in order for the user inside the development environment to be able
-to run `docker`, a.k.a. [DinD] or docker in docker.
+container solution is installed and accessible. Containers need to be privileged
+in order for the user inside the development environment to be able to run
+`docker`, a.k.a. [DinD] or docker in docker.
 
 The [`devenv.sh`](./devenv.sh) wrapper script automatically uses a "fat" image
 based on Alpine Linux. The content of this image is controlled through a set of
