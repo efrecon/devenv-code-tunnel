@@ -73,7 +73,7 @@ devenv.sh devenv -v
 This will create a (privileged) container or VM, running in the foreground and
 offering these features:
 
-- A volume named after the first argument (`devenv`) will be created, if
+- A volume named after the first argument (`devenv`) will be created if
   necessary and mounted into the development environment as the home directory
   for the user `coder`.
 - The local container/VM will also be named after the first argument (e.g.,
@@ -87,9 +87,9 @@ offering these features:
 
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 
-If you’re in a hurry, run this one-liner to fetch `devenv.sh` directly from
-GitHub. This example will only print the help through the `-h` option, but you
-can specify any of the options described in the
+Quick start: run this one-liner to fetch [`devenv.sh`](./devenv.sh) directly
+from GitHub. This example will only print the help through the `-h` option, but
+you can specify any of the options described in the
 [options](#quick-options-tunnelsh-run-down) section below.
 
 ```bash
@@ -131,7 +131,7 @@ to access your container from your browser.
 
 Notes:
 
-- `--privileged` is necessary so the environment can easily run
+- `--privileged` is necessary, so the environment can easily run
   Docker-in-Docker ([DinD]).
 - `--hostname` is required to avoid having to re-authorize the device tunnel
   each time the container starts -- as long as you use the same hostname. By
