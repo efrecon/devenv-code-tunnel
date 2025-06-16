@@ -1,6 +1,6 @@
 # Tunneled dev environments in containers or microVMs
 
-This project implements encapsulated development environments to be run in
+This project implements encapsulated development environments that run in
 containers or microVMs. Environments are designed to be accessed through tunnels
 (e.g., Visual Studio Code) and require `docker` or `podman` on the host, with
 optional support for [`krun`][krun]. The following one-liner will create a
@@ -17,9 +17,9 @@ The environment will automatically establish two tunnels and provide access
 instructions in the logs:
 
 - One VS Code [tunnel][vscode]. For access, you will have to follow the link to
-authorize the tunnel while logged in as `efrecon` at GitHub.
-- One [cloudflare] quick tunnel. Access from [cloudflare] is restricted
-to the public SSH keys registered under the `efrecon` account.
+  authorize the tunnel while logged in as `efrecon` at GitHub.
+- One [cloudflare] quick tunnel. Access from [cloudflare] is restricted to the
+  public SSH keys registered under the `efrecon` account.
 
 The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully
 encapsulated microVM with `podman` and `krun`, but will fall back to privileged
