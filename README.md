@@ -2,8 +2,8 @@
 
 This project implements encapsulated development environments to be run in
 containers or microVMs. Environments are designed to be accessed through tunnels
-from, e.g. Visual Studio Code. Provided you have `docker` or `podman` installed
-on a host -- and perhaps [`krun`][krun] -- the following one-liner will create a
+from, e.g., Visual Studio Code. Provided you have `docker` or `podman` installed
+on a host—and perhaps [`krun`][krun]—the following one-liner will create a
 volume called `devenv` and restrict access to the `efrecon` user at GitHub. Feel
 free to change to your username! You can audit the wrapper script
 [here](./devenv.sh).
@@ -16,17 +16,17 @@ curl -fsSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/main/dev
 The environment will automatically establish two tunnels and provide access
 instructions in the logs:
 
-- one vscode [tunnel][vscode]. For access, you will have to follow the link to
+- One VS Code [tunnel][vscode]. For access, you will have to follow the link to
 authorize the tunnel while logged in as `efrecon` at GitHub.
-- one [cloudflare] quick tunnel. Access from [cloudflare] is restricted
+- One [cloudflare] quick tunnel. Access from [cloudflare] is restricted
 to the public SSH keys registered under the `efrecon` account.
 
 The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully
-encapsulated microVM with `podman` and `krun`, but will gracefully downgrade to
-privileged containers on top of `podman` or `docker`, depending on which
-container solution is installed and accessible. Containers need to be privileged
-in order for the user inside the development environment to be able to run
-`docker`, a.k.a. [DinD] or docker in docker.
+encapsulated microVM with `podman` and `krun`, but will fall back to privileged
+containers on top of `podman` or `docker`, depending on which container solution
+is installed and accessible. Containers need to be privileged in order for the
+user inside the development environment to be able to run `docker`, a.k.a.
+[DinD] or docker in docker.
 
 The [`devenv.sh`](./devenv.sh) wrapper script automatically uses a "fat" image
 based on Alpine Linux. The content of this image is controlled through a set of
@@ -73,15 +73,15 @@ devenv.sh devenv -v
 This will create a (privileged) container or VM, running in the foreground and
 offering these features:
 
-+ A volume named after the first argument, `devenv` will be created, if
+- A volume named after the first argument, `devenv` will be created, if
   necessary and mounted into the development environment as the home directory
   for the user `coder`.
-+ The local container/VM will also be named after the first argument (e.g.
+- The local container/VM will also be named after the first argument (e.g.
   `devenv`). If there was an existing container running under that name, it will
   be removed.
-+ The vscode tunnel will be called after `<hostname>-devenv`, where `<hostname>`
+- The vscode tunnel will be called after `<hostname>-devenv`, where `<hostname>`
   will be the actual name of the host that the command is run on.
-+ The `-v` option will be passed to the entrypoint of the container, providing
+- The `-v` option will be passed to the entrypoint of the container, providing
   for more information in the logs of the container. You can pass any
   [option](#quick-options-tunnelsh-run-down) recognized by the entrypoint.
 
@@ -91,7 +91,8 @@ Even more in a hurry? Run the following one liner to run `devenv.sh` directly
 from GitHub. This example will only print the help through the `-h` option.
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/refs/heads/main/devenv.sh | sh -s - -h
+curl -fsSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/main/devenv.sh | \
+  sh -s - -h
 ```
 
 ### Manually with `docker`
@@ -128,9 +129,9 @@ to access your container from your browser.
 
 Notes:
 
-+ `--privileged` is necessary so the environment will be able to easily run
+- `--privileged` is necessary so the environment will be able to easily run
   Docker in Docker.
-+ `--hostname` is necessary in order to avoid to have to re-authorize the device
+- `--hostname` is necessary in order to avoid to have to re-authorize the device
   tunnel each time the container starts -- as long as you use the same hostname.
   By default, the name of the tunnel will then be the same as the hostname.
 
@@ -139,29 +140,29 @@ Notes:
 Inside the container, `tunnel.sh` is used to create the tunnel. The script takes
 the following options.
 
-+ `-v` (repeat the `v`s) to increase verbosity
-+ `-n xx` to give a name to the tunnel, this will automatically attempt to set
+- `-v` (repeat the `v`s) to increase verbosity
+- `-n xx` to give a name to the tunnel, this will automatically attempt to set
   the hostname inside the container to the same name. Changing the hostname
   **requires** `--privileged`, a warning will be printed out elsewise. Setting
   the hostname is to avoid that the tunnel will think that it is running on a
   different device each time it is run.
-+ `-f` to force authorization of the device at the provider
-+ `-p` to change the provider away from the `github` default.
-+ `-k` to specify a hook that will automatically be downloaded and executed
+- `-f` to force authorization of the device at the provider
+- `-p` to change the provider away from the `github` default.
+- `-k` to specify a hook that will automatically be downloaded and executed
   before the tunnel is started. You can use this to run a gist that would setup
   your environment and dotfiles, for example. To run this [gist], give its raw
   URL as a value, i.e.
   `https://gist.githubusercontent.com/efrecon/a9addf9f5812212366ede103bfc211f6/raw`
-+ `-g` is the name of a GitHub user (you?!) to allow for connecting into the
+- `-g` is the name of a GitHub user (you?!) to allow for connecting into the
   cloudflare tunnel via SSH.
-+ `-G` is the URL to a GIST that will be updated with details about the created
+- `-G` is the URL to a GIST that will be updated with details about the created
   tunnels. Under the root of that GIST, a file named after the name of the
   tunnel, with the `.txt` extension will be maintained with access content. For
   additional security, you should make that GIST private. This requires the
   `git` feature to be installed.
-+ `-T` selects the tunnels that are to be started, provided they have been
+- `-T` selects the tunnels that are to be started, provided they have been
   installed in the image. The default is to start all tunnels.
-+ `-L` selects the logs to reprint inside the main container logs. Specify a `-`
+- `-L` selects the logs to reprint inside the main container logs. Specify a `-`
   to not reprint anything.
 
 [gist]: https://gist.github.com/efrecon/a9addf9f5812212366ede103bfc211f6
@@ -171,10 +172,10 @@ the following options.
 Official images are published to the GitHub container [registry]. There are two
 images:
 
-+ `ghcr.io/efrecon/devenv-code-tunnel-alpine-minimal:main` provides a user
+- `ghcr.io/efrecon/devenv-code-tunnel-alpine-minimal:main` provides a user
   called `coder`. The user is able to `sudo` without password. Only the vscode
   CLI is installed.
-+ `ghcr.io/efrecon/devenv-code-tunnel-alpine:main` adds a number of
+- `ghcr.io/efrecon/devenv-code-tunnel-alpine:main` adds a number of
   (opinionated) software onto the image. The entire list is as per the content
   of the [features](./share/features/) directory.
 
