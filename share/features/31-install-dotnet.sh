@@ -36,7 +36,7 @@ done
 : "${INSTALL_DOTNET_URL:="https://dot.net/v1/dotnet-install.sh"}"
 
 # sha512 checksum of the install script.
-: "${INSTALL_DOTNET_SHA512:="749691260ef298c4c1adb6f4e78e47dff1963d57e8d2490bcfb105bad2f6a687093bf0057de5296e6a212dc40bdbbdaffbcd995f9746c8805c4e0024fdbed014"}"
+: "${INSTALL_DOTNET_SHA512:="f8c59166ed912d6861e93c3efc2840be31ec32897679678a72f781423ebf061348d3b92b16c9541f5b312a34160f452826bb3021efb1414d76bd7e237e4c0e9a"}"
 
 log_init INSTALL
 
