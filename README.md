@@ -156,7 +156,7 @@ the following options.
   URL as a value, i.e.
   `https://gist.githubusercontent.com/efrecon/a9addf9f5812212366ede103bfc211f6/raw`
 - `-g` is the name of a GitHub user (you?!) to allow for connecting into the
-  cloudflare tunnel via SSH.
+  tunnels.
 - `-G` is the URL to a GIST that will be updated with details about the created
   tunnels. Under the root of that GIST, a file named after the name of the
   tunnel (with a `.txt` extension) will be maintained to store access details.
@@ -174,6 +174,26 @@ the following options.
   to not reprint anything.
 
 [gist]: https://gist.github.com/efrecon/a9addf9f5812212366ede103bfc211f6
+
+## Security
+
+All traffic to and from the development environments and the clients is
+encrypted using HTTPS. When running on top of cloudflare tunnels, traffic is
+end-to-end encrypted using SSH.
+
+- Access to the VS Code tunnel is restricted to the GitHub user passed through
+  the `-g` option. On the first run, the tunnel will also have to be authorized
+  at GitHub through the URL printed in the logs.
+- Access to the cloudflare tunnel is restricted to the SSH keys that are stored
+  under the GitHub user passed through the `-g` option.
+
+When running using `krun`, the development environments are running inside micro
+VMs and are encapsulated from the host. When running using `podman` or `docker`,
+it is recommended to use the `--privileged` option. This is a security issue,
+but is mandatory to be able to run a separate Docker daemon inside the
+containers. The daemon will gracefully refuse to start whenever the container is
+detected to not have enough privileges. It is possible to pass, e.g. the socket
+of the Docker daemon running on the host to the containers.
 
 ## Official Images
 
