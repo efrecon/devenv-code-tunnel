@@ -80,11 +80,10 @@ authorize_forges() {
     verbose "Adding %s keys to %s" "$_domain" "${HOME}/.ssh/known_hosts"
     _forge_keys=$(mktemp known_hosts.XXXXXX)
     ssh-keyscan "$_domain" | grep -vE -e '^#' -e '^\s+$' > "$_forge_keys"
-    for _crypto in RSA DSA ECDSA ED25519; do
+    for _crypto in RSA ECDSA ED25519; do
       if grep -F "$_domain" "${HOME}/.ssh/known_hosts" | grep -qF "$(to_lower "${_crypto}")" ; then
         debug "%s %s key already in %s" "$_domain" "${_crypto}" "${HOME}/.ssh/known_hosts"
       else
-        verbose "Adding %s %s key to %s" "$_domain" "${_crypto}" "${HOME}/.ssh/known_hosts"
         if printf %s\\n "$_domain" | grep -qF 'github.com'; then
           # Compute the fingerprint of the key, see https://serverfault.com/a/701637
           _reported=$(sshkey2sha256 "$_forge_keys" "$_crypto")
@@ -96,11 +95,13 @@ authorize_forges() {
           # If they match, add the key to the known_hosts file
           if [ "$_reported" = "$_official" ]; then
             grep -F "$(to_lower "${_crypto}")" "$_forge_keys" >> "${HOME}/.ssh/known_hosts"
+            verbose "Verified and added %s %s key to %s" "$_domain" "${_crypto}" "${HOME}/.ssh/known_hosts"
           else
             warn "Fingerprint for %s key does not match official fingerprint" "${_crypto}"
           fi
         else
           grep -F "$(to_lower "${_crypto}")" "$_forge_keys" >> "${HOME}/.ssh/known_hosts"
+          verbose "Blindly added %s %s key to %s" "$_domain" "${_crypto}" "${HOME}/.ssh/known_hosts"
         fi
       fi
     done
