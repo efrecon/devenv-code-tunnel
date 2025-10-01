@@ -32,9 +32,12 @@ if ! command_present "aws"; then
   # Install the AWS CLI. This will bring a large number of python
   # dependencies...
   if is_os_family alpine; then
-    install_packages aws-cli
+    install_packages aws-cli aws-session-manager-plugin
   elif is_os_family debian; then
     install_packages awscli
+    arch=$(get_arch x86_64 64bit)
+    deb="https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_${arch}/session-manager-plugin.deb"
+    internet_deb_installer "$deb" /
   else
     error "Unsupported OS family: %s" "$(get_distro_name)"
   fi
