@@ -92,7 +92,7 @@ jobs:
           if printf %s\\n "$os" | grep -q 'alpine'; then
             image=${os}:3.22
           elif printf %s\\n "$os" | grep -q 'debian'; then
-            image=${os}:sid-slim
+            image=${os}:trixie-slim
           elif printf %s\\n "$os" | grep -q 'ubuntu'; then
             image=${os}:questing
           else
