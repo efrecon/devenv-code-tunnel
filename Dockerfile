@@ -17,7 +17,7 @@ ARG INSTALL_GROUP=${INSTALL_USER}
 
 # Build of vscode to install: only stable or insiders are available.
 ARG INSTALL_CODE_BUILD=stable
-ARG INSTALL_CLOUDFLARED_VERSION=2025.5.0
+ARG INSTALL_CLOUDFLARED_VERSION=2025.9.1
 # Version of Node.js to install. Empty to disable. This will match as much as
 # you want, e.g. 10 or 10.12, etc.
 ARG INSTALL_NODE_VERSION=22
@@ -29,10 +29,10 @@ ARG INSTALL_DOTNET_CHANNEL=8.0
 # Quality for the current channel.
 ARG INSTALL_DOTNET_QUALITY=GA
 # Version of Powershell to install
-ARG INSTALL_POWERSHELL_VERSION=7.5.1
-ARG INSTALL_GITHUB_VERSION=2.73.0
-ARG INSTALL_GITLAB_VERSION=1.57.0
-ARG INSTALL_TEA_VERSION=0.9.2
+ARG INSTALL_POWERSHELL_VERSION=7.5.3
+ARG INSTALL_GITHUB_VERSION=2.81.0
+ARG INSTALL_GITLAB_VERSION=1.72.0
+ARG INSTALL_TEA_VERSION=0.11.0
 
 
 # Become root to be able to perform installation operations.
