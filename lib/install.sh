@@ -47,7 +47,7 @@ internet_checksum() {
   _tmp_sums=$(mktemp)
   # Remove non-printable characters to avoid issues with Windows line endings
   # and bogus content from some PowerShell hashes.
-  download "$2" | tr -cd '[\x20-\x7e]\n' > "$_tmp_sums"
+  download "$2" | LC_ALL=C tr -cd '\n\040-\176' > "$_tmp_sums"
 
   # Note we pick the first checksum we find and do not enforce it to be at the
   # beginning. This allows to support checksums that would be embedded in HTML
