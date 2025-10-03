@@ -45,13 +45,16 @@ internet_checksum() {
   [ -z "$2" ] && error "internet_checksum: no url given"
   debug "Verifying checksum for %s using %s" "$1" "$2"
   _tmp_sums=$(mktemp)
-  download "$2" "$_tmp_sums"
+  # Remove non-printable characters to avoid issues with Windows line endings
+  # and bogus content from some PowerShell hashes.
+  download "$2" | LC_ALL=C tr -cd '\n\040-\176' > "$_tmp_sums"
 
   # Note we pick the first checksum we find and do not enforce it to be at the
   # beginning. This allows to support checksums that would be embedded in HTML
   # (release) notes, e.g. cloudflared.
-  _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{64}')
-  [ -z "$_sum" ] && _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{128}')
+  trace "Searching for checksum for %s in %s" "$1" "$_tmp_sums"
+  _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{64}' || :)
+  [ -z "$_sum" ] && _sum=$(grep -F "$1" "$_tmp_sums" | head -n 1 | grep -Eo '[0-9a-fA-F]{128}' || :)
 
   rm -f "$_tmp_sums"
   if [ -z "$_sum" ]; then
