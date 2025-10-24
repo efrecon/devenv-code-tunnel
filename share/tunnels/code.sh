@@ -45,6 +45,13 @@ bin_name
 # Environment file to load for reading defaults from.
 : "${CODE_DEFAULTS:="${CODE_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
 
+# Number of warnings to keep in window for deciding if tunnel should be
+# restarted.
+: "${CODE_WARNINGS_WINDOW:=5}"
+
+# Number of seconds between the olded and newest warning of the window to decide
+# if a restart is necessary.
+: "${CODE_WARNINGS_PERIOD:=60}"
 
 # Try using the name of the tunnel for the hostname, whenever relevant. This
 # allows to reuse the tunnel in a new container, since the vscode tunnel CLI
@@ -150,6 +157,32 @@ tunnel_wait() {
 EOF
 }
 
+
+__CODE_WARNINGS=""
+tunnel_connect_warning() {
+  # Now in seconds since the epoch, we don't parse the date from the line passed
+  # as argument. This is a simplification.
+  _now=$(date +%s)
+  # Keep a list of the 5 latest warnings, one timestamp per line.
+  __CODE_WARNINGS=$(printf '%s%s\n' "$__CODE_WARNINGS" "$_now"|tail -n "$CODE_WARNINGS_WINDOW")
+
+  # Test if the oldest warning was less than 60 seconds ago, this is our
+  # definition of "many" warnings. If it was, restart the tunnel.
+  _oldest=$(printf %s "$__CODE_WARNINGS" | head -n 1)
+  _elapsed=$((_now - _oldest))
+  if [ "${_elapsed:-32767}" -lt "$CODE_WARNINGS_PERIOD" ]; then
+    tunnel_restart "Too many warnings, restarting tunnel. Last warning: $1"
+  fi
+  return 1; # Continue reading the file
+}
+
+
+tunnel_supervise() {
+  when_infile "$CODE_LOG" 'E' \
+    '\[[0-9 :-]*\] warn' tunnel_connect_warning
+}
+
+
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="vscode tunnel starter"
 
@@ -195,3 +228,4 @@ if [ -z "$CODE_REEXPOSE" ] || printf %s\\n "$CODE_REEXPOSE" | grep -qF 'code'; t
 fi
 tunnel_start;  # Starts tunnel in the background
 tunnel_wait
+tunnel_supervise
