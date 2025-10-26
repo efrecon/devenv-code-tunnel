@@ -17,7 +17,7 @@ ARG INSTALL_GROUP=${INSTALL_USER}
 
 # Build of vscode to install: only stable or insiders are available.
 ARG INSTALL_CODE_BUILD=stable
-ARG INSTALL_CLOUDFLARED_VERSION=2025.9.1
+ARG INSTALL_CLOUDFLARED_VERSION=2025.10.0
 # Version of Node.js to install. Empty to disable. This will match as much as
 # you want, e.g. 10 or 10.12, etc.
 ARG INSTALL_NODE_VERSION=22
