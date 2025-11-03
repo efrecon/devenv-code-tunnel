@@ -207,8 +207,9 @@ if [ -z "$DEVENV_TUNNEL" ]; then
 fi
 if [ "$(printf %s "$DEVENV_TUNNEL" | wc -c)" -gt "$DEVENV_TUNNEL_NAME_MAX_SIZE" ]; then
   DEVENV_TUNNEL=$(
-    printf %s "$DEVENV_TUNNEL" |
-    cut -c1-$((DEVENV_TUNNEL_NAME_MAX_SIZE - 6)) )-$(
+      printf %s "$DEVENV_TUNNEL" |
+      cut -c1-$((DEVENV_TUNNEL_NAME_MAX_SIZE - 6))
+    )-$(
       printf %s "$DEVENV_TUNNEL" |
       md5sum |
       cut -c1-5
