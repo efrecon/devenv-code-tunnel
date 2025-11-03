@@ -1,9 +1,9 @@
 #!/bin/sh
 
 # Shell sanity. Stop on errors, undefined variables and pipeline errors.
-# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
-set -euo pipefail
-
+set -eu
+# shellcheck disable=SC3040 # POSIX now, but not in all shells yet
+if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 # Container orchestrator to use. Default is to pick first of podman or docker.
 : "${DEVENV_ORCHESTRATOR:=""}"
@@ -35,21 +35,20 @@ set -euo pipefail
 # Detach mode, when set to 1, will run the container in the background.
 : "${DEVENV_DETACH:=0}"
 
-info() {
-  _fmt="$1"
-  shift
-  # shellcheck disable=SC2059 # ok, we want to use printf format
-  printf "${_fmt}\n" "$@" >&2
-}
+# Verbosity level for this script.
+: "${DEVENV_VERBOSE:=1}"
 
-error() {
-  info "$@"
-  exit 1
-}
+# Maximum tunnel name size
+: "${DEVENV_TUNNEL_NAME_MAX_SIZE:=20}"
+
+# Sanitize who we are, handle curl|(ba)sh case.
+DEVENV_BIN=$(basename "$0")
+[ -z "$DEVENV_BIN" ] && DEVENV_BIN="devenv.sh"
+printf '%s\n' "$DEVENV_BIN" | grep -qE '^[a-z]*sh$' && DEVENV_BIN="devenv.sh"
 
 usage() {
   cat <<EOF
-Usage: $(basename "$0") [options] [volume|directory] [--] [args...]
+Usage: $DEVENV_BIN [options] [volume|directory] [--] [args...]
 Options:
   -d          Detach mode, run the container in the background.
   -i <path>   Path to private SSH key to pass to container. Default to best guess from .ssh directory.
@@ -59,6 +58,7 @@ Options:
   -o <name>   Container orchestrator to use. Default picks first of podman or docker.
   -r <name>   Container runtime to use, default is to prefer krun on podman, when possible.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
+  -v          Increase verbosity level. Can be used multiple times.
   -h          Show this help message and exit.
 
 First argument is the name of a volume or directory to share with the container.
@@ -69,14 +69,14 @@ If no volume or directory is given, the current directory will be used.
 Everything else is passed to the container, as is.
 
 Examples:
-  $(basename "$0") devenv -v;  # Creates and use a devenv volume, passing -v to the container entrypoint.
-  $(basename "$0") -- -v;      # Mount the current directory, passing -v to the container entrypoint.
+  $DEVENV_BIN devenv -v;  # Creates and use a devenv volume, passing -v to the container entrypoint.
+  $DEVENV_BIN -- -v;      # Mount the current directory, passing -v to the container entrypoint.
 EOF
 
   exit "${1:-0}"
 }
 
-while getopts "di:I:N:o:t:r:nh" opt; do
+while getopts ":di:I:N:o:t:r:nvh" opt; do
   case "$opt" in
     d) # Detach mode, run the container in the background.
       DEVENV_DETACH=1;;
@@ -94,15 +94,37 @@ while getopts "di:I:N:o:t:r:nh" opt; do
       DEVENV_RUNTIME="$OPTARG";;
     t) # Name of the tunnel to use. Default to hostname-containername.
       DEVENV_TUNNEL="$OPTARG";;
+    v) # Increase verbosity level. Can be used multiple times.
+      DEVENV_VERBOSE=$((DEVENV_VERBOSE + 1));;
     h) # Show help
       usage 0
       ;;
     *)  # Unknown option
-      error "Unknown option: %s" "$opt"
+      usage 1
       ;;
   esac
 done
 shift $((OPTIND - 1))
+
+
+# PML: Poor Man's Logging on stderr
+_log() {
+  printf '[%s] [%s] [%s] ' \
+    "$DEVENV_BIN" \
+    "${1:-LOG}" \
+    "$(date +'%Y%m%d-%H%M%S')" \
+    >&2
+  shift
+  _fmt="$1"
+  shift
+  # shellcheck disable=SC2059 # ok, we want to use printf format
+  printf "${_fmt}\n" "$@" >&2
+}
+trace() { [ "$DEVENV_VERBOSE" -ge "2" ] && _log DBG "$@" || true ; }
+verbose() { [ "$DEVENV_VERBOSE" -ge "1" ] && _log NFO "$@" || true ; }
+info() { [ "$DEVENV_VERBOSE" -ge "1" ] && _log NFO "$@" || true ; }
+warn() { _log WRN "$@"; }
+error() { _log ERR "$@" && exit 1; }
 
 runif() {
   if [ "$DEVENV_DRY_RUN" = "1" ]; then
@@ -181,9 +203,19 @@ fi
 # When no tunnel name is given, construct one based on the hostname and the name
 # of the container to create. This should be more or less unique.
 if [ -z "$DEVENV_TUNNEL" ]; then
-  DEVENV_TUNNEL=$(hostname)-$DEVENV_NAME
-  info "Using tunnel name: %s" "$DEVENV_TUNNEL"
+  DEVENV_TUNNEL=$(hostname|cut -d. -f1)-$DEVENV_NAME
 fi
+if [ "$(printf %s "$DEVENV_TUNNEL" | wc -c)" -gt "$DEVENV_TUNNEL_NAME_MAX_SIZE" ]; then
+  DEVENV_TUNNEL=$(
+    printf %s "$DEVENV_TUNNEL" |
+    cut -c1-$((DEVENV_TUNNEL_NAME_MAX_SIZE - 6)) )-$(
+      printf %s "$DEVENV_TUNNEL" |
+      md5sum |
+      cut -c1-5
+    )
+  warn "Truncated tunnel name to fit tunnel name size limit: %s" "$DEVENV_TUNNEL"
+fi
+info "Using tunnel name: %s" "$DEVENV_TUNNEL"
 
 # Force pulling of the image, do this early so we can fail fast if the image
 # cannot be pulled.
