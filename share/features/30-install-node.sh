@@ -356,8 +356,9 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   verbose "System-wide npm installation under %s, as per %s" \
     "$INSTALL_PREFIX" "${INSTALL_PREFIX}/etc/npmrc"
 
-  # Arrange to get the latest version of npm
-  as_root npm update -g npm
+  # Do not arrange to get the latest version of npm. Keep the one that comes
+  # with node, as it is tested to work with that version of node.
+  # as_root npm update -g npm
 
   if [ "$INSTALL_TARGET" = "user" ]; then
     PATH="${INSTALL_USER_PREFIX}/bin:${PATH}"
