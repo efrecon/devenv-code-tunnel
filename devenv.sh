@@ -121,7 +121,6 @@ _log() {
   printf "${_fmt}\n" "$@" >&2
 }
 trace() { [ "$DEVENV_VERBOSE" -ge "2" ] && _log DBG "$@" || true ; }
-verbose() { [ "$DEVENV_VERBOSE" -ge "1" ] && _log NFO "$@" || true ; }
 info() { [ "$DEVENV_VERBOSE" -ge "1" ] && _log NFO "$@" || true ; }
 warn() { _log WRN "$@"; }
 error() { _log ERR "$@" && exit 1; }
