@@ -10,7 +10,7 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 # Path to private SSH key to use for authentication, will be passed to
 # container, together with public key. Default to best guess under .ssh
-# directory.
+# directory. Set to "-" to not pass any key.
 : "${DEVENV_IDENTITY:=""}"
 
 # Name of the container to use. When empty, will use the name of the volume or
@@ -51,7 +51,7 @@ usage() {
 Usage: $DEVENV_BIN [options] [volume|directory] [--] [args...]
 Options:
   -d          Detach mode, run the container in the background.
-  -i <path>   Path to private SSH key to pass to container. Default to best guess from .ssh directory.
+  -i <path>   Path to private SSH key to pass to container. Default: best guess from .ssh directory. For no key, use "-".
   -I <image>  Docker image to use. Default to latest full image.
   -n          Dry-run: just print the command that would be run, do not run it.
   -N <name>   Name of the container to use. Default based on volume or directory name mounted.
@@ -154,9 +154,20 @@ if [ -z "$DEVENV_IDENTITY" ]; then
   # shellcheck disable=SC2016 # ok, we want to use printf format
   DEVENV_IDENTITY=$(find "$HOME/.ssh" -type f -name 'id_*' | sort | head -n 1)
   if [ -z "$DEVENV_IDENTITY" ]; then
-    error "No SSH key found. Please set DEVENV_IDENTITY or create an SSH key."
+    warn "No SSH key found under %s." "$HOME/.ssh"
   else
     info "Using SSH key: %s" "$DEVENV_IDENTITY"
+  fi
+fi
+# When identity is set to "-", unset it to avoid passing any key.
+[ "$DEVENV_IDENTITY" = "-" ] && DEVENV_IDENTITY=
+# Validate SSH key files exist
+if [ -n "$DEVENV_IDENTITY" ]; then
+  if ! [ -f "$DEVENV_IDENTITY" ]; then
+    error "Private SSH key file not found: %s" "$DEVENV_IDENTITY"
+  fi
+  if ! [ -f "${DEVENV_IDENTITY}.pub" ]; then
+    error "Public SSH key file not found: %s" "${DEVENV_IDENTITY}.pub"
   fi
 fi
 
@@ -243,12 +254,20 @@ fi
 # options/arguments that were passed to this script are passed to the container
 # entrypoint.
 set -- \
-    --name "$DEVENV_NAME" \
-    --hostname "$DEVENV_TUNNEL" \
-    -v "$DEVENV_IDENTITY:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY"):Z,ro" \
-    -v "${DEVENV_IDENTITY}.pub:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY").pub:Z,ro" \
     -v "$root:/home/coder:Z" \
     "$DEVENV_IMAGE" \
+      "$@"
+
+if [ -n "$DEVENV_IDENTITY" ]; then
+  set -- \
+    -v "$DEVENV_IDENTITY:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY"):Z,ro" \
+    -v "${DEVENV_IDENTITY}.pub:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY").pub:Z,ro" \
+    "$@"
+fi
+
+set -- \
+    --name "$DEVENV_NAME" \
+    --hostname "$DEVENV_TUNNEL" \
       "$@"
 
 # Detach or not. When not in detach mode, we will run the container in
