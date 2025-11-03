@@ -51,7 +51,7 @@ usage() {
 Usage: $DEVENV_BIN [options] [volume|directory] [--] [args...]
 Options:
   -d          Detach mode, run the container in the background.
-  -i <path>   Path to private SSH key to pass to container. Default to best guess from .ssh directory.
+  -i <path>   Path to private SSH key to pass to container. Default: best guess from .ssh directory. For no key, use "-".
   -I <image>  Docker image to use. Default to latest full image.
   -n          Dry-run: just print the command that would be run, do not run it.
   -N <name>   Name of the container to use. Default based on volume or directory name mounted.
@@ -161,6 +161,15 @@ if [ -z "$DEVENV_IDENTITY" ]; then
 fi
 # When identity is set to "-", unset it to avoid passing any key.
 [ "$DEVENV_IDENTITY" = "-" ] && DEVENV_IDENTITY=
+# Validate SSH key files exist
+if [ -n "$DEVENV_IDENTITY" ]; then
+  if ! [ -f "$DEVENV_IDENTITY" ]; then
+    error "Private SSH key file not found: %s" "$DEVENV_IDENTITY"
+  fi
+  if ! [ -f "${DEVENV_IDENTITY}.pub" ]; then
+    error "Public SSH key file not found: %s" "${DEVENV_IDENTITY}.pub"
+  fi
+fi
 
 # Handle remaining arguments. The first argument is the name of a volume, or the
 # path to a directory to mount inside the container. When this is empty, or not
