@@ -37,22 +37,3 @@ jobs:
       username: ${{ github.actor }}
     secrets:
       password: ${{ secrets.GITHUB_TOKEN }}
-
-  minimal:
-    uses: ./.github/workflows/_build.yml
-    needs: repository
-    permissions:
-      contents: read
-      packages: write
-    strategy:
-      matrix:
-        os: [alpine, debian]
-    with:
-      image: ${{ github.actor }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
-      platforms: linux/amd64
-      os: ${{ matrix.os }}
-      build-args: |
-        INSTALL_FEATURES=sudo codecli cloudflare git
-      username: ${{ github.actor }}
-    secrets:
-      password: ${{ secrets.GITHUB_TOKEN }}
