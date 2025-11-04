@@ -282,7 +282,11 @@ if [ "$DEVENV_DETACH" = "1" ]; then
   set -- --restart unless-stopped -d "$@"
 else
   info "Starting self-destructing container '%s' in foreground" "$DEVENV_NAME"
-  set -- -it --rm "$@"
+  if [ -t 0 ]; then
+    set -- -it --rm "$@"
+  else
+    set -- -t --rm "$@"
+  fi
 fi
 
 # Tweak the command to run the container when using podman.
