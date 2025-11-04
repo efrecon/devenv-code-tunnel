@@ -151,12 +151,16 @@ fi
 # Pick private SSH key to use. Default to best guess from .ssh directory. This
 # sorts because we prefer ed25519 keys over rsa keys.
 if [ -z "$DEVENV_IDENTITY" ]; then
-  # shellcheck disable=SC2016 # ok, we want to use printf format
-  DEVENV_IDENTITY=$(find "$HOME/.ssh" -type f -name 'id_*' | sort | head -n 1)
-  if [ -z "$DEVENV_IDENTITY" ]; then
-    warn "No SSH key found under %s." "$HOME/.ssh"
+  if [ -d "$HOME/.ssh" ]; then
+    # shellcheck disable=SC2016 # ok, we want to use printf format
+    DEVENV_IDENTITY=$(find "$HOME/.ssh" -type f -name 'id_*' | sort | head -n 1)
+    if [ -z "$DEVENV_IDENTITY" ]; then
+      warn "No SSH key found under %s, will not forward your identity." "$HOME/.ssh"
+    else
+      info "Using SSH key: %s" "$DEVENV_IDENTITY"
+    fi
   else
-    info "Using SSH key: %s" "$DEVENV_IDENTITY"
+    warn "No .ssh directory found under %s, will not forward your identity." "$HOME"
   fi
 fi
 # When identity is set to "-", unset it to avoid passing any key.
