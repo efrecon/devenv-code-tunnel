@@ -31,7 +31,7 @@ log_init INSTALL
 if is_os_family alpine; then
   install_packages mysql-client postgresql17-client sqlite redis
 elif is_os_family debian; then
-  install_packages mysql-client postgresql-client-17 sqlite3 redis-server redis-tools
+  install_packages default-mysql-client postgresql-client-17 sqlite3 redis-server redis-tools
 else
   error "Unsupported OS family: %s" "$(get_distro_name)"
 fi
