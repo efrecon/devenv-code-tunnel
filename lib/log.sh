@@ -83,7 +83,7 @@ _logline() {
   # printf
   case "${1:-}" in
     TRC) _lvl=$(dark_gray "TRC") ;;
-    DBG) _lvl=$(light_gray "DBG") ;;
+    DBG) _lvl="DBG" ;;
     NFO) _lvl=$(blue "NFO") ;;
     WRN) _lvl=$(red "WRN") ;;
     ERR) _lvl=$(magenta "ERR") ;;
