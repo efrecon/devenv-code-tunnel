@@ -74,7 +74,7 @@ internet_script_installer() {
   if [ -n "${3:-}" ]; then
     checksum "$_tmp_script" "$3" "$2"
   fi
-  verbose "Running downloaded script $_tmp_script"
+  verbose "Running script %s, downloaded from %s" "$_tmp_script" "$1"
   shift 3
   _ret=0
   if head -n 1 "$_tmp_script" | grep -qE '^#!'; then
