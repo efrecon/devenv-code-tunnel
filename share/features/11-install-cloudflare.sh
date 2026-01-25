@@ -28,7 +28,7 @@ done
 : "${INSTALL_USER_PREFIX:="${HOME}/.local"}"
 : "${INSTALL_TARGET:="user"}"
 
-: "${INSTALL_CLOUDFLARED_VERSION:="2025.4.0"}"
+: "${INSTALL_CLOUDFLARED_VERSION:="2026.1.1"}"
 
 # URL to download the code CLI from.
 : "${INSTALL_CLOUDFLARED_URL:="https://github.com/cloudflare/cloudflared/releases/download/${INSTALL_CLOUDFLARED_VERSION}/cloudflared-$(get_os)-$(get_golang_arch)"}"
