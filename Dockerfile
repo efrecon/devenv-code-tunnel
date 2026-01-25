@@ -25,7 +25,7 @@ ARG INSTALL_NODE_VERSION=22
 ARG INSTALL_NODE_TYPE=release
 # Version of .NET to install. Empty to disable. STS, LTS, 2-hand, 3-hand
 # versions
-ARG INSTALL_DOTNET_CHANNEL=8.0
+ARG INSTALL_DOTNET_CHANNEL=10.0
 # Quality for the current channel.
 ARG INSTALL_DOTNET_QUALITY=GA
 # Version of Powershell to install

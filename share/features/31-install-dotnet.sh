@@ -27,7 +27,7 @@ done
 
 # Version of .NET to install. Empty to disable. STS, LTS, 2-hand, 3-hand
 # versions
-: "${INSTALL_DOTNET_CHANNEL:="8.0"}"
+: "${INSTALL_DOTNET_CHANNEL:="10.0"}"
 
 # Quality for the current channel.
 : "${INSTALL_DOTNET_QUALITY:="GA"}"
@@ -36,7 +36,7 @@ done
 : "${INSTALL_DOTNET_URL:="https://dot.net/v1/dotnet-install.sh"}"
 
 # sha512 checksum of the install script.
-: "${INSTALL_DOTNET_SHA512:="9af8b9bff274be82915d9cefb53c6cf61d791c1221083fb939f29c6778cb697e9606253094894a488762c74456108b3b4652f1cb3ab518bdae19891bab5a9421"}"
+: "${INSTALL_DOTNET_SHA512:="971ad8d21a7d17247da2fdfc8867358bde015a7622d09b62324b5d87ddc349c6892727487c700df602e3028eda18216bf40493cb53a989ebf8991dc8cfd78427"}"
 
 log_init INSTALL
 
