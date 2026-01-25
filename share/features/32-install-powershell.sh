@@ -26,7 +26,7 @@ done
 : "${INSTALL_PREFIX:="/usr/local"}"
 
 # Version of Powershell to install. Empty to disable.
-: "${INSTALL_POWERSHELL_VERSION:="7.5.1"}"
+: "${INSTALL_POWERSHELL_VERSION:="7.5.4"}"
 
 # Root URL where to find the tarballs.
 : "${INSTALL_POWERSHELL_ROOTURL:="https://github.com/PowerShell/PowerShell/releases/download"}"
