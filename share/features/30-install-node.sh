@@ -56,7 +56,9 @@ done
 # image.
 : "${INSTALL_NODE_IMAGE:="library/node"}"
 
-: "${INSTALL_NODE_REGCLIENT_VERSION:="0.8.2"}"
+# Version of regclient to use when installing binaries out of an existing Docker
+# image.
+: "${INSTALL_NODE_REGCLIENT_VERSION:="0.11.1"}"
 
 log_init INSTALL
 
