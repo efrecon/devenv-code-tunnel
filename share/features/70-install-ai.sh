@@ -28,11 +28,28 @@ done
 : "${INSTALL_TARGET:="user"}"
 
 : "${INSTALL_CLAUDE_VERSION:="latest"}"
-: "${INSTALL_CLAUDE_INSTALLER:="https://claude.ai/install.sh"}"
-: "${INSTALL_CLAUDE_SHA512:="4f72071a0444fc5fdab0404b31c4e5f3618ed5af538b5d9f25ab0382a15227fff73c32ea08c1cb727373c5292615439a6b544a0c3d70dd4c14ee67d1bc75e014"}"
+: "${INSTALL_CLAUDE_ROOT:="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"}"
 
 log_init INSTALL
 
+# Decide target directory for the installations, based on the INSTALL_TARGET
+# preference.
+[ "$INSTALL_TARGET" = "user" ] \
+  && BINDIR="${INSTALL_USER_PREFIX}/bin" \
+  || BINDIR="${INSTALL_PREFIX}/bin"
 
-internet_script_installer "$INSTALL_CLAUDE_INSTALLER" claude "$INSTALL_CLAUDE_SHA512" "$INSTALL_CLAUDE_VERSION"
-verbose "Installed claude: $(claude --version)"
+if [ "$INSTALL_CLAUDE_VERSION" = "latest" ]; then
+  INSTALL_CLAUDE_VERSION=$(download "$INSTALL_CLAUDE_ROOT/latest")
+  verbose "Latest claude version: %s" "$INSTALL_CLAUDE_VERSION"
+fi
+
+if is_musl_os; then
+  platform=$(get_os)-$(get_arch)-musl
+else
+  platform=$(get_os)-$(get_arch)
+fi
+internet_bin_installer \
+  "${INSTALL_CLAUDE_ROOT}/${INSTALL_CLAUDE_VERSION}/${platform}/claude" \
+  "$BINDIR" \
+  "claude"
+verbose "Installed claude version %s to %s/claude" "$("$BINDIR/claude" --version)" "$BINDIR"
