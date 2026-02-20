@@ -35,3 +35,4 @@ log_init INSTALL
 
 
 internet_script_installer "$INSTALL_CLAUDE_INSTALLER" claude "$INSTALL_CLAUDE_SHA512" "$INSTALL_CLAUDE_VERSION"
+verbose "Installed claude: $(claude --version)"
