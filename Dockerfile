@@ -5,6 +5,11 @@ FROM ${INSTALL_IMAGE}
 # Where to install our own stuff.
 ARG INSTALL_PREFIX=/usr/local
 
+# Target location whenever possible: root or user. root is preferred as it
+# allows changing the underlying and updated image while keeping a user area
+# mounted from a volume.
+ARG INSTALL_TARGET=root
+
 # What to install, default is everything
 ARG INSTALL_FEATURES=
 
@@ -30,10 +35,13 @@ ARG INSTALL_DOTNET_CHANNEL=10.0
 ARG INSTALL_DOTNET_QUALITY=GA
 # Version of Powershell to install
 ARG INSTALL_POWERSHELL_VERSION=7.5.4
+# Versions of forge CLI tools to install.
 ARG INSTALL_GITHUB_VERSION=2.87.0
-ARG INSTALL_GITLAB_VERSION=1.86.0
+ARG INSTALL_GITLAB_VERSION=1.87.0
 ARG INSTALL_TEA_VERSION=0.12.0
-ARG INSTALL_CLAUDE_VERSION=latest
+# Versions of AI assistants to install.
+# TODO: Revert to latest when 2.1.63 fixed on alpine
+ARG INSTALL_CLAUDE_VERSION=2.1.62
 
 
 # Become root to be able to perform installation operations.
