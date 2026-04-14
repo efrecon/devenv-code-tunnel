@@ -22,7 +22,7 @@ ARG INSTALL_GROUP=${INSTALL_USER}
 
 # Build of vscode to install: only stable or insiders are available.
 ARG INSTALL_CODE_BUILD=stable
-ARG INSTALL_CLOUDFLARED_VERSION=2026.2.0
+ARG INSTALL_CLOUDFLARED_VERSION=2026.3.0
 # Version of Node.js to install. Empty to disable. This will match as much as
 # you want, e.g. 10 or 10.12, etc.
 ARG INSTALL_NODE_VERSION=22
@@ -34,14 +34,14 @@ ARG INSTALL_DOTNET_CHANNEL=10.0
 # Quality for the current channel.
 ARG INSTALL_DOTNET_QUALITY=GA
 # Version of Powershell to install
-ARG INSTALL_POWERSHELL_VERSION=7.5.4
+ARG INSTALL_POWERSHELL_VERSION=7.6.0
 # Versions of forge CLI tools to install.
-ARG INSTALL_GITHUB_VERSION=2.87.0
-ARG INSTALL_GITLAB_VERSION=1.87.0
-ARG INSTALL_TEA_VERSION=0.12.0
-# Versions of AI assistants to install.
-# TODO: Revert to latest when 2.1.63 fixed on alpine
-ARG INSTALL_CLAUDE_VERSION=2.1.62
+ARG INSTALL_GITHUB_VERSION=2.89.0
+ARG INSTALL_GITLAB_VERSION=1.92.0
+ARG INSTALL_TEA_VERSION=0.13.0
+# Versions of AI assistants to install. Keep this on latest as they are expected
+# to update often and we want to pick the latest available.
+ARG INSTALL_CLAUDE_VERSION=latest
 
 
 # Become root to be able to perform installation operations.
