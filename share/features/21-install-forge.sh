@@ -27,15 +27,15 @@ done
 : "${INSTALL_USER_PREFIX:="${HOME}/.local"}"
 : "${INSTALL_TARGET:="user"}"
 
-: "${INSTALL_GITHUB_VERSION:="2.87.0"}"
+: "${INSTALL_GITHUB_VERSION:="2.89.0"}"
 : "${INSTALL_GITHUB_URL:="https://github.com/cli/cli/releases/download/v${INSTALL_GITHUB_VERSION}/gh_${INSTALL_GITHUB_VERSION}_$(get_os)_$(get_golang_arch).tar.gz"}"
 : "${INSTALL_GITHUB_SUMS:="https://github.com/cli/cli/releases/download/v${INSTALL_GITHUB_VERSION}/gh_${INSTALL_GITHUB_VERSION}_checksums.txt"}"
 
-: "${INSTALL_GITLAB_VERSION:="1.86.0"}"
+: "${INSTALL_GITLAB_VERSION:="1.92.0"}"
 : "${INSTALL_GITLAB_URL:="https://gitlab.com/gitlab-org/cli/-/releases/v${INSTALL_GITLAB_VERSION}/downloads/glab_${INSTALL_GITLAB_VERSION}_$(get_os)_$(get_golang_arch).tar.gz"}"
 : "${INSTALL_GITLAB_SUMS:="https://gitlab.com/gitlab-org/cli/-/releases/v${INSTALL_GITLAB_VERSION}/downloads/checksums.txt"}"
 
-: "${INSTALL_TEA_VERSION:="0.12.0"}"
+: "${INSTALL_TEA_VERSION:="0.13.0"}"
 : "${INSTALL_TEA_URL:="https://dl.gitea.com/tea/${INSTALL_TEA_VERSION}/tea-${INSTALL_TEA_VERSION}-$(get_os)-$(get_golang_arch)"}"
 : "${INSTALL_TEA_SUM:="https://dl.gitea.com/tea/${INSTALL_TEA_VERSION}/tea-${INSTALL_TEA_VERSION}-$(get_os)-$(get_golang_arch).sha256"}"
 
