@@ -35,6 +35,12 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 # Detach mode, when set to 1, will run the container in the background.
 : "${DEVENV_DETACH:=0}"
 
+# Default XDG config directory.
+: "${XDG_CONFIG_HOME:="$HOME/.config"}"
+
+# Path where to find the RC file to source, first file found will be used.
+: "${DEVENV_RC_PATHS:="$XDG_CONFIG_HOME/devenvrc:$HOME/.devenvrc:$(pwd)/.devenvrc:/etc/devenvrc:/usr/local/etc/devenvrc"}"
+
 # Verbosity level for this script.
 : "${DEVENV_VERBOSE:=1}"
 
@@ -68,6 +74,9 @@ If no volume or directory is given, the current directory will be used.
 
 Everything else is passed to the container, as is.
 
+First found file from $DEVENV_RC_PATHS is sourced before parsing the options.
+Export DEVENV_ or TUNNEL_ variables to set defaults for $DEVENV_BIN or the container entrypoint.
+
 Examples:
   $DEVENV_BIN devenv -v;  # Creates and use a devenv volume, passing -v to the container entrypoint.
   $DEVENV_BIN -- -v;      # Mount the current directory, passing -v to the container entrypoint.
@@ -76,6 +85,41 @@ EOF
   exit "${1:-0}"
 }
 
+
+# PML: Poor Man's Logging on stderr
+_log() {
+  printf '[%s] [%s] [%s] ' \
+    "$DEVENV_BIN" \
+    "${1:-LOG}" \
+    "$(date +'%Y%m%d-%H%M%S')" \
+    >&2
+  shift
+  _fmt="$1"
+  shift
+  # shellcheck disable=SC2059 # ok, we want to use printf format
+  printf "${_fmt}\n" "$@" >&2
+}
+trace() { [ "$DEVENV_VERBOSE" -ge "2" ] && _log DBG "$@" || true ; }
+info() { [ "$DEVENV_VERBOSE" -ge "1" ] && _log NFO "$@" || true ; }
+warn() { _log WRN "$@"; }
+error() { _log ERR "$@" && exit 1; }
+
+
+# Source the first RC file found in the colon-separated DEVENV_RC_PATHS.
+_ifs=$IFS; IFS=:
+for _rc_path in $DEVENV_RC_PATHS; do
+  if [ -f "$_rc_path" ]; then
+    info "Sourcing RC file: %s" "$_rc_path"
+    # shellcheck disable=SC1090
+    . "$_rc_path"
+    break
+  fi
+done
+IFS=$_ifs
+unset _ifs _rc_path
+
+# Now parse the options. Do it here so we can override the defaults set by the
+# RC file or environment variables.
 while getopts ":di:I:N:o:t:r:nvh" opt; do
   case "$opt" in
     d) # Detach mode, run the container in the background.
@@ -107,23 +151,6 @@ done
 shift $((OPTIND - 1))
 
 
-# PML: Poor Man's Logging on stderr
-_log() {
-  printf '[%s] [%s] [%s] ' \
-    "$DEVENV_BIN" \
-    "${1:-LOG}" \
-    "$(date +'%Y%m%d-%H%M%S')" \
-    >&2
-  shift
-  _fmt="$1"
-  shift
-  # shellcheck disable=SC2059 # ok, we want to use printf format
-  printf "${_fmt}\n" "$@" >&2
-}
-trace() { [ "$DEVENV_VERBOSE" -ge "2" ] && _log DBG "$@" || true ; }
-info() { [ "$DEVENV_VERBOSE" -ge "1" ] && _log NFO "$@" || true ; }
-warn() { _log WRN "$@"; }
-error() { _log ERR "$@" && exit 1; }
 
 runif() {
   if [ "$DEVENV_DRY_RUN" = "1" ]; then
@@ -311,6 +338,14 @@ else
     set -- --privileged "$@"
   fi
 fi
+
+# Pass all variables starting with TUNNEL_ to the container.
+for _env in $(env | grep -E '^TUNNEL_' | cut -d= -f1); do
+  eval "_env_val=\${${_env}}"
+  # shellcheck disable=SC2154 # ok, set through eval.
+  set -- -e "$_env=$_env_val" "$@"
+done
+
 # Now finalize the command to start the container.
 set -- "$DEVENV_ORCHESTRATOR" container run "$@"
 

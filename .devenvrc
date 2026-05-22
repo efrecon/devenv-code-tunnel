@@ -1,0 +1,20 @@
+#!/bin/sh
+
+# This file is automatically sourced by devenv.sh whenever it is found in the
+# current directory. Sourcing happens early on so you can still override through
+# command-line options. devenv.sh will actually look for the following files, in
+# order, first file wins.
+# - $XDG_CONFIG_HOME/devenvrc
+# - $HOME/.devenvrc
+# - $(pwd)/.devenvrc
+# - /etc/devenvrc
+# - /usr/local/etc/devenvrc
+
+# Use this file to export any environment variable that is recognized by
+# devenv.sh, i.e. variables starting with DEVENV_. You can also export all
+# variables supported by the tunnel.sh entrypoint, as these will be
+# automatically passed to the container when it is created. These variables
+# start with TUNNEL_.
+
+# export DEVENV_VERBOSE=3
+# export TUNNEL_VERBOSE=3
