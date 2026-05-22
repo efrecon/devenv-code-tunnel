@@ -341,9 +341,7 @@ fi
 
 # Pass all variables starting with TUNNEL_ to the container.
 for _env in $(env | grep -E '^TUNNEL_' | cut -d= -f1); do
-  eval "_env_val=\${${_env}}"
-  # shellcheck disable=SC2154 # ok, set through eval.
-  set -- -e "$_env=$_env_val" "$@"
+  set -- -e "$_env" "$@"
 done
 
 # Now finalize the command to start the container.
