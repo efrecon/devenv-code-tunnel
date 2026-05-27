@@ -244,8 +244,21 @@ if [ -n "$TUNNEL_GIST" ]; then
 fi
 [ -n "${TUNNEL_GIST_FILE:-}" ] && export TUNNEL_GIST_FILE
 
-# Start tunnels in the background
-delegate "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
+# Start tunnels in the background, collect supervisor PIDs for signal forwarding.
+_TUNNEL_PIDS=$( delegate "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 |
+                cut -f2 |
+                tr '\n' ' ' )
+
+_forward_signal() {
+  for _pid in $_TUNNEL_PIDS; do
+    debug "Forwarding signal %s to PID %d" "$1" "$_pid"
+    kill "-$1" "$_pid" 2>/dev/null || true
+  done
+}
+trap '_forward_signal HUP;  trap - HUP;  kill -HUP  $$' HUP
+trap '_forward_signal INT;  trap - INT;  kill -INT  $$' INT
+trap '_forward_signal TERM; trap - TERM; kill -TERM $$' TERM
+trap '_forward_signal TERM' EXIT
 
 # Push the tunnel details to the gist whenever the TUNNEL_GIST_FILE is changed.
 # Note that cloudflared tunnels will be established soonish, but code tunnels
