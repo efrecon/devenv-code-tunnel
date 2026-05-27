@@ -39,6 +39,48 @@ init_get() {
 }
 
 
+# Supervise a script, restarting it when it exits with a non-zero status.
+# $1 is the human-readable name of the script
+# $2 is the path to the script
+# Remaining arguments are passed to the script, as is.
+_supervise() {
+  _sup_name=$1
+  _sup_script=$2
+  shift 2
+  _sup_running=1
+  _child_pid=
+  _delay=0
+
+  # shellcheck disable=SC2329 # Called from trap.
+  _sup_signal() {
+    _sup_running=0
+    [ -n "$_child_pid" ] && kill "-$1" "$_child_pid" 2>/dev/null || true
+  }
+  trap '_sup_signal HUP'  HUP
+  trap '_sup_signal INT'  INT
+  trap '_sup_signal TERM' TERM
+
+  while [ "$_sup_running" = "1" ]; do
+    ${INSTALL_OPTIMIZE:-} "$_sup_script" "$@" &
+    _child_pid=$!
+    _rc=0
+    wait "$_child_pid" || _rc=$?
+    _child_pid=
+    [ "$_sup_running" = "0" ] && break
+    [ "$_rc" -eq 0 ] && break
+    debug "%s exited with %d, restarting in %d seconds" "$_sup_name" "$_rc" "$_delay"
+    [ "$_delay" -gt 0 ] && sleep "$_delay" || true
+    if [ "$_delay" -eq 0 ]; then
+      _delay=1
+    elif [ "$((_delay * 2))" -gt 60 ]; then
+      _delay=60
+    else
+      _delay=$((_delay * 2))
+    fi
+  done
+}
+
+
 # Start dependency scripts
 # $1 is the type of script, used in messages and for background/foreground
 # $2 is the directory to look for scripts
@@ -76,14 +118,16 @@ delegate() {
         # TODO: Log the output to files?
         if is_true "$_bg_run"; then
           debug "Spawning %s using %s" "$_s" "$_script"
-          ${INSTALL_OPTIMIZE:-} "$_script" "$@" &
+          _supervise "$_s" "$_script" "$@" >&2 &
+          info "Supervising %s %s with PID $!" "$_human_t" "$_s"
+          printf %s\\t%d\\n "$_s" "$!"
         else
           debug "Running %s using %s" "$_s" "$_script"
           if ! ${INSTALL_OPTIMIZE:-} "$_script" "$@"; then
             error "%s %s failed" "$_human_t" "$_script"
           fi
+          printf %s\\n "$_s"
         fi
-        printf %s\\n "$_s"
       else
         warn "%s %s is not executable" "$_human_t" "$_script"
       fi
