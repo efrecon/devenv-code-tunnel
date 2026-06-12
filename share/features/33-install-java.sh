@@ -32,7 +32,7 @@ INSTALL_JAVA_MAIN_VERSION="${INSTALL_JAVA_VERSION%%.*}"
 
 
 # Root URL where to find the tarballs.
-: "${INSTALL_JAVA_ROOTURL:="https://github.com/adoptium/temurin${INSTALL_JAVA_VERSION}-binaries/releases/download"}"
+: "${INSTALL_JAVA_ROOTURL:="https://github.com/adoptium/temurin${INSTALL_JAVA_MAIN_VERSION}-binaries/releases/download"}"
 
 # Find out the OS, add the alpine prefix if needed, generate the default URLs
 os=$(get_os)
@@ -40,7 +40,7 @@ arch=$(get_arch aarch64 aarch64)
 if is_musl_os; then
   os="alpine-${os}"
 fi
-: "${INSTALL_JAVA_URL:="${INSTALL_JAVA_ROOTURL}/v${INSTALL_JAVA_MAIN_VERSION}/OpenJDK${INSTALL_JAVA_MAIN_VERSION}U-jdk_${arch}_${os}_hotspot_${INSTALL_JAVA_VERSION}.tar.gz"}"
+: "${INSTALL_JAVA_URL:="${INSTALL_JAVA_ROOTURL}/$(url_encode "jdk-${INSTALL_JAVA_VERSION}" "A-Za-z0-9.~-")/OpenJDK${INSTALL_JAVA_MAIN_VERSION}U-jdk_${arch}_${os}_hotspot_${INSTALL_JAVA_VERSION}.tar.gz"}"
 : "${INSTALL_JAVA_SUMS:="${INSTALL_JAVA_URL}.sha256.txt"}"
 
 
@@ -48,6 +48,7 @@ log_init INSTALL
 
 
 if ! command_present "java" && [ -n "$INSTALL_JAVA_VERSION" ]; then
+  trace "Installing Java %s from %s" "$INSTALL_JAVA_VERSION" "$INSTALL_JAVA_URL"
   # Download and install
   internet_tgz_installer \
     "$INSTALL_JAVA_URL" \

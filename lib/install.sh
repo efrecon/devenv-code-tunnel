@@ -1,5 +1,26 @@
 #!/bin/sh
 
+
+# Encode $1 as a URL-safe string, replacing special characters with % hex codes.
+# $2 is the set of characters not to encode (default: A-Za-z0-9._~-)
+url_encode() {
+  _ue_str="$1"
+  _ue_safe="${2:-"A-Za-z0-9._~-"}"
+  _ue_encoded=""
+  while [ -n "$_ue_str" ]; do
+    _ue_char="${_ue_str%"${_ue_str#?}"}"
+    _ue_str="${_ue_str#?}"
+    # shellcheck disable=SC2254
+    case "$_ue_char" in
+      [${_ue_safe}]) _ue_encoded="${_ue_encoded}${_ue_char}" ;;
+      *) _ue_encoded="${_ue_encoded}$(LC_ALL=C printf '%%%02X' "'${_ue_char}")" ;;
+    esac
+  done
+  printf '%s' "$_ue_encoded"
+  unset _ue_str _ue_safe _ue_encoded _ue_char || true
+}
+
+
 # Verify that file at $1 has sha512/sha256 checksum $2. When $3 is present, it
 # is used to provide a description of the file. When $4 is present, it is the
 # mode to use for the file (otherwise text mode is used, which should work in
@@ -23,6 +44,7 @@ checksum() {
   else
     warn "No checksum provided for ${3:-$1}. Skipping verification."
   fi
+  unset _sum || true
 }
 
 
