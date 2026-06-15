@@ -26,7 +26,7 @@ done
 : "${INSTALL_PREFIX:="/usr/local"}"
 
 # Version of Java to install.
-: "${INSTALL_JAVA_VERSION:="25.0.3_9"}"
+: "${INSTALL_JAVA_VERSION:="25.0.3+9"}"
 # Main (major) version of Java, i.e. everything before the first dot.
 INSTALL_JAVA_MAIN_VERSION="${INSTALL_JAVA_VERSION%%.*}"
 
@@ -40,7 +40,9 @@ arch=$(get_arch aarch64 aarch64)
 if is_musl_os; then
   os="alpine-${os}"
 fi
-: "${INSTALL_JAVA_URL:="${INSTALL_JAVA_ROOTURL}/$(url_encode "jdk-${INSTALL_JAVA_VERSION}" "A-Za-z0-9.~-")/OpenJDK${INSTALL_JAVA_MAIN_VERSION}U-jdk_${arch}_${os}_hotspot_${INSTALL_JAVA_VERSION}.tar.gz"}"
+file_version=$(printf '%s' "$INSTALL_JAVA_VERSION" | sed 's/[^A-Za-z0-9.-]/_/g')
+url_version=$(url_encode "$INSTALL_JAVA_VERSION")
+: "${INSTALL_JAVA_URL:="${INSTALL_JAVA_ROOTURL}/jdk-${url_version}/OpenJDK${INSTALL_JAVA_MAIN_VERSION}U-jdk_${arch}_${os}_hotspot_${file_version}.tar.gz"}"
 : "${INSTALL_JAVA_SUMS:="${INSTALL_JAVA_URL}.sha256.txt"}"
 
 
@@ -55,10 +57,12 @@ if ! command_present "java" && [ -n "$INSTALL_JAVA_VERSION" ]; then
     "${INSTALL_PREFIX}/share/java" \
     "java" \
     "$INSTALL_JAVA_SUMS"
-  as_root chmod a+x "${INSTALL_PREFIX}/share/java/bin/java"
-  as_root ln -sf "${INSTALL_PREFIX}/share/java/bin/java" "${INSTALL_PREFIX}/bin/java"
+  for _bin in "${INSTALL_PREFIX}/share/java/jdk-${INSTALL_JAVA_VERSION}/bin"/*; do
+    [ -x "$_bin" ] || continue
+    as_root chmod a+x "$_bin"
+    as_root ln -sf "$_bin" "${INSTALL_PREFIX}/bin/$(basename "$_bin")"
+  done
 
-  JAVA_HOME="${INSTALL_PREFIX}/share/java"; export JAVA_HOME
   verbose "Installed Java %s inside %s. Running version: %s" \
     "$INSTALL_JAVA_VERSION" \
     "${INSTALL_PREFIX}/share/java" \

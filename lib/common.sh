@@ -64,7 +64,7 @@ find_exec() {
 # Defaults to stdout if no file.
 download() {
   [ -z "$1" ] && error "download: no url given"
-  debug "Downloading $1"
+  debug "Downloading %s" "$1"
   ${INSTALL_OPTIMIZE:-} curl -fsSL "$1" --retry 5 --output "${2:-"-"}"
 }
 
