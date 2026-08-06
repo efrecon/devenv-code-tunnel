@@ -1,4 +1,4 @@
-ARG INSTALL_IMAGE=alpine:3.22.0
+ARG INSTALL_IMAGE=alpine:3.24.1
 FROM ${INSTALL_IMAGE}
 
 
@@ -93,4 +93,4 @@ EXPOSE 2222
 # Run behind tini, capturing the entire process group to properly teardown all
 # subprocesses.
 STOPSIGNAL SIGTERM
-ENTRYPOINT [ "tini", "-s", "--", "tunnel.sh" ]
+ENTRYPOINT [ "tini", "-s", "tunnel.sh", "--" ]
