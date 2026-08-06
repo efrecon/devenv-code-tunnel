@@ -167,12 +167,18 @@ runif() {
 
 # Pick container orchestrator. Default to podman, then docker. If neither is
 # found, exit with error.
-if command -v podman >/dev/null 2>&1; then
-  DEVENV_ORCHESTRATOR=podman
-elif command -v docker >/dev/null 2>&1; then
-  DEVENV_ORCHESTRATOR=docker
+if [ -z "$DEVENV_ORCHESTRATOR" ]; then
+  if command -v podman >/dev/null 2>&1; then
+    DEVENV_ORCHESTRATOR=podman
+  elif command -v docker >/dev/null 2>&1; then
+    DEVENV_ORCHESTRATOR=docker
+  else
+    error "No container orchestrator found. Please install podman or docker."
+  fi
 else
-  error "No container orchestrator found. Please install podman or docker."
+  if ! command -v "$DEVENV_ORCHESTRATOR" >/dev/null 2>&1; then
+    error "Container orchestrator not found: %s" "$DEVENV_ORCHESTRATOR"
+  fi
 fi
 
 # Pick private SSH key to use. Default to best guess from .ssh directory. This
