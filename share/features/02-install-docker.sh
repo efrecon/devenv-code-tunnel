@@ -26,7 +26,7 @@ done
 : "${INSTALL_USER:="coder"}"
 
 : "${INSTALL_DOCKER_URL:="https://get.docker.com"}"
-: "${INSTALL_DOCKER_SHA512:="7c880de2c45132677b8ce29b26ccff5ebd32535ef63bf684b30699d686c4a6b1cbfcb898d08bac624dd2e1ea46713e302c9b048eb1eceaa33b40cade3320638b"}"
+: "${INSTALL_DOCKER_SHA512:="ee045aa9a4877faf4f2464dfafe5cda742910e6015d798ea12a5e5462416ee7a0434b553c9ac87fa339a767e6dce05881eb9dbea58e595acfe6d60be3a0ab247"}"
 
 log_init INSTALL
 
