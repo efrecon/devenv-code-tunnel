@@ -31,7 +31,10 @@ log_init INSTALL
 if is_os_family alpine; then
   install_packages mysql-client postgresql18-client sqlite redis
 elif is_os_family debian; then
-  install_packages default-mysql-client postgresql-client-18 sqlite3 redis-server redis-tools
+  install_packages default-mysql-client postgresql-common sqlite3 redis-server redis-tools
+  # Automatically configure the official PGDG Apt repository
+  as_root /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+  install_packages postgresql-client-18
 else
   error "Unsupported OS family: %s" "$(get_distro_name)"
 fi
