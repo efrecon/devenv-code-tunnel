@@ -29,6 +29,7 @@ log_init INSTALL
 
 
 if is_os_family alpine; then
+  as_root mkdir -p /usr/share/man
   install_packages mysql-client postgresql18-client sqlite redis
 elif is_os_family debian; then
   install_packages default-mysql-client postgresql-common sqlite3 redis-server redis-tools
