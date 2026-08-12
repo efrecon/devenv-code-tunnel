@@ -29,27 +29,38 @@ done
 : "${INSTALL_TARGET:="user"}"
 
 : "${INSTALL_CHISEL_VERSION:="1.11.8"}"
+: "${INSTALL_CROC_VERSION:="11.1.0"}"
 
-# URL to download the code CLI from.
+# URL to download chisel and croc from.
 : "${INSTALL_CHISEL_URL:="https://github.com/jpillora/chisel/releases/download/v${INSTALL_CHISEL_VERSION}/chisel_${INSTALL_CHISEL_VERSION}_$(get_os)_$(get_golang_arch).gz"}"
 : "${INSTALL_CHISEL_SUMS:="https://github.com/jpillora/chisel/releases/download/v${INSTALL_CHISEL_VERSION}/chisel_${INSTALL_CHISEL_VERSION}_checksums.txt"}"
+
+# https://github.com/schollz/croc/releases/download/v11.1.0/croc_v11.1.0_Linux-64bit.tar.gz
+: "${INSTALL_CROC_URL:="https://github.com/schollz/croc/releases/download/v${INSTALL_CROC_VERSION}/croc_v${INSTALL_CROC_VERSION}_$(uname -s)-$(get_arch x86_64 64bit i686 32bit aarch64 ARM64).tar.gz"}"
+: "${INSTALL_CROC_SUMS:="https://github.com/schollz/croc/releases/download/v${INSTALL_CROC_VERSION}/croc_v${INSTALL_CROC_VERSION}_checksums.txt"}"
 
 
 log_init INSTALL
 
+[ "$INSTALL_TARGET" = "user" ] \
+  && BINDIR="${INSTALL_USER_PREFIX}/bin" \
+  || BINDIR="${INSTALL_PREFIX}/bin"
 
 debug "Installing chisel v%s" "$INSTALL_CHISEL_VERSION"
 
 # Install the chisel CLI in the proper directory location, i.e. as per
 # INSTALL_TARGET preference.
-[ "$INSTALL_TARGET" = "user" ] \
-  && BINDIR="${INSTALL_USER_PREFIX}/bin" \
-  || BINDIR="${INSTALL_PREFIX}/bin"
 chisel=$(internet_bin_installer \
                 "$INSTALL_CHISEL_URL" \
                 "$BINDIR" \
                 "chisel" \
                 "$INSTALL_CHISEL_SUMS")
+verbose "Installed chisel version %s" "$("$chisel" --version)"
 
-# Verify installation through printing the version.
-verbose "Installed chisel %s" "$("$chisel" --version)"
+# Same for croc.
+croc=$(internet_bintgz_installer \
+                "$INSTALL_CROC_URL" \
+                "$BINDIR" \
+                "croc" \
+                "$INSTALL_CROC_SUMS")
+verbose "Installed %s" "$("$croc" --version)"
