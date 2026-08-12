@@ -132,6 +132,8 @@ internet_bin_installer() {
 
   # declare shortcuts for the arguments and download the file
   _tgt_bin=${3:-"$(basename "$1")"}
+  _ext="${1##*.}"
+  [ "$_ext" = "$_tgt_bin" ] && _ext=""
   _tmp_bin=$(mktemp -t "${_tgt_bin}.XXXXXX")
   download "$1" "$_tmp_bin"
 
@@ -148,12 +150,20 @@ internet_bin_installer() {
   if [ "$(dir_owner "$2")" = "0" ]; then
     verbose "Installing %s to %s, as root" "$1" "${2%/}/$_tgt_bin"
     as_root mkdir -p "$2"
-    as_root cp -f "$_tmp_bin" "${2%/}/$_tgt_bin"
+    if [ "$_ext" = "gz" ]; then
+      as_root gunzip -c "$_tmp_bin" > "${2%/}/$_tgt_bin"
+    else
+      as_root cp -f "$_tmp_bin" "${2%/}/$_tgt_bin"
+    fi
     as_root chmod a+rx "${2%/}/$_tgt_bin"
   else
     verbose "Installing %s to %s" "$1" "${2%/}/$_tgt_bin"
     mkdir -p "$2"
-    cp -f "$_tmp_bin" "${2%/}/$_tgt_bin"
+    if [ "$_ext" = "gz" ]; then
+      gunzip -c "$_tmp_bin" > "${2%/}/$_tgt_bin"
+    else
+      cp -f "$_tmp_bin" "${2%/}/$_tgt_bin"
+    fi
     chmod a+rx "${2%/}/$_tgt_bin"
   fi
 
