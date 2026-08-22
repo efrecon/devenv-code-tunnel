@@ -93,4 +93,4 @@ EXPOSE 2222
 # Run behind tini, capturing the entire process group to properly teardown all
 # subprocesses.
 STOPSIGNAL SIGTERM
-ENTRYPOINT [ "tini", "-s", "tunnel.sh", "--" ]
+ENTRYPOINT [ "tini", "-s", "tunnel.sh" ]
