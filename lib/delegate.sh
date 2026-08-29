@@ -1,5 +1,8 @@
 #!/bin/sh
 
+: "${_CODER_PIDS:=}"
+: "${_CODER_TRAPPED:=0}"
+
 # Restart the script in the background, with the same arguments. You may pass a
 # leading prefix of (local) variables to export to the process (defaults to the
 # cleanname of this script, in uppercase). All other arguments MUST be the ones
@@ -38,46 +41,59 @@ init_get() {
   find "$1" -maxdepth 1 -type f -executable -name "*${2}.sh"
 }
 
-
-# Supervise a script, restarting it when it exits with a non-zero status.
-# $1 is the human-readable name of the script
-# $2 is the path to the script
-# Remaining arguments are passed to the script, as is.
-_supervise() {
-  _sup_name=$1
-  _sup_script=$2
-  shift 2
-  _sup_running=1
-  _child_pid=
-  _delay=0
-
-  # shellcheck disable=SC2329 # Called from trap.
-  _sup_signal() {
-    _sup_running=0
-    [ -n "$_child_pid" ] && kill "-$1" "$_child_pid" 2>/dev/null || true
-  }
-  trap '_sup_signal HUP'  HUP
-  trap '_sup_signal INT'  INT
-  trap '_sup_signal TERM' TERM
-
-  while [ "$_sup_running" = "1" ]; do
-    ${INSTALL_OPTIMIZE:-} "$_sup_script" "$@" &
-    _child_pid=$!
-    _rc=0
-    wait "$_child_pid" || _rc=$?
-    _child_pid=
-    [ "$_sup_running" = "0" ] && break
-    [ "$_rc" -eq 0 ] && break
-    debug "%s exited with %d, restarting in %d seconds" "$_sup_name" "$_rc" "$_delay"
-    [ "$_delay" -gt 0 ] && sleep "$_delay" || true
-    if [ "$_delay" -eq 0 ]; then
-      _delay=1
-    elif [ "$((_delay * 2))" -gt 60 ]; then
-      _delay=60
-    else
-      _delay=$((_delay * 2))
-    fi
+_spawn_signal() {
+  for _pid in $_CODER_PIDS; do
+    debug "Forwarding signal %s to PID %d" "$1" "$_pid"
+    kill "-$1" "$_pid" 2>/dev/null || true
   done
+}
+
+# Only called for TERM/EXIT, not INT: terminal already delivered INT to the group
+spawn_wait() {
+  _ret=0
+  for _pid in $_CODER_PIDS; do
+    # Re-enter wait if interrupted by a signal before the process actually exits
+    while kill -0 "$_pid" 2>/dev/null; do
+      wait "$_pid" 2>/dev/null
+      _wrc=$?
+      if [ "$_wrc" -le 127 ]; then
+        _ret=$_wrc
+        break
+      fi
+    done
+  done
+  _CODER_PIDS=; # Clear the list of PIDs, so we don't try to wait for them again
+  unset _pid || true
+  debug "All spawned processes exited, returning %d" "$_ret"
+  return "$_ret"
+}
+
+spawn() {
+  [ -z "${1:-}" ] && error "spawn: No executable given"
+  [ -x "$1" ] || error "spawn: $1 is not executable"
+
+  _bin=$1
+  shift
+  trace "Spawning %s with arguments: %s" "$_bin" "$*"
+  "$_bin" "$@" &
+  _spawned=$!
+  # Prune dead PIDs before appending, so the list only holds live processes
+  _alive_pids=
+  for _pid in $_CODER_PIDS; do
+    kill -0 "$_pid" 2>/dev/null && _alive_pids="$_alive_pids $_pid" || true
+  done
+  _CODER_PIDS="$_alive_pids $_spawned"
+  debug "Spawned %s with PID %d" "$_bin" "$_spawned"
+
+  if [ "$_CODER_TRAPPED" = "0" ]; then
+    trap '_spawn_signal HUP;  trap - HUP;  kill -HUP  $$' HUP
+    trap '_spawn_signal INT;  trap - INT;  kill -INT  $$' INT
+    trap '_spawn_signal TERM; spawn_wait || true; trap - TERM; kill -TERM $$' TERM
+    trap '_spawn_signal TERM; spawn_wait; _spawn_exit=$?; trap - EXIT; exit "$_spawn_exit"' EXIT
+    _CODER_TRAPPED=1
+  fi
+  printf %s\\n "$_spawned"
+  unset _bin _alive_pids _pid _spawned || true
 }
 
 
@@ -118,8 +134,19 @@ delegate() {
         # TODO: Log the output to files?
         if is_true "$_bg_run"; then
           debug "Spawning %s using %s" "$_s" "$_script"
-          _supervise "$_s" "$_script" "$@" >&2 &
-          info "Supervising %s %s with PID $!" "$_human_t" "$_s"
+          # Find the supervise.sh script
+          _bindir=$(dirname "$0")
+          for _d in share/orchestration ../share/orchestration; do
+            if [ -d "${_bindir}/$_d" ]; then
+              if [ -x "${_bindir}/$_d/supervise.sh" ]; then
+                _supervise="${_bindir}/$_d/supervise.sh"
+                break
+              fi
+            fi
+          done
+          [ -z "$_supervise" ] && error "Could not find supervise.sh!"
+          debug "Using %s to supervise %s" "$_supervise" "$_script"
+          "$_supervise" -n "$_s" -b "$_script" -- "$@" &
           printf %s\\t%d\\n "$_s" "$!"
         else
           debug "Running %s using %s" "$_s" "$_script"

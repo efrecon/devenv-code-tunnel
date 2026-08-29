@@ -8,7 +8,7 @@ set -euo pipefail
 CLOUDFLARE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in log common wait system; do
+for lib in log common wait system delegate; do
   for d in ../../lib ../lib lib; do
     if [ -d "${CLOUDFLARE_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -70,12 +70,13 @@ tunnel_start() (
   # all remaining arguments blindly to the command.
   unset_varset TUNNEL
 
-  "$CLOUDFLARE_LWRAP" -- \
-    "$CLOUDFLARE_BIN" tunnel \
-      --no-autoupdate \
-      --protocol "${CLOUDFLARE_PROTOCOL}" \
-      --url "tcp://localhost:$CLOUDFLARE_SSH" \
-      "$@" &
+  spawn \
+    "$CLOUDFLARE_LWRAP" -- \
+      "$CLOUDFLARE_BIN" tunnel \
+        --no-autoupdate \
+        --protocol "${CLOUDFLARE_PROTOCOL}" \
+        --url "tcp://localhost:$CLOUDFLARE_SSH" \
+        "$@"
 )
 
 
@@ -143,7 +144,7 @@ sshd_wait
 debug "Starting cloudflare tunnel using %s, logs at %s" "$CLOUDFLARE_BIN" "$CLOUDFLARE_LOG"
 if [ -z "$CLOUDFLARE_REEXPOSE" ] || printf %s\\n "$CLOUDFLARE_REEXPOSE" | grep -qF 'cloudflared'; then
   debug "Forwarding logs from %s" "$CLOUDFLARE_LOG"
-  "$CLOUDFLARE_LOGGER" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG" &
+  spawn "$CLOUDFLARE_LOGGER" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG" >/dev/null
 fi
-tunnel_start "$@";  # Starts tunnel in the background
-tunnel_wait
+tunnel_start "$@"
+spawn_wait

@@ -8,7 +8,7 @@ set -euo pipefail
 CODE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in log common wait system; do
+for lib in log common wait system delegate; do
   for d in ../../lib ../lib lib; do
     if [ -d "${CODE_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -76,8 +76,7 @@ tunnel_logged_in() {
 # Wrapper around code tunnel. Will log automatically.
 code_tunnel() { "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
 code_tunnel_bg() {
-  "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@" &
-  CODE_PID=$!
+  spawn "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"
 }
 
 
@@ -96,7 +95,7 @@ tunnel_login() {
 
   # Login at the provider in the background and wait for the process to end.
   code_tunnel_bg user login --provider "$CODE_PROVIDER"
-  wait "$CODE_PID"
+  spawn_wait
 
   # Kill the log re-printer tree, we might have children and signals might not
   # be propagated. Note: we cannot kill the process group, as it would kill too
@@ -132,13 +131,15 @@ tunnel_restart() {
 }
 
 
+# TODO: Rewrite using spawn() semantic. Add a spawn_kill() and maybe a spawn_wait_latest()
+
 # Wait for the tunnel to be started and print out its URL
 tunnel_wait() {
   # Wait for "ready" message in log and extract URL from it.
   debug "Wait for code tunnel to start..."
-  url=$(when_infile "$CODE_LOG" 'F' \
+  url=$(when_infile "$CODE_LOG" 'E' \
           'error connecting to tunnel:' tunnel_restart \
-          'Open this link in your browser' - | grep -oE 'https?://.*')
+          '(Open this link in your browser|➜\s+Open:)' - | grep -oE 'https?://.*')
 
   # Log URL, also make sure it appears in the container output.
   verbose "Code tunnel started at %s" "$url"
@@ -184,14 +185,15 @@ CODE_LWRAP=${CODE_ORCHESTRATION_DIR}/lwrap.sh
 CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.
-tunnel_configure
 debug "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
+tunnel_configure
 if is_true "$CODE_FORCE" || ! tunnel_logged_in; then
   tunnel_login
 fi
 if [ -z "$CODE_REEXPOSE" ] || printf %s\\n "$CODE_REEXPOSE" | grep -qF 'code'; then
   debug "Forwarding logs from %s" "$CODE_LOG"
-  "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
+  spawn "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG"
 fi
-tunnel_start;  # Starts tunnel in the background
+tunnel_start
 tunnel_wait
+spawn_wait  # exit code propagates to supervise.sh, which restarts on non-zero
