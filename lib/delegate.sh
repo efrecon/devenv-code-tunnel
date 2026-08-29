@@ -41,6 +41,15 @@ init_get() {
   find "$1" -maxdepth 1 -type f -executable -name "*${2}.sh"
 }
 
+_spawn_update() {
+  _alive_pids=
+  for _pid in $_CODER_PIDS; do
+    kill -0 "$_pid" 2>/dev/null && _alive_pids="$_alive_pids $_pid" || true
+  done
+  _CODER_PIDS=$_alive_pids
+  unset _alive_pids _pid || true
+}
+
 _spawn_signal() {
   for _pid in $_CODER_PIDS; do
     debug "Forwarding signal %s to PID %d" "$1" "$_pid"
@@ -48,24 +57,72 @@ _spawn_signal() {
   done
 }
 
+_spawn_wait() {
+  [ -z "${1:-}" ] && return 0
+
+  # Re-enter wait if interrupted by a signal before the process actually exits
+  while kill -0 "$1" 2>/dev/null; do
+    wait "$1" 2>/dev/null
+    _wrc=$?
+    if [ "$_wrc" -le 127 ]; then
+      return "$_wrc"
+    fi
+  done
+
+  return 0
+}
+
 # Only called for TERM/EXIT, not INT: terminal already delivered INT to the group
 spawn_wait() {
   _ret=0
-  for _pid in $_CODER_PIDS; do
-    # Re-enter wait if interrupted by a signal before the process actually exits
-    while kill -0 "$_pid" 2>/dev/null; do
-      wait "$_pid" 2>/dev/null
-      _wrc=$?
-      if [ "$_wrc" -le 127 ]; then
-        _ret=$_wrc
-        break
-      fi
-    done
+  _wait_pids=
+
+  if [ "$#" -gt 0 ]; then
+    _wait_pids="$*"
+  else
+    _wait_pids=$_CODER_PIDS
+  fi
+
+  for _pid in $_wait_pids; do
+    _spawn_wait "$_pid"
+    _wrc=$?
+    [ "$_wrc" -ne 0 ] && _ret=$_wrc
   done
-  _CODER_PIDS=; # Clear the list of PIDs, so we don't try to wait for them again
-  unset _pid || true
-  debug "All spawned processes exited, returning %d" "$_ret"
+
+  # Keep only processes that are still running.
+  _spawn_update
+
+  unset _pid _wait_pids _wrc || true
+  debug "Spawned processes %s exited, returning %d" "$_wait_pids" "$_ret"
   return "$_ret"
+}
+
+spawn_latest() {
+  # The latest PID is the last PID in the list.
+  # shellcheck disable=SC2086 # We want to expand the arguments
+  set -- $_CODER_PIDS
+  if [ "$#" -gt 0 ]; then
+    printf %s\\n "$#"
+  fi
+}
+
+spawn_kill() {
+  _kill_pids=
+
+  if [ "$#" -gt 0 ]; then
+    _kill_pids="$*"
+  else
+    _kill_pids=$_CODER_PIDS
+  fi
+
+  for _pid in $_kill_pids; do
+    debug "Killing PID %d" "$_pid"
+    kill_tree "$_pid" "${1:-TERM}" >/dev/null
+  done
+
+  _spawn_update
+  unset _pid _kill_pids || true
+  debug "All spawned processes killed"
 }
 
 spawn() {
@@ -77,18 +134,17 @@ spawn() {
   trace "Spawning %s with arguments: %s" "$_bin" "$*"
   "$_bin" "$@" &
   _spawned=$!
+
   # Prune dead PIDs before appending, so the list only holds live processes
-  _alive_pids=
-  for _pid in $_CODER_PIDS; do
-    kill -0 "$_pid" 2>/dev/null && _alive_pids="$_alive_pids $_pid" || true
-  done
-  _CODER_PIDS="$_alive_pids $_spawned"
+  _spawn_update
+  _CODER_PIDS="$_CODER_PIDS $_spawned"
   debug "Spawned %s with PID %d" "$_bin" "$_spawned"
 
   if [ "$_CODER_TRAPPED" = "0" ]; then
     trap '_spawn_signal HUP;  trap - HUP;  kill -HUP  $$' HUP
     trap '_spawn_signal INT;  trap - INT;  kill -INT  $$' INT
     trap '_spawn_signal TERM; spawn_wait || true; trap - TERM; kill -TERM $$' TERM
+    # shellcheck disable=SC2154 # _spawn_exit set inside trap
     trap '_spawn_signal TERM; spawn_wait; _spawn_exit=$?; trap - EXIT; exit "$_spawn_exit"' EXIT
     _CODER_TRAPPED=1
   fi

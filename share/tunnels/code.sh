@@ -90,18 +90,17 @@ tunnel_login() {
   debug "Logging in at %s" "$CODE_PROVIDER"
 
   # Start reprinting the logs, remember the PID of that process.
-  "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG" &
-  CODE_LOGGER_PID=$!
+  spawn "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG"
 
   # Login at the provider in the background and wait for the process to end.
   code_tunnel_bg user login --provider "$CODE_PROVIDER"
-  spawn_wait
+  spawn_wait_latest
 
   # Kill the log re-printer tree, we might have children and signals might not
   # be propagated. Note: we cannot kill the process group, as it would kill too
   # many processes and the - semantic isn't supported on busybox.
   verbose "Logged in at %s" "$CODE_PROVIDER"
-  kill_tree "$CODE_LOGGER_PID"
+  spawn_kill # Kill all spawned processes, including the logger
 }
 
 
