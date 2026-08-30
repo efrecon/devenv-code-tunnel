@@ -329,6 +329,8 @@ kill_tree() {
   [ -z "${1:-}" ] && error "kill_tree: must pass pid as first arg"
   for _pid in $(ps_children "$1"); do
     kill -"${2:-TERM}" "$_pid"
+    printf %d\\n "$_pid"
   done
   kill -"${2:-TERM}" "$1"
+  printf %d\\n "$1"
 }

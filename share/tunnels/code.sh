@@ -8,7 +8,7 @@ set -euo pipefail
 CODE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 
 # Hurry up and find the libraries
-for lib in log common wait system; do
+for lib in log common wait system delegate; do
   for d in ../../lib ../lib lib; do
     if [ -d "${CODE_ROOTDIR}/$d" ]; then
       # shellcheck disable=SC1090
@@ -76,8 +76,7 @@ tunnel_logged_in() {
 # Wrapper around code tunnel. Will log automatically.
 code_tunnel() { "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
 code_tunnel_bg() {
-  "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@" &
-  CODE_PID=$!
+  spawn "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"
 }
 
 
@@ -91,27 +90,26 @@ tunnel_login() {
   debug "Logging in at %s" "$CODE_PROVIDER"
 
   # Start reprinting the logs, remember the PID of that process.
-  "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG" &
-  CODE_LOGGER_PID=$!
+  spawn "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG"
 
   # Login at the provider in the background and wait for the process to end.
   code_tunnel_bg user login --provider "$CODE_PROVIDER"
-  wait "$CODE_PID"
+  spawn_wait "$(spawn_latest)"
 
   # Kill the log re-printer tree, we might have children and signals might not
   # be propagated. Note: we cannot kill the process group, as it would kill too
   # many processes and the - semantic isn't supported on busybox.
   verbose "Logged in at %s" "$CODE_PROVIDER"
-  kill_tree "$CODE_LOGGER_PID"
+  spawn_kill -t -r "login cleanup" # Kill all spawned processes, including the logger
 }
 
 
 # Start the tunnel
 tunnel_start() {
   if [ -z "$CODE_NAME" ]; then
-    code_tunnel_bg --accept-server-license-terms --random-name
+    code_tunnel_bg --accept-server-license-terms --random-name "$@"
   else
-    code_tunnel_bg --accept-server-license-terms --name "$CODE_NAME"
+    code_tunnel_bg --accept-server-license-terms --name "$CODE_NAME" "$@"
   fi
 }
 
@@ -121,7 +119,8 @@ tunnel_start() {
 # that it should keep processing.
 tunnel_restart() {
   warn "Error in tunnel: $1"
-  kill_tree "$CODE_PID"
+  CODE_PID=$(spawn_latest)
+  [ -n "$CODE_PID" ] && spawn_kill -t -r "restart" "$CODE_PID" # Kill the code tunnel process
 
   if [ "$CODE_RESTART" -ge 0 ]; then
     sleep "$CODE_RESTART"
@@ -132,23 +131,28 @@ tunnel_restart() {
 }
 
 
+tunnel_info() {
+  # Log URL, also make sure it appears in the container output.
+  verbose "Code tunnel started at %s" "$1"
+  reprint "$CODE_GIST_FILE" <<EOF
+
+(vs)code tunnel running, access it from your browser at the following URL:
+    $1
+
+EOF
+}
+
+
 # Wait for the tunnel to be started and print out its URL
 tunnel_wait() {
   # Wait for "ready" message in log and extract URL from it.
   debug "Wait for code tunnel to start..."
-  url=$(when_infile "$CODE_LOG" 'F' \
+  url=$(when_infile "$CODE_LOG" 'E' \
           'error connecting to tunnel:' tunnel_restart \
-          'Open this link in your browser' - | grep -oE 'https?://.*')
-
-  # Log URL, also make sure it appears in the container output.
-  verbose "Code tunnel started at %s" "$url"
-  reprint "$CODE_GIST_FILE" <<EOF
-
-(vs)code tunnel running, access it from your browser at the following URL:
-    $url
-
-EOF
+          '(Open this link in your browser|➜\s+Open:)' - | grep -oE 'https?://.*')
+  tunnel_info "$url"
 }
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="vscode tunnel starter"
@@ -184,14 +188,22 @@ CODE_LWRAP=${CODE_ORCHESTRATION_DIR}/lwrap.sh
 CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.
-tunnel_configure
 debug "Starting code tunnel using %s, logs at %s" "$CODE_BIN" "$CODE_LOG"
+tunnel_configure
 if is_true "$CODE_FORCE" || ! tunnel_logged_in; then
   tunnel_login
 fi
 if [ -z "$CODE_REEXPOSE" ] || printf %s\\n "$CODE_REEXPOSE" | grep -qF 'code'; then
   debug "Forwarding logs from %s" "$CODE_LOG"
-  "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG" &
+  spawn "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG"
 fi
-tunnel_start;  # Starts tunnel in the background
+tunnel_start "$@"
 tunnel_wait
+
+CODE_PID=$(spawn_latest)
+trace "Code tunnel running as PID %d, waiting for it to exit.." "$CODE_PID"
+spawn_wait "$CODE_PID"; # Wait for the tunnel to end.
+
+_ret=$?
+spawn_kill -t -r "cleanup"; # Kill the log relay, if any.
+exit $_ret
