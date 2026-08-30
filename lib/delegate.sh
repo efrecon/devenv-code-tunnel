@@ -41,22 +41,30 @@ init_get() {
   find "$1" -maxdepth 1 -type f -executable -name "*${2}.sh"
 }
 
+
+# Catch up the list of PIDs in _CODER_PIDS, removing any that have exited, add
+# the ones passed as arguments if they are alive.
 _spawn_update() {
+  # Reconstruct the list of alive PIDs, by checking each PID in _CODER_PIDS. Any
+  # PID passed as argument is to be added to the list, if it is alive.
   _alive_pids=
-  for _pid in $_CODER_PIDS; do
-    kill -0 "$_pid" 2>/dev/null && _alive_pids="$_alive_pids $_pid" || true
+  for _pid in $_CODER_PIDS "$@"; do
+    [ -z "${_pid:-}" ] && continue
+    if kill -0 "$_pid" 2>/dev/null; then
+      if [ -z "$_alive_pids" ]; then
+        _alive_pids="$_pid"
+      else
+        _alive_pids="$_alive_pids $_pid"
+      fi
+    fi
   done
   _CODER_PIDS=$_alive_pids
   unset _alive_pids _pid || true
 }
 
-_spawn_signal() {
-  for _pid in $_CODER_PIDS; do
-    debug "Forwarding signal %s to PID %d" "$1" "$_pid"
-    kill "-$1" "$_pid" 2>/dev/null || true
-  done
-}
 
+# Wait for the process with PID passed as $1 to exit. Returns the exit code of
+# the process, or 0 if the process was already dead.
 _spawn_wait() {
   [ -z "${1:-}" ] && return 0
 
@@ -72,17 +80,22 @@ _spawn_wait() {
   return 0
 }
 
-# Only called for TERM/EXIT, not INT: terminal already delivered INT to the group
+
+# Wait for the processes with PIDs passed as arguments to exit. If no arguments
+# are passed, wait for all PIDs in _CODER_PIDS. Returns the exit of the last
+# process returning an error.
 spawn_wait() {
   _ret=0
-  _wait_pids=
 
+  # Decide upon the list of PIDs to wait for.
+  _wait_pids=
   if [ "$#" -gt 0 ]; then
     _wait_pids="$*"
   else
     _wait_pids=$_CODER_PIDS
   fi
 
+  # Wait in turns, remember last non-zero exit code.
   for _pid in $_wait_pids; do
     _spawn_wait "$_pid"
     _wrc=$?
@@ -92,64 +105,116 @@ spawn_wait() {
   # Keep only processes that are still running.
   _spawn_update
 
+  # Log and return the exit code of the last process that returned an error, if
+  # any.
+  [ -n "$_wait_pids" ] && debug "Spawned processes %s exited, returning %d" "$_wait_pids" "$_ret"
   unset _pid _wait_pids _wrc || true
-  debug "Spawned processes %s exited, returning %d" "$_wait_pids" "$_ret"
   return "$_ret"
 }
 
+
+# Return the PID of the latest spawned process, or nothing if none are running.
 spawn_latest() {
-  # The latest PID is the last PID in the list.
-  # shellcheck disable=SC2086 # We want to expand the arguments
-  set -- $_CODER_PIDS
-  if [ "$#" -gt 0 ]; then
-    printf %s\\n "$#"
-  fi
+  printf '%s' "${_CODER_PIDS:-}" | tr ' ' '\n' | tail -n 1
 }
 
-spawn_kill() {
-  _kill_pids=
 
+# Send a signal to the process tree of each PID passed as argument, or to all
+# PIDs in _CODER_PIDS if no arguments are passed. The signal to send is from the
+# -s option, defaults to TERM.
+spawn_kill() {
+  _sigspec=TERM
+  _tree=0
+  _reason=unknown
+  while getopts "r:s:t-" opt; do
+    case "$opt" in
+      r) # Specify the reason for logging purposes
+        _reason=$OPTARG;;
+      s) # Specify the sigspec
+        _sigspec=$OPTARG;;
+      t) # Specify whether to kill the process tree
+        _tree=1;;
+      -) # End of options, file name to follow
+        break;;
+      *)  # Unknown option
+        error "spawn_kill: Unknown option $opt";;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  # Decide upon the list of PIDs to kill.
+  _kill_pids=
   if [ "$#" -gt 0 ]; then
     _kill_pids="$*"
   else
     _kill_pids=$_CODER_PIDS
   fi
 
+  # Kill the processes, or their trees.
   for _pid in $_kill_pids; do
-    debug "Killing PID %d" "$_pid"
-    kill_tree "$_pid" "${1:-TERM}" >/dev/null
+    if [ "$_tree" -eq 1 ]; then
+      debug "Killing tree of PID %d with signal %s. Reason: %s" "$_pid" "$_sigspec" "$_reason"
+      kill_tree "$_pid" "$_sigspec" >/dev/null
+    else
+      debug "Killing PID %d with signal %s. Reason: %s" "$_pid" "$_sigspec" "$_reason"
+      kill "-$_sigspec" "$_pid" 2>/dev/null || true
+    fi
   done
 
+  # Recapture the list of alive PIDs, since some may have exited.
   _spawn_update
-  unset _pid _kill_pids || true
-  debug "All spawned processes killed"
+  unset _pid _kill_pids _sigspec _tree || true
 }
 
+
+# Spawn a process in the background, and return its PID.
 spawn() {
+  _name=
+  while getopts "n:-" opt; do
+    case "$opt" in
+      n) # Specify the name for logging purposes
+        _name=$OPTARG;;
+      -) # End of options, file name to follow
+        break;;
+      *)  # Unknown option
+        error "spawn: Unknown option $opt";;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  # Sanity check on the executable.
   [ -z "${1:-}" ] && error "spawn: No executable given"
   [ -x "$1" ] || error "spawn: $1 is not executable"
 
+  # Capture the executable and default name for logging purposes, if not already
+  # set.
   _bin=$1
   shift
+  [ -z "${_name:-}" ] && _name=$(basename "$_bin")
+
+  # Spawn the process in the background, and remember its PID.
   trace "Spawning %s with arguments: %s" "$_bin" "$*"
   "$_bin" "$@" &
   _spawned=$!
 
-  # Prune dead PIDs before appending, so the list only holds live processes
-  _spawn_update
-  _CODER_PIDS="$_CODER_PIDS $_spawned"
-  debug "Spawned %s with PID %d" "$_bin" "$_spawned"
+  # Prune dead PIDs before appending, so the list only holds live processes. Add
+  # the new PID to the list of live processes.
+  _spawn_update "$_spawned"
+  debug "Spawned %s with PID %d" "$_name" "$_spawned"
 
+  # Install process-wide signal handlers if not already done.
   if [ "$_CODER_TRAPPED" = "0" ]; then
-    trap '_spawn_signal HUP;  trap - HUP;  kill -HUP  $$' HUP
-    trap '_spawn_signal INT;  trap - INT;  kill -INT  $$' INT
-    trap '_spawn_signal TERM; spawn_wait || true; trap - TERM; kill -TERM $$' TERM
+    trap 'spawn_kill -s HUP -r "HUP trap";  trap - HUP;  kill -HUP  $$' HUP
+    trap 'spawn_kill -s INT -r "INT trap";  trap - INT;  kill -INT  $$' INT
+    trap 'spawn_kill -s TERM -r "TERM trap"; spawn_wait || true; trap - TERM; kill -TERM $$' TERM
     # shellcheck disable=SC2154 # _spawn_exit set inside trap
-    trap '_spawn_signal TERM; spawn_wait; _spawn_exit=$?; trap - EXIT; exit "$_spawn_exit"' EXIT
+    trap 'spawn_kill -s TERM -r "EXIT trap"; spawn_wait; _spawn_exit=$?; trap - EXIT; exit "$_spawn_exit"' EXIT
     _CODER_TRAPPED=1
   fi
+
+  # Return the PID of the spawned process, for convenience.
   printf %s\\n "$_spawned"
-  unset _bin _alive_pids _pid _spawned || true
+  unset _bin _name _spawned || true
 }
 
 

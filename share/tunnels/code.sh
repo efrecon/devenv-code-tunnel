@@ -94,22 +94,22 @@ tunnel_login() {
 
   # Login at the provider in the background and wait for the process to end.
   code_tunnel_bg user login --provider "$CODE_PROVIDER"
-  spawn_wait_latest
+  spawn_wait "$(spawn_latest)"
 
   # Kill the log re-printer tree, we might have children and signals might not
   # be propagated. Note: we cannot kill the process group, as it would kill too
   # many processes and the - semantic isn't supported on busybox.
   verbose "Logged in at %s" "$CODE_PROVIDER"
-  spawn_kill # Kill all spawned processes, including the logger
+  spawn_kill -t -r "login cleanup" # Kill all spawned processes, including the logger
 }
 
 
 # Start the tunnel
 tunnel_start() {
   if [ -z "$CODE_NAME" ]; then
-    code_tunnel_bg --accept-server-license-terms --random-name
+    code_tunnel_bg --accept-server-license-terms --random-name "$@"
   else
-    code_tunnel_bg --accept-server-license-terms --name "$CODE_NAME"
+    code_tunnel_bg --accept-server-license-terms --name "$CODE_NAME" "$@"
   fi
 }
 
@@ -119,7 +119,8 @@ tunnel_start() {
 # that it should keep processing.
 tunnel_restart() {
   warn "Error in tunnel: $1"
-  kill_tree "$CODE_PID"
+  CODE_PID=$(spawn_latest)
+  [ -n "$CODE_PID" ] && spawn_kill -t -r "restart" "$CODE_PID" # Kill the code tunnel process
 
   if [ "$CODE_RESTART" -ge 0 ]; then
     sleep "$CODE_RESTART"
@@ -130,7 +131,17 @@ tunnel_restart() {
 }
 
 
-# TODO: Rewrite using spawn() semantic. Add a spawn_kill() and maybe a spawn_wait_latest()
+tunnel_info() {
+  # Log URL, also make sure it appears in the container output.
+  verbose "Code tunnel started at %s" "$1"
+  reprint "$CODE_GIST_FILE" <<EOF
+
+(vs)code tunnel running, access it from your browser at the following URL:
+    $1
+
+EOF
+}
+
 
 # Wait for the tunnel to be started and print out its URL
 tunnel_wait() {
@@ -139,16 +150,9 @@ tunnel_wait() {
   url=$(when_infile "$CODE_LOG" 'E' \
           'error connecting to tunnel:' tunnel_restart \
           '(Open this link in your browser|➜\s+Open:)' - | grep -oE 'https?://.*')
-
-  # Log URL, also make sure it appears in the container output.
-  verbose "Code tunnel started at %s" "$url"
-  reprint "$CODE_GIST_FILE" <<EOF
-
-(vs)code tunnel running, access it from your browser at the following URL:
-    $url
-
-EOF
+  tunnel_info "$url"
 }
+
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="vscode tunnel starter"
@@ -193,6 +197,13 @@ if [ -z "$CODE_REEXPOSE" ] || printf %s\\n "$CODE_REEXPOSE" | grep -qF 'code'; t
   debug "Forwarding logs from %s" "$CODE_LOG"
   spawn "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG"
 fi
-tunnel_start
+tunnel_start "$@"
 tunnel_wait
-spawn_wait  # exit code propagates to supervise.sh, which restarts on non-zero
+
+CODE_PID=$(spawn_latest)
+trace "Code tunnel running as PID %d, waiting for it to exit.." "$CODE_PID"
+spawn_wait "$CODE_PID"; # Wait for the tunnel to end.
+
+_ret=$?
+spawn_kill -t -r "cleanup"; # Kill the log relay, if any.
+exit $_ret

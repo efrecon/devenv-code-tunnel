@@ -48,6 +48,7 @@ sshd_wait() {
     sleep 1
     trace "Waiting for sshd to start on port %s..." "$CLOUDFLARE_SSH"
   done
+  debug "sshd alive on port %s" "$CLOUDFLARE_SSH"
 }
 
 
@@ -64,54 +65,52 @@ tunnel_pubkey() {
 }
 
 
-tunnel_start() (
+tunnel_start() {
   # Remove all TUNNEL_ variables from the environment, since cloudflared
   # respects some of them and we force settings through the command line. Pass
   # all remaining arguments blindly to the command.
   unset_varset TUNNEL
 
-  spawn \
+  spawn -n cloudflared -- \
     "$CLOUDFLARE_LWRAP" -- \
       "$CLOUDFLARE_BIN" tunnel \
         --no-autoupdate \
         --protocol "${CLOUDFLARE_PROTOCOL}" \
         --url "tcp://localhost:$CLOUDFLARE_SSH" \
-        "$@"
-)
+        "$@" > /dev/null
+}
 
 
 tunnel_info() {
-  url=$(printf %s\\n "$1" | grep -oE 'https://.*\.trycloudflare.com')
   public_key=$(tunnel_pubkey)
-  verbose "Cloudflare tunnel started at %s" "$url"
+  verbose "Cloudflare tunnel started at %s" "$1"
 
   reprint "$CLOUDFLARE_GIST_FILE" <<EOF
 
 cloudflare tunnel running, run the following command to connect securely:
-    ssh-keygen -R $CLOUDFLARE_HOSTNAME && echo '$CLOUDFLARE_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $url' $(id -un)@$CLOUDFLARE_HOSTNAME
+    ssh-keygen -R $CLOUDFLARE_HOSTNAME && echo '$CLOUDFLARE_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $1' $(id -un)@$CLOUDFLARE_HOSTNAME
 
 cloudflare tunnel running, run the following command to connect without verification (DANGER!):
-    ssh -o ProxyCommand='cloudflared access tcp --hostname $url' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new $(id -un)@$CLOUDFLARE_HOSTNAME
+    ssh -o ProxyCommand='cloudflared access tcp --hostname $1' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new $(id -un)@$CLOUDFLARE_HOSTNAME
 
 DANGEROUS configuration snippet for \$HOME/.ssh/config:
 
 Host $CLOUDFLARE_HOSTNAME
   HostName $CLOUDFLARE_HOSTNAME
-  ProxyCommand cloudflared access tcp --hostname $url
+  ProxyCommand cloudflared access tcp --hostname $1
   UserKnownHostsFile /dev/null
   StrictHostKeyChecking accept-new
   User $(id -un)
 
 EOF
-
-  return 1;  # Keep reading the file, as per convention for when_infile
 }
 
 
 tunnel_wait() {
-  debug "Wait for cloudflare tunnels to start..."
-  when_infile "$CLOUDFLARE_LOG" 'E' \
-    'https://.*\.trycloudflare.com' tunnel_info
+  debug "Wait for cloudflare tunnel to start..."
+  url=$(when_infile "$CLOUDFLARE_LOG" 'E' \
+          'https://.*\.trycloudflare.com' - | grep -oE 'https://.*\.trycloudflare.com')
+  tunnel_info "$url"
 }
 
 
@@ -147,4 +146,12 @@ if [ -z "$CLOUDFLARE_REEXPOSE" ] || printf %s\\n "$CLOUDFLARE_REEXPOSE" | grep -
   spawn "$CLOUDFLARE_LOGGER" -s "$CLOUDFLARE_BIN" -- "$CLOUDFLARE_LOG" >/dev/null
 fi
 tunnel_start "$@"
-spawn_wait
+tunnel_wait
+
+CLOUDFLARE_PID=$(spawn_latest)
+trace "Cloudflare tunnel running as PID %d, waiting for it to exit.." "$CLOUDFLARE_PID"
+spawn_wait "$CLOUDFLARE_PID"; # Wait for the tunnel to end.
+
+_ret=$?
+spawn_kill -t -r "cleanup"; # Kill the log relay, if any.
+exit $_ret
