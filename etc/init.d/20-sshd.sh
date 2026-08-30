@@ -204,6 +204,12 @@ SSHD_LOGFILE=${SSHD_PREFIX}/log/sshd.log
 SSHD_CONFIG_USER="${SSHD_CONFIG_DIR%/}/user"
 SSHD_CONFIG_SERVER="${SSHD_CONFIG_DIR%/}/server"
 
+# Bail out if something is already listening on the port
+if nc -z -w 1 localhost "$SSHD_PORT" 2>/dev/null; then
+  warn "A server is already answering on port %s, skipping" "$SSHD_PORT"
+  exit 0
+fi
+
 configure_dropbear "$_USER"
 touch "$SSHD_LOGFILE"
 verbose "Starting dropbear sshd for user %s on port %s" "$_USER" "$SSHD_PORT"
