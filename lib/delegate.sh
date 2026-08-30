@@ -208,7 +208,7 @@ spawn() {
     trap 'spawn_kill -s INT -r "INT trap";  trap - INT;  kill -INT  $$' INT
     trap 'spawn_kill -s TERM -r "TERM trap"; spawn_wait || true; trap - TERM; kill -TERM $$' TERM
     # shellcheck disable=SC2154 # _spawn_exit set inside trap
-    trap 'spawn_kill -s TERM -r "EXIT trap"; spawn_wait; _spawn_exit=$?; trap - EXIT; exit "$_spawn_exit"' EXIT
+    trap '_spawn_exit=$?; spawn_kill -s TERM -r "EXIT trap" || true; spawn_wait || true; trap - EXIT; exit "$_spawn_exit"' EXIT
     _CODER_TRAPPED=1
   fi
 
