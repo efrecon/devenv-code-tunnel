@@ -114,20 +114,14 @@ tunnel_start() {
 }
 
 
-# Restart the tunnel when failure has been detected in the logs. This will kill
-# the code tunnel process, sleep and return 1: convention for the caller to know
-# that it should keep processing.
+# Kill the current tunnel and set the restart flag; returns 0 to stop when_infile
+# so the parent loop can call tunnel_start and capture the new PID.
 tunnel_restart() {
   warn "Error in tunnel: $1"
   CODE_PID=$(spawn_latest)
-  [ -n "$CODE_PID" ] && spawn_kill -t -r "restart" "$CODE_PID" # Kill the code tunnel process
-
-  if [ "$CODE_RESTART" -ge 0 ]; then
-    sleep "$CODE_RESTART"
-    tunnel_start
-  fi
-
-  return 1; # This was an error, continue reading the file
+  [ -n "$CODE_PID" ] && spawn_kill -t -r "restart" "$CODE_PID"
+  touch "$_CODE_RESTART_FLAG"
+  return 0
 }
 
 
@@ -145,11 +139,23 @@ EOF
 
 # Wait for the tunnel to be started and print out its URL
 tunnel_wait() {
-  # Wait for "ready" message in log and extract URL from it.
+  # _CODE_RESTART_FLAG is inherited by the when_infile subshell so tunnel_restart
+  # can signal back without modifying _CODER_PIDS in the child.
+  _CODE_RESTART_FLAG=$(mktemp "${TMPDIR:-/tmp}/restart.XXXXXX")
   debug "Wait for code tunnel to start..."
-  url=$(when_infile "$CODE_LOG" 'E' \
-          'error connecting to tunnel:' tunnel_restart \
-          '(Open this link in your browser|➜\s+Open:)' - | grep -oE 'https?://.*')
+  while true; do
+    url=$(when_infile "$CODE_LOG" 'E' \
+            'error connecting to tunnel:' tunnel_restart \
+            '(Open this link in your browser|➜\s+Open:)' - | grep -oE 'https?://.*') || true
+    if [ -f "$_CODE_RESTART_FLAG" ]; then
+      rm -f "$_CODE_RESTART_FLAG"
+      [ "$CODE_RESTART" -lt 0 ] && break
+      sleep "$CODE_RESTART"
+      tunnel_start
+      continue
+    fi
+    break
+  done
   tunnel_info "$url"
 }
 
