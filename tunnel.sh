@@ -237,6 +237,9 @@ if [ -n "$TUNNEL_GIST" ]; then
           fi
         fi
       )
+
+      # Timestamp the gist file at regular intervals.
+      spawn "${TUNNEL_ORCHESTRATION_DIR}/timestamp.sh" -- "$TUNNEL_GIST_FILE" >/dev/null
     else
       warn "Failed to clone gist %s" "$TUNNEL_GIST"
     fi
@@ -274,10 +277,11 @@ trap 'tunnel_signal TERM; _tunnel_wait' EXIT
 # might take time as they might require interaction with the user to authorize
 # the device.
 if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
-  "${TUNNEL_ORCHESTRATION_DIR}/notify.sh" \
-    -f "$TUNNEL_GIST_FILE" \
-    -- \
-      "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" &
+  spawn \
+    "${TUNNEL_ORCHESTRATION_DIR}/notify.sh" \
+      -f "$TUNNEL_GIST_FILE" \
+      -- \
+        "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" >/dev/null
 fi
 
 while true; do

@@ -103,6 +103,8 @@ Host $CLOUDFLARE_HOSTNAME
   User $(id -un)
 
 EOF
+  # Timestamp the gist file to indicate when it was last updated.
+  "$CLOUDFLARE_TIMESTAMP" -s 0 -- "$CLOUDFLARE_GIST_FILE"
 }
 
 
@@ -110,7 +112,7 @@ tunnel_wait() {
   debug "Wait for cloudflare tunnel to start..."
   url=$(when_infile "$CLOUDFLARE_LOG" 'E' \
           'https://.*\.trycloudflare.com' - | grep -oE 'https://.*\.trycloudflare.com')
-  tunnel_info "$url"
+  [ -n "$CLOUDFLARE_GIST_FILE" ] && tunnel_info "$url"
 }
 
 
@@ -133,8 +135,10 @@ CLOUDFLARE_BIN=$(find_inpath cloudflared "$CLOUDFLARE_USER_PREFIX" "$CLOUDFLARE_
 CLOUDFLARE_ORCHESTRATION_DIR=${CLOUDFLARE_ROOTDIR}/../orchestration
 CLOUDFLARE_LOGGER=${CLOUDFLARE_ORCHESTRATION_DIR}/logger.sh
 CLOUDFLARE_LWRAP=${CLOUDFLARE_ORCHESTRATION_DIR}/lwrap.sh
+CLOUDFLARE_TIMESTAMP=${CLOUDFLARE_ORCHESTRATION_DIR}/timestamp.sh
 [ -x "$CLOUDFLARE_LOGGER" ] || error "Cannot find logger.sh"
 [ -x "$CLOUDFLARE_LWRAP" ] || error "Cannot find lwrap.sh"
+[ -x "$CLOUDFLARE_TIMESTAMP" ] || error "Cannot find timestamp.sh"
 CLOUDFLARE_LOG=$("$CLOUDFLARE_LWRAP" -L -- "$CLOUDFLARE_BIN")
 
 check_command nc || error "nc is not installed. Please install it first."

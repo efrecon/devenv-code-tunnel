@@ -134,6 +134,8 @@ tunnel_info() {
     $1
 
 EOF
+  # Timestamp the gist file to indicate when it was last updated.
+  "$CODE_TIMESTAMP" -s 0 -- "$CODE_GIST_FILE"
 }
 
 
@@ -156,7 +158,7 @@ tunnel_wait() {
     fi
     break
   done
-  tunnel_info "$url"
+  [ -n "$CODE_GIST_FILE" ] && tunnel_info "$url"
 }
 
 
@@ -189,8 +191,10 @@ CODE_BIN=$(find_inpath code "$CODE_USER_PREFIX" "$CODE_PREFIX")
 CODE_ORCHESTRATION_DIR=${CODE_ROOTDIR}/../orchestration
 CODE_LOGGER=${CODE_ORCHESTRATION_DIR}/logger.sh
 CODE_LWRAP=${CODE_ORCHESTRATION_DIR}/lwrap.sh
+CODE_TIMESTAMP=${CODE_ORCHESTRATION_DIR}/timestamp.sh
 [ -x "$CODE_LOGGER" ] || error "Cannot find logger.sh"
 [ -x "$CODE_LWRAP" ] || error "Cannot find lwrap.sh"
+[ -x "$CODE_TIMESTAMP" ] || error "Cannot find timestamp.sh"
 CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.
