@@ -33,6 +33,8 @@ bin_name
 # Environment file to load for reading defaults from.
 : "${TIMESTAMP_DEFAULTS:="${TIMESTAMP_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
 
+# Load defaults
+[ -n "$TIMESTAMP_DEFAULTS" ] && read_envfile "$TIMESTAMP_DEFAULTS" TIMESTAMP
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Timestamp file at regular intervals, or once."
@@ -74,9 +76,6 @@ timestamp_set() {
 
 
 log_init TIMESTAMP
-
-# Load defaults
-[ -n "$TIMESTAMP_DEFAULTS" ] && read_envfile "$TIMESTAMP_DEFAULTS" NOTIFY
 
 
 # Pick up the path to the timestamp file from the command line, if empty.
