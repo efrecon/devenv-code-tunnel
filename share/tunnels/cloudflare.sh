@@ -105,7 +105,7 @@ Host $CLOUDFLARE_HOSTNAME
 
 EOF
   # Timestamp the gist file to indicate when it was last updated.
-  "$CLOUDFLARE_TIMESTAMP" -s 0 -- "$CLOUDFLARE_GIST_FILE"
+  [ -n "$CLOUDFLARE_GIST_FILE" ] && "$CLOUDFLARE_TIMESTAMP" -s 0 -- "$CLOUDFLARE_GIST_FILE"
 }
 
 
@@ -113,7 +113,7 @@ tunnel_wait() {
   debug "Wait for cloudflare tunnel to start..."
   url=$(when_infile "$CLOUDFLARE_LOG" 'E' \
           'https://.*\.trycloudflare.com' - | grep -oE 'https://.*\.trycloudflare.com')
-  [ -n "$CLOUDFLARE_GIST_FILE" ] && tunnel_info "$url"
+  tunnel_info "$url"
 }
 
 
