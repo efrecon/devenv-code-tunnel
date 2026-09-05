@@ -105,7 +105,7 @@ Host $CLOUDFLARE_HOSTNAME
 
 EOF
   # Timestamp the gist file to indicate when it was last updated.
-  [ -n "$CLOUDFLARE_GIST_FILE" ] && "$CLOUDFLARE_TIMESTAMP" -s 0 -- "$CLOUDFLARE_GIST_FILE"
+  [ -n "$CLOUDFLARE_GIST_FILE" ] && "$CLOUDFLARE_TIMESTAMP" -s 0 -- "$CLOUDFLARE_GIST_FILE" || true
 }
 
 

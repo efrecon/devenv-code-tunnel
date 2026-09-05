@@ -136,7 +136,7 @@ tunnel_info() {
 
 EOF
   # Timestamp the gist file to indicate when it was last updated.
-  [ -n "$CODE_GIST_FILE" ] && "$CODE_TIMESTAMP" -s 0 -- "$CODE_GIST_FILE"
+  [ -n "$CODE_GIST_FILE" ] && "$CODE_TIMESTAMP" -s 0 -- "$CODE_GIST_FILE" || true
 }
 
 
