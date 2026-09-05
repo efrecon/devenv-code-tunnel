@@ -1,8 +1,9 @@
 #!/bin/sh
 
 # Shell sanity. Stop on errors, undefined variables and pipeline errors.
-# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
-set -euo pipefail
+set -eu
+# shellcheck disable=SC3040 # now part of POSIX, but not everywhere yet!
+if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 # Absolute location of the script where this script is located.
 CODE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
@@ -134,6 +135,8 @@ tunnel_info() {
     $1
 
 EOF
+  # Timestamp the gist file to indicate when it was last updated.
+  [ -n "$CODE_GIST_FILE" ] && "$CODE_TIMESTAMP" -s 0 -- "$CODE_GIST_FILE" || true
 }
 
 
@@ -189,8 +192,10 @@ CODE_BIN=$(find_inpath code "$CODE_USER_PREFIX" "$CODE_PREFIX")
 CODE_ORCHESTRATION_DIR=${CODE_ROOTDIR}/../orchestration
 CODE_LOGGER=${CODE_ORCHESTRATION_DIR}/logger.sh
 CODE_LWRAP=${CODE_ORCHESTRATION_DIR}/lwrap.sh
+CODE_TIMESTAMP=${CODE_ORCHESTRATION_DIR}/timestamp.sh
 [ -x "$CODE_LOGGER" ] || error "Cannot find logger.sh"
 [ -x "$CODE_LWRAP" ] || error "Cannot find lwrap.sh"
+[ -x "$CODE_TIMESTAMP" ] || error "Cannot find timestamp.sh"
 CODE_LOG=$("$CODE_LWRAP" -L -- "$CODE_BIN")
 
 # configure, login and start the tunnel if the vscode CLI is installed.

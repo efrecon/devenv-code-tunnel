@@ -1,8 +1,9 @@
 #!/bin/sh
 
 # Shell sanity. Stop on errors, undefined variables and pipeline errors.
-# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
-set -euo pipefail
+set -eu
+# shellcheck disable=SC3040 # now part of POSIX, but not everywhere yet!
+if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 # Absolute location of the script where this script is located.
 CLOUDFLARE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
@@ -103,6 +104,8 @@ Host $CLOUDFLARE_HOSTNAME
   User $(id -un)
 
 EOF
+  # Timestamp the gist file to indicate when it was last updated.
+  [ -n "$CLOUDFLARE_GIST_FILE" ] && "$CLOUDFLARE_TIMESTAMP" -s 0 -- "$CLOUDFLARE_GIST_FILE" || true
 }
 
 
@@ -133,8 +136,10 @@ CLOUDFLARE_BIN=$(find_inpath cloudflared "$CLOUDFLARE_USER_PREFIX" "$CLOUDFLARE_
 CLOUDFLARE_ORCHESTRATION_DIR=${CLOUDFLARE_ROOTDIR}/../orchestration
 CLOUDFLARE_LOGGER=${CLOUDFLARE_ORCHESTRATION_DIR}/logger.sh
 CLOUDFLARE_LWRAP=${CLOUDFLARE_ORCHESTRATION_DIR}/lwrap.sh
+CLOUDFLARE_TIMESTAMP=${CLOUDFLARE_ORCHESTRATION_DIR}/timestamp.sh
 [ -x "$CLOUDFLARE_LOGGER" ] || error "Cannot find logger.sh"
 [ -x "$CLOUDFLARE_LWRAP" ] || error "Cannot find lwrap.sh"
+[ -x "$CLOUDFLARE_TIMESTAMP" ] || error "Cannot find timestamp.sh"
 CLOUDFLARE_LOG=$("$CLOUDFLARE_LWRAP" -L -- "$CLOUDFLARE_BIN")
 
 check_command nc || error "nc is not installed. Please install it first."

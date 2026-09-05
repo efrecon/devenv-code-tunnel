@@ -1,8 +1,9 @@
 #!/bin/sh
 
 # Shell sanity. Stop on errors, undefined variables and pipeline errors.
-# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
-set -euo pipefail
+set -eu
+# shellcheck disable=SC3040 # now part of POSIX, but not everywhere yet!
+if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 # Absolute location of the script where this script is located.
 SSHD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )

@@ -1,8 +1,9 @@
 #!/bin/sh
 
 # Shell sanity. Stop on errors, undefined variables and pipeline errors.
-# shellcheck disable=SC3040 # ok, see: https://unix.stackexchange.com/a/654932
-set -euo pipefail
+set -eu
+# shellcheck disable=SC3040 # now part of POSIX, but not everywhere yet!
+if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 # Absolute location of the script where this script is located.
 TUNNEL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
@@ -237,6 +238,9 @@ if [ -n "$TUNNEL_GIST" ]; then
           fi
         fi
       )
+
+      # Timestamp the gist file at regular intervals.
+      spawn "${TUNNEL_ORCHESTRATION_DIR}/timestamp.sh" -- "$TUNNEL_GIST_FILE" >/dev/null
     else
       warn "Failed to clone gist %s" "$TUNNEL_GIST"
     fi
@@ -274,10 +278,11 @@ trap 'tunnel_signal TERM; _tunnel_wait' EXIT
 # might take time as they might require interaction with the user to authorize
 # the device.
 if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
-  "${TUNNEL_ORCHESTRATION_DIR}/notify.sh" \
-    -f "$TUNNEL_GIST_FILE" \
-    -- \
-      "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" &
+  spawn \
+    "${TUNNEL_ORCHESTRATION_DIR}/notify.sh" \
+      -f "$TUNNEL_GIST_FILE" \
+      -- \
+        "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" >/dev/null
 fi
 
 while true; do
