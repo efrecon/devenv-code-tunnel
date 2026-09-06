@@ -331,7 +331,7 @@ if [ "$DEVENV_ORCHESTRATOR" = "podman" ]; then
   if [ "${DEVENV_RUNTIME:-}" = "krun" ]; then
     # When using krun, it is not possible to use the QUIC protocol (on top of
     # UDP) for cloudflare tunnels. Force running on top of HTTP/2.
-    set -- --runtime=krun --user 0:0 -e TUNNEL_CLOUDFLARE_PROTOCOL=http2 "$@"
+    set -- --runtime=krun --user 0:0 -e TUNNEL_CLOUDFLARE_PROTOCOL=http2 -e TUNNEL_DOCKERD_OPTIONS="--firewall-backend=nftables --ip-forward=false" "$@"
   elif [ -n "$DEVENV_RUNTIME" ]; then
     set -- --runtime="$DEVENV_RUNTIME" --privileged "$@"
   else
