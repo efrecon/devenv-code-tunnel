@@ -35,6 +35,9 @@ bin_name
 # Where the docker daemon listens, defaults to the standard docker socket.
 : "${DOCKERD_SOCK:="/var/run/docker.sock"}"
 
+# Additional options to pass to the docker daemon.
+: "${DOCKERD_OPTIONS:=${TUNNEL_DOCKERD_OPTIONS:-""}}"
+
 # Environment file to load for reading defaults from.
 : "${DOCKERD_DEFAULTS:="${DOCKERD_ROOTDIR}/../${CODER_BIN}.env"}"
 
@@ -63,7 +66,7 @@ log_init DOCKERD
 
 
 dockerd_start() {
-  as_root dockerd 2>&1 | tee -a "$DOCKERD_LOGFILE" > /dev/null &
+  as_root dockerd $DOCKERD_OPTIONS 2>&1 | tee -a "$DOCKERD_LOGFILE" > /dev/null &
 }
 
 dockerd_wait() {
@@ -96,10 +99,9 @@ DOCKERD_LOGGER=${DOCKERD_ORCHESTRATION_DIR}/logger.sh
 [ -x "$DOCKERD_LOGGER" ] || error "Cannot find logger.sh"
 
 dockerd_start
-dockerd_wait
 if [ -z "$DOCKERD_REEXPOSE" ] || printf %s\\n "$DOCKERD_REEXPOSE" | grep -qF 'dockerd'; then
-  verbose "Docker daemon responding on socket %s, forwarding logs from %s" "$DOCKERD_SOCK" "$DOCKERD_LOGFILE"
+  verbose "Forwarding dockerd logs from %s" "$DOCKERD_LOGFILE"
   "$DOCKERD_LOGGER" -s "dockerd" -- "$DOCKERD_LOGFILE" &
-else
-  verbose "Docker daemon responding on socket %s, logs at %s" "$DOCKERD_SOCK" "$DOCKERD_LOGFILE"
 fi
+dockerd_wait
+verbose "Docker daemon responding on socket %s, raw logs at %s" "$DOCKERD_SOCK" "$DOCKERD_LOGFILE"
