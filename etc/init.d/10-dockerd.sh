@@ -66,6 +66,7 @@ log_init DOCKERD
 
 
 dockerd_start() {
+  # shellcheck disable=SC2086 # We want word splitting for $DOCKERD_OPTIONS
   as_root dockerd $DOCKERD_OPTIONS 2>&1 | tee -a "$DOCKERD_LOGFILE" > /dev/null &
 }
 
@@ -97,6 +98,16 @@ DOCKERD_LOGFILE="${DOCKERD_PREFIX}/log/dockerd.log"
 DOCKERD_ORCHESTRATION_DIR=${DOCKERD_ROOTDIR}/../../share/orchestration
 DOCKERD_LOGGER=${DOCKERD_ORCHESTRATION_DIR}/logger.sh
 [ -x "$DOCKERD_LOGGER" ] || error "Cannot find logger.sh"
+
+# Force storage driver when running from within podman.
+if is_podman_container; then
+  if [ -n "$DOCKERD_OPTIONS" ]; then
+    DOCKERD_OPTIONS="$DOCKERD_OPTIONS --storage-driver=vfs"
+  else
+    DOCKERD_OPTIONS="--storage-driver=vfs"
+  fi
+  verbose "Running inside a Podman container, forcing storage driver to vfs."
+fi
 
 dockerd_start
 if [ -z "$DOCKERD_REEXPOSE" ] || printf %s\\n "$DOCKERD_REEXPOSE" | grep -qF 'dockerd'; then

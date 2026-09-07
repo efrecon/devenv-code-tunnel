@@ -3,6 +3,19 @@
 # Note: This is a library, not a standalone script. It is meant to be sourced
 # from other scripts.
 
+is_podman_container() {
+  if [ -f '/run/.containerenv' ]; then
+    trace "/run/.containerenv detected. Running inside a Podman container."
+    return 0
+  fi
+  # shellcheck disable=SC2154 # 'container' may be set in the environment
+  if [ "$container" = "podman" ]; then
+    trace "container variable set to %s. Running inside a Podman container." "$container"
+    return 0
+  fi
+  return 1
+}
+
 is_privileged() {
   # Get the capability bounding set
   cap_bnd=$(grep '^CapBnd:' /proc/$$/status | awk '{print $2}')
