@@ -20,7 +20,7 @@ jobs:
           repository=$(printf %s\\n "${{ github.repository }}" | cut -d'/' -f2)
           printf 'repository=%s\n' "$repository" >> $GITHUB_OUTPUT
 
-  build:
+  all-in-one:
     uses: ./.github/workflows/_build.yml
     needs: repository
     permissions:
