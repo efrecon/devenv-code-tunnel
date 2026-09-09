@@ -131,7 +131,7 @@ notify_inotify() {
   else
     verbose "Watching file path %s with inotifywait" "$NOTIFY_PATH"
     NOTIFY_DIR="$(dirname "$NOTIFY_PATH")"
-    inotifywait -qm --format '%w%f' -e close_write "$NOTIFY_DIR" |
+    inotifywait -qm --format '%w%f' -e close_write,moved_to "$NOTIFY_DIR" |
     while IFS="$new_line" read -r p; do
       if [ "$p" = "$NOTIFY_PATH" ]; then
         notify_trigger "$p" "$@"
