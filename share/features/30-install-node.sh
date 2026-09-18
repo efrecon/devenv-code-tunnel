@@ -295,6 +295,8 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   if [ -z "$latest" ]; then
     error "No latest version of Node.js matching %s found" "$INSTALL_NODE_VERSION"
   fi
+  _node_major=${latest#v}
+  _node_major=${_node_major%%.*}
   debug "Installing Node %s" "$latest"
 
   if [ "$INSTALL_NODE_SOURCE" = "auto" ]; then
@@ -303,9 +305,15 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
       debug "Installing Node.js %s for %s %s" "$latest" "$(get_os)" "$arch"
       if is_musl_os; then
-        # musl builds are only available for x64
         if [ "$arch" = "x64" ]; then
           INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.gz"
+        elif [ "$arch" = "arm64" ]; then
+          if [ "$_node_major" -ge 22 ]; then
+            INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.gz"
+          else
+            debug "No binaries available for %s and musl, will build from source" "$arch"
+            INSTALL_TGZURL=
+          fi
         else
           debug "No binaries available for %s and musl, will build from source" "$arch"
           INSTALL_TGZURL=
