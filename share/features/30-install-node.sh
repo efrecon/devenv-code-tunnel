@@ -295,7 +295,8 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
   if [ -z "$latest" ]; then
     error "No latest version of Node.js matching %s found" "$INSTALL_NODE_VERSION"
   fi
-  _node_major=${latest%%.*}
+  _node_major=${latest#v}
+  _node_major=${_node_major%%.*}
   debug "Installing Node %s" "$latest"
 
   if [ "$INSTALL_NODE_SOURCE" = "auto" ]; then
