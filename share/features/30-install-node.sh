@@ -305,16 +305,18 @@ if ! command_present "node" && [ -n "$INSTALL_NODE_VERSION" ]; then
     if [ "$INSTALL_NODE_DOMAIN" = "unofficial-builds.nodejs.org" ]; then
       debug "Installing Node.js %s for %s %s" "$latest" "$(get_os)" "$arch"
       if is_musl_os; then
-        if [ "$_node_major" -ge 22 ]; then
+        if [ "$arch" = "x64" ]; then
           INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.gz"
-        else
-          # musl builds are only available for x64
-          if [ "$arch" = "x64" ]; then
+        elif [ "$arch" = "arm64" ]; then
+          if [ "$_node_major" -ge 22 ]; then
             INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-musl.tar.gz"
           else
             debug "No binaries available for %s and musl, will build from source" "$arch"
             INSTALL_TGZURL=
           fi
+        else
+          debug "No binaries available for %s and musl, will build from source" "$arch"
+          INSTALL_TGZURL=
         fi
       else
         INSTALL_TGZURL="${INSTALL_ROOTURL}/${latest}/node-${latest}-$(get_os)-${arch}-glibc.tar.gz"
