@@ -105,7 +105,7 @@ EOF
 tunnel_wait() {
   debug "Wait for cloudflare tunnel to start..."
   addr=$(when_infile "$TAILCAT_LOG" 'E' \
-          'tcp[0-9A-Za-z_-]{151}' - | grep -oE 'tcp[0-9A-Za-z_-]{151}')
+          'tc[A-Za-z0-9_-]{30,250}' - | grep -oE 'tc[A-Za-z0-9_-]{30,250}')
   tunnel_info "$addr"
 }
 
