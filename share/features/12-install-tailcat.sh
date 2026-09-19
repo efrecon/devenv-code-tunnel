@@ -33,7 +33,7 @@ done
 INSTALL_TAILCAT_VERSION=${INSTALL_TAILCAT_VERSION#v}; # Remove leading v, if any
 
 # URL to download the code CLI from.
-: "${INSTALL_TAILCAT_URL:="https://github.com/tailscale/tailcat/releases/download/v${INSTALL_TAILCAT_VERSION}/tailcat_${INSTALL_TAILCAT_VERSION}_$(get_os)_$(get_golang_arch).tar.gz"}"
+: "${INSTALL_TAILCAT_URL:="https://github.com/tailscale/tailcat/releases/download/v${INSTALL_TAILCAT_VERSION}/tailcat_${INSTALL_TAILCAT_VERSION}_$(get_os)_$(get_golang_arch armv7l armv7).tar.gz"}"
 : "${INSTALL_TAILCAT_SUMS:="https://github.com/tailscale/tailcat/releases/download/v${INSTALL_TAILCAT_VERSION}/checksums.txt"}"
 
 
