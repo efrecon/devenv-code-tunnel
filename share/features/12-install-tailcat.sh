@@ -53,9 +53,9 @@ EOF
 [ "$INSTALL_TARGET" = "user" ] \
   && BINDIR="${INSTALL_USER_PREFIX}/bin" \
   || BINDIR="${INSTALL_PREFIX}/bin"
-tailcat=$(internet_tgz_installer \
+tailcat=$(internet_bintgz_installer \
                 "$INSTALL_TAILCAT_URL" \
-                "$INSTALL_PREFIX" \
+                "$BINDIR" \
                 "tailcat" \
                 "$INSTALL_TAILCAT_SUMS")
 
