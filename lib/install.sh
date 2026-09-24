@@ -299,3 +299,79 @@ internet_deb_installer() {
   # Clean up and return the path to the target binary
   rm -f "$_tmp_deb"
 }
+
+extract_cert() {
+  [ -z "$1" ] && error "extract_cert: no URL given"
+  if [ -z "${2:-}" ]; then
+    _dump_dir=$(mktemp -d)
+  else
+    _dump_dir=$2
+  fi
+  # $3 is the index of the certificate to extract. Empty->extract all certificates.
+
+  if [ ! -d "$_dump_dir" ]; then
+    verbose "Creating dump directory at %s" "$_dump_dir"
+    mkdir -p "$_dump_dir"
+  fi
+
+  # Extract scheme (e.g., https), host:port, etc.
+  _scheme=$(printf '%s' "$1" | sed -n 's|^\([a-zA-Z][a-zA-Z0-9+.-]*\)://.*|\1|p')
+  _host_port=$(printf '%s' "$1" | sed 's|^[a-zA-Z][a-zA-Z0-9+.-]*://||; s|/.*||')
+  _host=$(printf '%s' "$_host_port" | sed 's|:.*||')
+  _port=$(printf '%s' "$_host_port" | sed -n 's|.*:\([0-9]*\)$|\1|p')
+  if [ -z "$_port" ]; then
+    case "$_scheme" in
+      https) _port=443 ;;
+      http)  _port=80 ;;
+      *)     _port=443 ;; # Default fallback
+    esac
+  fi
+
+  # Fetch certificates using OpenSSL
+  _output=$(echo | openssl s_client -connect "${_host}:${_port}" -showcerts 2>/dev/null)
+
+  if [ -z "$_output" ]; then
+    warn "Failed to connect or retrieve output from %s:%s" "$_host" "$_port"
+    return 1
+  fi
+
+  # Parse certificates
+  _index=0
+  _count=0
+  _filename=""
+
+  printf "%s\n" "$_output" |
+    awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' |
+    while read -r line; do
+      if [ "$line" = "-----BEGIN CERTIFICATE-----" ]; then
+        # Determine output filename based on role
+        if [ "$_index" = 0 ]; then
+          _filename="${_dump_dir}/cert_${_index}_leaf.crt"
+        else
+          _filename="${_dump_dir}/cert_${_index}_intermediate.crt"
+        fi
+
+        # Write to file if extracting all or if matching the targeted index
+        if [ -z "${3:-}" ] || [ "$_index" = "${3:-}" ]; then
+          printf "%s\n" "$line" > "$_filename"
+        fi
+      elif [ "$line" = "-----END CERTIFICATE-----" ]; then
+        if [ -z "${3:-}" ] || [ "$_index" = "${3:-}" ]; then
+          printf "%s\n" "$line" >> "$_filename"
+          _subject=$(openssl x509 -in "$_filename" -noout -subject 2>/dev/null | sed 's/subject= *//')
+          verbose "Saved subject: %s at Index %d to %s" "$_subject" "$_index" "$_filename"
+          printf %s\\n "$_filename";  # Print the filename of the saved certificate
+          _count=$((_count + 1))
+        fi
+        _index=$((_index + 1))
+      else
+        if [ -n "$_filename" ]; then
+          if [ -z "${3:-}" ] || [ "$_index" = "${3:-}" ]; then
+            printf "%s\n" "$line" >> "$_filename"
+          fi
+        fi
+      fi
+    done
+
+  unset _scheme _host_port _host _port _index _count _filename _subject
+}
