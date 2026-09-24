@@ -25,6 +25,7 @@ bin_name
 
 # All following vars have defaults here, but will be set and inherited from
 # the calling tunnel.sh script.
+: "${XDG_CONFIG_HOME:="${HOME}/.config"}"
 : "${TAILCAT_VERBOSE:=${TUNNEL_VERBOSE:-0}}"
 : "${TAILCAT_LOG:=${TUNNEL_LOG:-2}}"
 : "${TAILCAT_HOSTNAME:="${TUNNEL_NAME:-""}"}"
@@ -34,6 +35,8 @@ bin_name
 : "${TAILCAT_GITHUB_USER:="${TUNNEL_GITHUB_USER:-""}"}"
 : "${TAILCAT_REEXPOSE:="${TUNNEL_REEXPOSE:-"tailcat"}"}"
 : "${TAILCAT_GIST_FILE:="${TUNNEL_GIST_FILE:-""}"}"
+: "${TAILCAT_CONFIG_DIR:="${XDG_CONFIG_HOME}/tailcat"}"
+: "${TAILCAT_KEYS_DIR:="${TAILCAT_CONFIG_DIR}/keys"}"
 # Environment file to load for reading defaults from.
 : "${TAILCAT_DEFAULTS:="${TAILCAT_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
 
@@ -63,15 +66,23 @@ tunnel_pubkey() {
 }
 
 
-tunnel_start() {
-  # Remove all TUNNEL_ variables from the environment, since cloudflared
-  # respects some of them and we force settings through the command line. Pass
-  # all remaining arguments blindly to the command.
-  unset_varset TUNNEL
+tunnel_configure() {
+  if [ ! -f "${TAILCAT_KEYS_DIR}/${TUNNEL_NAME}.private.json" ]; then
+    verbose "Generating key for tunnel $TUNNEL_NAME"
+    "$TAILCAT_BIN" genkey --key "$TUNNEL_NAME" > /dev/null
+    if [ ! -f "${TAILCAT_KEYS_DIR}/${TUNNEL_NAME}.private.json" ]; then
+      error "Failed to generate key for tunnel $TUNNEL_NAME"
+    fi
+  else
+    trace "Key for tunnel $TUNNEL_NAME already configured"
+  fi
+}
 
+
+tunnel_start() {
   spawn -n tailcat -- \
     "$TAILCAT_LWRAP" -- \
-      "$TAILCAT_BIN" serve "$TAILCAT_SSH" "$@" > /dev/null
+      "$TAILCAT_BIN" --key "$TUNNEL_NAME" serve "$TAILCAT_SSH" "$@" > /dev/null
 }
 
 
@@ -139,6 +150,7 @@ check_command nc || error "nc is not installed. Please install it first."
 sshd_wait
 debug "TAILCAT_REEXPOSE is set to %s" "$TAILCAT_REEXPOSE"
 
+tunnel_configure
 debug "Starting tailcat tunnel using %s, logs at %s" "$TAILCAT_BIN" "$TAILCAT_LOG"
 if [ -z "$TAILCAT_REEXPOSE" ] || printf %s\\n "$TAILCAT_REEXPOSE" | grep -qF 'tailcat'; then
   debug "Forwarding logs from %s" "$TAILCAT_LOG"
