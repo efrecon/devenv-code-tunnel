@@ -97,6 +97,8 @@ tailcat tunnel running, run the following command to connect securely:
 
 tailcat tunnel running, run the following command to connect without verification (DANGER!):
     ssh -o ProxyCommand='tailcat $1 $TAILCAT_SSH' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=accept-new $(id -un)@$TAILCAT_HOSTNAME
+  or
+    tailcat ssh -p $TAILCAT_SSH $(id -un)@$1
 
 tailcat DANGEROUS configuration snippet for \$HOME/.ssh/config:
 
