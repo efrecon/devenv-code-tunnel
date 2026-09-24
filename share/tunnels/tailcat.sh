@@ -67,14 +67,14 @@ tunnel_pubkey() {
 
 
 tunnel_configure() {
-  if [ ! -f "${TAILCAT_KEYS_DIR}/${TUNNEL_NAME}.private.json" ]; then
-    verbose "Generating key for tunnel $TUNNEL_NAME"
-    "$TAILCAT_BIN" genkey --key "$TUNNEL_NAME" > /dev/null
-    if [ ! -f "${TAILCAT_KEYS_DIR}/${TUNNEL_NAME}.private.json" ]; then
-      error "Failed to generate key for tunnel $TUNNEL_NAME"
+  if [ ! -f "${TAILCAT_KEYS_DIR}/${TAILCAT_HOSTNAME}.private.json" ]; then
+    verbose "Generating key for tunnel $TAILCAT_HOSTNAME"
+    "$TAILCAT_BIN" genkey --key "$TAILCAT_HOSTNAME" > /dev/null
+    if [ ! -f "${TAILCAT_KEYS_DIR}/${TAILCAT_HOSTNAME}.private.json" ]; then
+      error "Failed to generate key for tunnel $TAILCAT_HOSTNAME"
     fi
   else
-    trace "Key for tunnel $TUNNEL_NAME already configured"
+    trace "Key for tunnel $TAILCAT_HOSTNAME already configured"
   fi
 }
 
@@ -82,7 +82,7 @@ tunnel_configure() {
 tunnel_start() {
   spawn -n tailcat -- \
     "$TAILCAT_LWRAP" -- \
-      "$TAILCAT_BIN" --key "$TUNNEL_NAME" serve "$TAILCAT_SSH" "$@" > /dev/null
+      "$TAILCAT_BIN" --key "$TAILCAT_HOSTNAME" serve "$TAILCAT_SSH" "$@" > /dev/null
 }
 
 
