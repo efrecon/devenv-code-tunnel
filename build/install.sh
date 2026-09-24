@@ -125,6 +125,7 @@ less
 make
 logrotate
 inotifywait inotify-tools
+openssl
 EOF
 
 if is_os_family alpine; then
@@ -159,7 +160,7 @@ export_varset "INSTALL"
 export CODER_INTERACTIVE
 
 # Find out where the features directory is.
-for d in "${INSTALL_ROOTDIR}/share/features" "${INSTALL_PREFIX}/share/features"; do
+for d in "${INSTALL_ROOTDIR}/../share/features" "${INSTALL_PREFIX}/share/features"; do
   if [ -d "$d" ]; then
     FEATURES_DIR=$d
     break
