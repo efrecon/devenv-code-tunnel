@@ -69,7 +69,7 @@ tunnel_pubkey() {
 tunnel_configure() {
   if [ ! -f "${TAILCAT_KEYS_DIR}/${TAILCAT_HOSTNAME}.private.json" ]; then
     verbose "Generating key for tunnel $TAILCAT_HOSTNAME"
-    "$TAILCAT_BIN" genkey --key "$TAILCAT_HOSTNAME" > /dev/null
+    "$TAILCAT_BIN" genkey --fixed-region --key "$TAILCAT_HOSTNAME" > /dev/null
     if [ ! -f "${TAILCAT_KEYS_DIR}/${TAILCAT_HOSTNAME}.private.json" ]; then
       error "Failed to generate key for tunnel $TAILCAT_HOSTNAME"
     fi
