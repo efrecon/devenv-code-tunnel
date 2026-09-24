@@ -27,7 +27,8 @@ done
 : "${INSTALL_USER:="coder"}"
 
 : "${INSTALL_DOCKER_URL:="https://get.docker.com"}"
-: "${INSTALL_DOCKER_SHA512:="3aade142e1407340769de1b463deb632650d6156984ded6164d33f284ecd202ef5d9ed7562061a1eb0d038ec7305798ae17c61de53bb94812545525ca694314d"}"
+: "${INSTALL_DOCKER_RAW:="https://github.com/docker/docker-install/raw/refs/heads/master/install.sh"}"
+: "${INSTALL_DOCKER_SHA512:=""}"
 
 log_init INSTALL
 
@@ -37,6 +38,32 @@ if ! command_present "docker"; then
   if is_os_family alpine; then
     install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
   else
+    if [ -z "$INSTALL_DOCKER_SHA512" ]; then
+      _cert=$(extract_cert "$INSTALL_DOCKER_URL" "" 0 || true)
+      if [ -n "$_cert" ]; then
+        CN=$(openssl x509 -in "$_cert" -noout -subject -nameopt multiline | awk -F'= ' '/commonName/ {print $2}')
+        rm -f "$_cert"
+        if printf '%s\n' "$CN" | grep -qE 'docker.com$'; then
+          _raw=$(mktemp) && download "$INSTALL_DOCKER_RAW" "$_raw"
+          _official=$(mktemp) && download "$INSTALL_DOCKER_URL" "$_official"
+          trace "Comparing downloaded install script with the raw version %s %s" "$_raw" "$_official"
+          # Count positional header lines
+          diff_count=$(diff "$_raw" "$_official" | grep -c '^[0-9]' || true)
+          # 1 line is ok, the SHA is inserted at CI time.
+          if [ "$diff_count" -gt 1 ]; then
+            error "The downloaded install script differs from the raw version by $diff_count lines"
+          else
+            verbose "The downloaded install script matches the raw version"
+          fi
+          rm -f "$_raw" "$_official"
+          verbose "Certificate common name matches docker.com: $CN"
+        else
+          error "Certificate common name does not match docker.com: $CN"
+        fi
+      else
+        error "Failed to extract certificate from $INSTALL_DOCKER_URL"
+      fi
+    fi
     as_root internet_script_installer "$INSTALL_DOCKER_URL" docker "$INSTALL_DOCKER_SHA512"
   fi
 fi
