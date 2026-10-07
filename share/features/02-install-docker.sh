@@ -38,33 +38,40 @@ if ! command_present "docker"; then
   if is_os_family alpine; then
     install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
   else
-    if [ -z "$INSTALL_DOCKER_SHA512" ]; then
-      _cert=$(extract_cert "$INSTALL_DOCKER_URL" "" 0 || true)
-      if [ -n "$_cert" ]; then
-        CN=$(openssl x509 -in "$_cert" -noout -subject -nameopt multiline | awk -F'= ' '/commonName/ {print $2}')
-        rm -f "$_cert"
-        if printf '%s\n' "$CN" | grep -qE 'docker.com$'; then
-          _raw=$(mktemp) && download "$INSTALL_DOCKER_RAW" "$_raw"
-          _official=$(mktemp) && download "$INSTALL_DOCKER_URL" "$_official"
-          trace "Comparing downloaded install script with the raw version %s %s" "$_raw" "$_official"
-          # Count positional header lines
-          diff_count=$(diff "$_raw" "$_official" | grep -c '^[0-9]' || true)
-          # 1 line is ok, the SHA is inserted at CI time.
-          if [ "$diff_count" -gt 1 ]; then
-            error "The downloaded install script differs from the raw version by $diff_count lines"
-          else
-            verbose "The downloaded install script matches the raw version"
-          fi
-          rm -f "$_raw" "$_official"
-          verbose "Certificate common name matches docker.com: $CN"
-        else
-          error "Certificate common name does not match docker.com: $CN"
-        fi
-      else
-        error "Failed to extract certificate from $INSTALL_DOCKER_URL"
+    _official=$(mktemp)
+    download "$INSTALL_DOCKER_URL" "$_official"
+
+    if [ -n "$INSTALL_DOCKER_SHA512" ]; then
+      checksum "$_official" "$INSTALL_DOCKER_SHA512" "docker install script"
+    else
+      # Extract the commit SHA published inside the official script
+      commit_sha=$(sed -n 's/^SCRIPT_COMMIT_SHA="*\([a-f0-9]\{40\}\)"*/\1/p' "$_official")
+
+      if [ -z "$commit_sha" ]; then
+        rm -f "$_official"
+        error "Could not extract SCRIPT_COMMIT_SHA from $INSTALL_DOCKER_URL"
       fi
+
+      # Download the exact commit from GitHub for cross-verification
+      _raw=$(mktemp)
+      raw_url="https://raw.githubusercontent.com/docker/docker-install/${commit_sha}/install.sh"
+      download "$raw_url" "$_raw"
+
+      # Ensure the ONLY difference is the SCRIPT_COMMIT_SHA assignment line
+      unexpected_diff=$(diff -u "$_raw" "$_official" | grep -E '^[+-]' | grep -vE '^(\+\+\+|---|[+-]SCRIPT_COMMIT_SHA=)' || true)
+      rm -f "$_raw"
+
+      if [ -n "$unexpected_diff" ]; then
+        rm -f "$_official"
+        error "The downloaded install script contains unexpected modifications compared to GitHub commit $commit_sha"
+      fi
+
+      verbose "Script successfully cross-verified against GitHub commit $commit_sha"
     fi
-    as_root internet_script_installer "$INSTALL_DOCKER_URL" docker "$INSTALL_DOCKER_SHA512"
+
+    # Execute the already-verified local file (avoids TOCTOU re-download)
+    as_root sh "$_official"
+    rm -f "$_official"
   fi
 fi
 
