@@ -11,7 +11,7 @@ SSHD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" &
 # Hurry up and find the libraries
 for lib in log common delegate system; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${SSHD_ROOTDIR}/$d" ]; then
+    if [ -d "${SSHD_ROOTDIR}/$d" ] && [ -f "${SSHD_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${SSHD_ROOTDIR}/$d/${lib}.sh"
       break

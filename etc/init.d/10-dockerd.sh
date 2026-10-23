@@ -9,7 +9,7 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 DOCKERD_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
 for lib in log common system docker; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${DOCKERD_ROOTDIR}/$d" ]; then
+    if [ -d "${DOCKERD_ROOTDIR}/$d" ] && [ -f "${DOCKERD_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${DOCKERD_ROOTDIR}/$d/${lib}.sh"
       break

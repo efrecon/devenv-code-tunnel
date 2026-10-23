@@ -11,7 +11,7 @@ TUNNEL_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")"
 # Hurry up and find the libraries
 for lib in log common system delegate install; do
   for d in ../lib lib; do
-    if [ -d "${TUNNEL_ROOTDIR}/$d" ]; then
+    if [ -d "${TUNNEL_ROOTDIR}/$d" ] && [ -f "${TUNNEL_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${TUNNEL_ROOTDIR}/$d/${lib}.sh"
       break

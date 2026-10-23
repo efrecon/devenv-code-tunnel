@@ -11,7 +11,7 @@ LOGROTATE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")
 # Hurry up and find the libraries
 for lib in log common system; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${LOGROTATE_ROOTDIR}/$d" ]; then
+    if [ -d "${LOGROTATE_ROOTDIR}/$d" ] && [ -f "${LOGROTATE_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${LOGROTATE_ROOTDIR}/$d/${lib}.sh"
       break

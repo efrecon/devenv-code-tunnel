@@ -11,7 +11,7 @@ GIST_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" &
 # Hurry up and find the libraries
 for lib in log common system; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${GIST_ROOTDIR}/$d" ]; then
+    if [ -d "${GIST_ROOTDIR}/$d" ] && [ -f "${GIST_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${GIST_ROOTDIR}/$d/${lib}.sh"
       break

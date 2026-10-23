@@ -11,7 +11,7 @@ LWRAP_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" 
 # Hurry up and find the libraries
 for lib in log common; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${LWRAP_ROOTDIR}/$d" ]; then
+    if [ -d "${LWRAP_ROOTDIR}/$d" ] && [ -f "${LWRAP_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${LWRAP_ROOTDIR}/$d/${lib}.sh"
       break

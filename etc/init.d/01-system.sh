@@ -11,7 +11,7 @@ SYSTEM_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")"
 # Hurry up and find the libraries
 for lib in log common system; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${SYSTEM_ROOTDIR}/$d" ]; then
+    if [ -d "${SYSTEM_ROOTDIR}/$d" ] && [ -f "${SYSTEM_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${SYSTEM_ROOTDIR}/$d/${lib}.sh"
       break

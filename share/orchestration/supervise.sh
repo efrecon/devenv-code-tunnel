@@ -11,7 +11,7 @@ SUPERVISE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")
 # Hurry up and find the libraries
 for lib in log common system delegate; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${SUPERVISE_ROOTDIR}/$d" ]; then
+    if [ -d "${SUPERVISE_ROOTDIR}/$d" ] && [ -f "${SUPERVISE_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${SUPERVISE_ROOTDIR}/$d/${lib}.sh"
       break

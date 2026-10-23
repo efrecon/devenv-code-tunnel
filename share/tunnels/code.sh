@@ -11,7 +11,7 @@ CODE_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" &
 # Hurry up and find the libraries
 for lib in log common wait system delegate; do
   for d in ../../lib ../lib lib; do
-    if [ -d "${CODE_ROOTDIR}/$d" ]; then
+    if [ -d "${CODE_ROOTDIR}/$d" ] && [ -f "${CODE_ROOTDIR}/$d/${lib}.sh" ]; then
       # shellcheck disable=SC1090
       . "${CODE_ROOTDIR}/$d/${lib}.sh"
       break
