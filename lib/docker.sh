@@ -9,7 +9,7 @@ is_podman_container() {
     return 0
   fi
   # shellcheck disable=SC2154 # 'container' may be set in the environment
-  if [ "$container" = "podman" ]; then
+  if [ "${container:-""}" = "podman" ]; then
     trace "container variable set to %s. Running inside a Podman container." "$container"
     return 0
   fi
