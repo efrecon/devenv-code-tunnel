@@ -5,7 +5,7 @@ set -eu
 # shellcheck disable=SC3040 # POSIX now, but not in all shells yet
 if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
-# Container orchestrator to use. Default is to pick first of podman or docker.
+# Container orchestrator to use. Default is to pick first of msb, podman or docker.
 : "${DEVENV_ORCHESTRATOR:=""}"
 
 # Path to private SSH key to use for authentication, will be passed to
@@ -61,7 +61,7 @@ Options:
   -I <image>  Docker image to use. Default to latest full image.
   -n          Dry-run: just print the command that would be run, do not run it.
   -N <name>   Name of the container to use. Default based on volume or directory name mounted.
-  -o <name>   Container orchestrator to use. Default picks first of podman or docker.
+  -o <name>   Container orchestrator to use. Default picks first of msb, podman or docker.
   -r <name>   Container runtime to use, default is to prefer krun on podman, when possible.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
   -v          Increase verbosity level. Can be used multiple times.
@@ -168,18 +168,24 @@ runif() {
 # Pick container orchestrator. Default to podman, then docker. If neither is
 # found, exit with error.
 if [ -z "$DEVENV_ORCHESTRATOR" ]; then
-  if command -v podman >/dev/null 2>&1; then
+  if command -v msb >/dev/null 2>&1; then
+    DEVENV_ORCHESTRATOR=msb
+  elif command -v podman >/dev/null 2>&1; then
     DEVENV_ORCHESTRATOR=podman
   elif command -v docker >/dev/null 2>&1; then
     DEVENV_ORCHESTRATOR=docker
   else
-    error "No container orchestrator found. Please install podman or docker."
+    error "No orchestrator found. Please install msb, podman or docker."
   fi
 else
   if ! command -v "$DEVENV_ORCHESTRATOR" >/dev/null 2>&1; then
-    error "Container orchestrator not found: %s" "$DEVENV_ORCHESTRATOR"
+    error "Orchestrator not found: %s" "$DEVENV_ORCHESTRATOR"
   fi
 fi
+
+DEVENV_SANDBOXING=Container
+[ "$DEVENV_ORCHESTRATOR" = "msb" ] && DEVENV_SANDBOXING=Sandbox
+DEVENV_SANDBOXING_LCASE=$(printf "%s" "$DEVENV_SANDBOXING" | tr '[:upper:]' '[:lower:]')
 
 # Pick private SSH key to use. Default to best guess from .ssh directory. This
 # sorts because we prefer ed25519 keys over rsa keys.
@@ -244,7 +250,7 @@ fi
 # name.
 if [ -z "$DEVENV_NAME" ]; then
   DEVENV_NAME=$(basename "$(realpath "$root")")
-  info "Using container name: %s" "$DEVENV_NAME"
+  info "Using %s name: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
 fi
 
 # When no tunnel name is given, construct one based on the hostname and the name
