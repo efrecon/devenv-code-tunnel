@@ -1,8 +1,8 @@
 # Tunneled dev environments in containers or microVMs
 
-This project implements encapsulated development environments that run in containers or microVMs.
-Environments are designed to be accessed through tunnels (e.g., Visual Studio Code)
-and require `docker` or `podman` on the host, with optional support for [`krun`][krun].
+This project implements encapsulated development environments that run in microVMs or containers.
+Environments are designed to be accessed from anywhere through tunnels (e.g., Visual Studio Code).
+They require [`msb`][msb], `docker` or `podman` on the host, with optional support for [`krun`][krun].
 The following one-liner will create a volume called `devenv` and restrict access to the `efrecon` user at GitHub.
 Replace `efrecon` with your GitHub username.
 Feel free to audit the [wrapper script](./devenv.sh).
@@ -12,16 +12,19 @@ curl -fsSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/main/dev
   sh -s - devenv -- -g efrecon
 ```
 
-The environment will automatically establish two tunnels and provide access instructions in the logs:
+The environment will automatically establish 3 tunnels and provide access instructions in the logs:
 
 - One VS Code [tunnel][vscode].
   For access, you will have to follow the link to authorize the tunnel while logged in as `efrecon` at GitHub.
 - One [cloudflare] quick tunnel.
-  Access from [cloudflare] is restricted to the public SSH keys registered under the `efrecon` account.
+  Access through Cloudflare is restricted to the public SSH keys registered under the `efrecon` account.
+- One [tailcat] tunnel.
+  Access through Tailscale is restricted to the public SSH keys registered under the `efrecon` account.
 
-The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully encapsulated microVM with `podman` and `krun`,
+The [`devenv.sh`](./devenv.sh) wrapper script will prefer creating a fully isolated sandbox with `msb`,
+otherwise a fully encapsulated microVM with `podman` and `krun`,
 but will fall back to privileged containers on top of `podman` or `docker`,
-depending on which container solution is installed and accessible.
+depending on which container/sandboxing solution is installed and accessible.
 Containers need to be privileged in order for the user inside the development environment to be able to run `docker`,
 a.k.a. Docker-in-Docker ([DinD]).
 
@@ -30,31 +33,19 @@ The content of this image is controlled through a set of high-level [features](.
 To tune the content of your environment, for example to remove features or change the base image,
 you can control its content through build arguments via the [command-line](#manually-with-docker) or [compose](#with-compose).
 
+[msb]: https://github.com/superradcompany/microsandbox
 [krun]: https://github.com/containers/crun/blob/main/krun.1.md
 [vscode]: https://code.visualstudio.com/docs/remote/tunnels
 [cloudflare]: https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/
+[tailcat]: https://github.com/tailscale/tailcat
 [DinD]: https://www.docker.com/resources/docker-in-docker-containerized-ci-workflows-dockercon-2023/
 
 ## Usage
 
-### With `compose`
-
-Run the following command to get a tunnel with a random name, using the `github` provider:
-
-```bash
-docker compose up
-```
-
-Watch the logs, and authorize the device as per the instructions.
-Once your tunnel has been authorized,
-the logs will print out a URL to access the tunnel from your browser.
-
-You can set the environment variable `TUNNEL_NAME` to choose the name of your tunnel.
-
 ### Using the Standalone Helper
 
 The standalone helper aims at quickly creating isolated development environments based on the images created by this project.
-It uses sensible defaults and, when possible, will prefer microVMs using podman's [krun].
+It uses sensible defaults and, when possible, will prefer microVMs using first `msb`, otherwise podman's [krun].
 Start by making sure [`devenv.sh`](devenv.sh) is accessible from your `$PATH`.
 Run the following to create a development environment with the all-inclusive official [image].
 
@@ -72,7 +63,7 @@ running in the foreground and offering these features:
 - The VS Code tunnel will be called after `<hostname>-devenv`,
   where `<hostname>` will be the actual name of the host that the command is run on.
 - The `-v` option will be passed to the entrypoint of the container, providing for more information in the logs of the container.
-  You can pass any [option](#quick-options-tunnelsh-run-down) recognized by the entrypoint.
+  You can pass any [option](#quick-options-tunnelsh-run-down) recognized by the [entrypoint](#quick-options-tunnelsh-run-down).
 - First RC file found will have been sourced.
   Variable starting with `DEVENV_` control the behaviour of `devenv.sh`.
   Variable starting with `TUNNEL_` are automatically passed to the entrypoint.
@@ -93,6 +84,20 @@ but you can specify any of the options described in the [options](#quick-options
 curl -fsSL https://raw.githubusercontent.com/efrecon/devenv-code-tunnel/main/devenv.sh | \
   sh -s - -h
 ```
+
+### With `compose`
+
+Run the following command to get a tunnel with a random name, using the `github` provider:
+
+```bash
+docker compose up
+```
+
+Watch the logs, and authorize the device as per the instructions.
+Once your tunnel has been authorized,
+the logs will print out a URL to access the tunnel from your browser.
+
+You can set the environment variable `TUNNEL_NAME` to choose the name of your tunnel.
 
 ### Manually with `docker`
 
@@ -171,13 +176,13 @@ The script takes the following options.
 ## Security
 
 All traffic to and from the development environments and the clients is encrypted using HTTPS.
-When running on top of cloudflare tunnels, traffic is end-to-end encrypted using SSH.
+When running on top of [cloudflare] and [tailcat] tunnels, traffic is end-to-end encrypted using SSH.
 
 - Access to the VS Code tunnel is restricted to the GitHub user passed through the `-g` option.
   On the first run, the tunnel will also have to be authorized at GitHub through the URL printed in the logs.
-- Access to the cloudflare tunnel is restricted to the SSH keys that are stored under the GitHub user passed through the `-g` option.
+- Access to the cloudflare and tailcat tunnels is restricted to the SSH keys that are stored under the GitHub user passed through the `-g` option.
 
-When running using `krun`, the development environments are running inside microVMs and are encapsulated from the host.
+When running using `msb`or `krun`, the development environments are running inside microVMs and are encapsulated from the host.
 When running using `podman` or `docker`, it is recommended to use the `--privileged` option.
 This is a security issue, but is mandatory to be able to run a separate Docker daemon inside the containers.
 The daemon will gracefully refuse to start whenever the container is detected to not have enough privileges.
