@@ -182,7 +182,7 @@ When running on top of [cloudflare] and [tailcat] tunnels, traffic is end-to-end
   On the first run, the tunnel will also have to be authorized at GitHub through the URL printed in the logs.
 - Access to the cloudflare and tailcat tunnels is restricted to the SSH keys that are stored under the GitHub user passed through the `-g` option.
 
-When running using `msb`or `krun`, the development environments are running inside microVMs and are encapsulated from the host.
+When running using `msb` or `krun`, the development environments are running inside microVMs and are encapsulated from the host.
 When running using `podman` or `docker`, it is recommended to use the `--privileged` option.
 This is a security issue, but is mandatory to be able to run a separate Docker daemon inside the containers.
 The daemon will gracefully refuse to start whenever the container is detected to not have enough privileges.
