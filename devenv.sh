@@ -69,6 +69,7 @@ Options:
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
   -v          Increase verbosity level. Can be used multiple times.
   -h          Show this help message and exit.
+  --opt <val> Pass additional options to the container runner, blindly.
 
 First argument is the name of a volume or directory to share with the container.
 If no volume or directory is given, the current directory will be used.

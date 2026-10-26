@@ -53,7 +53,7 @@ Run the following to create a development environment with the all-inclusive off
 devenv.sh devenv -v
 ```
 
-This will create a (privileged) container or VM,
+This will create a VM or (privileged) container,
 running in the foreground and offering these features:
 
 - A volume named after the first argument (`devenv`) will be created if necessary
