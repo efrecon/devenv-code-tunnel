@@ -5,7 +5,7 @@ set -eu
 # shellcheck disable=SC3040 # POSIX now, but not in all shells yet
 if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
-# Container orchestrator to use. Default is to pick first of podman or docker.
+# Container orchestrator to use. Default is to pick first of msb, podman or docker.
 : "${DEVENV_ORCHESTRATOR:=""}"
 
 # Path to private SSH key to use for authentication, will be passed to
@@ -47,6 +47,9 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 # Maximum tunnel name size
 : "${DEVENV_TUNNEL_NAME_MAX_SIZE:=20}"
 
+# Additional options to pass to the container runner.
+: "${DEVENV_OPTIONS:=""}"
+
 # Sanitize who we are, handle curl|(ba)sh case.
 DEVENV_BIN=$(basename "$0")
 [ -z "$DEVENV_BIN" ] && DEVENV_BIN="devenv.sh"
@@ -61,11 +64,12 @@ Options:
   -I <image>  Docker image to use. Default to latest full image.
   -n          Dry-run: just print the command that would be run, do not run it.
   -N <name>   Name of the container to use. Default based on volume or directory name mounted.
-  -o <name>   Container orchestrator to use. Default picks first of podman or docker.
+  -o <name>   Container orchestrator to use. Default picks first of msb, podman or docker.
   -r <name>   Container runtime to use, default is to prefer krun on podman, when possible.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
   -v          Increase verbosity level. Can be used multiple times.
   -h          Show this help message and exit.
+  --opt <val> Pass additional options to the container runner, blindly.
 
 First argument is the name of a volume or directory to share with the container.
 If no volume or directory is given, the current directory will be used.
@@ -120,35 +124,66 @@ unset _ifs _rc_path
 
 # Now parse the options. Do it here so we can override the defaults set by the
 # RC file or environment variables.
-while getopts ":di:I:N:o:t:r:nvh" opt; do
-  case "$opt" in
-    d) # Detach mode, run the container in the background.
-      DEVENV_DETACH=1;;
-    i) # Path to private SSH key to pass to container. Default to best guess from .ssh directory
-      DEVENV_IDENTITY="$OPTARG";;
-    I) # Docker image to use. Default to latest full image.
-      DEVENV_IMAGE="$OPTARG";;
-    n) # Dry-run: just print the command that would be run, do not run it.
-      DEVENV_DRY_RUN=1;;
-    N) # Name of the container to use. Default based on volume or directory name mounted.
-      DEVENV_NAME="$OPTARG";;
-    o) # Container orchestrator to use. Default picks first of podman or docker.
-      DEVENV_ORCHESTRATOR="$OPTARG";;
-    r) # Runtime to use for the container. Default to krun, if available.
-      DEVENV_RUNTIME="$OPTARG";;
-    t) # Name of the tunnel to use. Default to hostname-containername.
-      DEVENV_TUNNEL="$OPTARG";;
-    v) # Increase verbosity level. Can be used multiple times.
-      DEVENV_VERBOSE=$((DEVENV_VERBOSE + 1));;
-    h) # Show help
-      usage 0
-      ;;
-    *)  # Unknown option
-      usage 1
-      ;;
-  esac
+while [ $# -gt 0 ]; do
+  OPTIND=1
+  while getopts ":di:I:N:o:t:r:nvh-:" opt; do
+    case "$opt" in
+      d) # Detach mode, run the container in the background.
+        DEVENV_DETACH=1;;
+      i) # Path to private SSH key to pass to container. Default to best guess from .ssh directory
+        DEVENV_IDENTITY="$OPTARG";;
+      I) # Docker image to use. Default to latest full image.
+        DEVENV_IMAGE="$OPTARG";;
+      n) # Dry-run: just print the command that would be run, do not run it.
+        DEVENV_DRY_RUN=1;;
+      N) # Name of the container to use. Default based on volume or directory name mounted.
+        DEVENV_NAME="$OPTARG";;
+      o) # Container orchestrator to use. Default picks first of podman or docker.
+        DEVENV_ORCHESTRATOR="$OPTARG";;
+      r) # Runtime to use for the container. Default to krun, if available.
+        DEVENV_RUNTIME="$OPTARG";;
+      t) # Name of the tunnel to use. Default to hostname-containername.
+        DEVENV_TUNNEL="$OPTARG";;
+      v) # Increase verbosity level. Can be used multiple times.
+        DEVENV_VERBOSE=$((DEVENV_VERBOSE + 1));;
+      h) # Show help
+        usage 0
+        ;;
+      -) # Save any option starting with -- and its value
+        case "$OPTARG" in
+          *=*)
+            _entry="--$OPTARG"
+            ;;
+          *)
+            _entry="--$OPTARG"
+            if [ "$OPTIND" -le "$#" ]; then
+              _val=
+              eval "_val=\${$OPTIND}"
+              case "$_val" in
+                -*)
+                  ;;
+                *)
+                  _entry="$_entry $_val"
+                  shift "$OPTIND"
+                  OPTIND=1
+                  [ -z "$DEVENV_OPTIONS" ] && DEVENV_OPTIONS="$_entry" || DEVENV_OPTIONS="$DEVENV_OPTIONS $_entry"
+                  continue 2
+                  ;;
+              esac
+            fi
+            ;;
+        esac
+        [ -z "$DEVENV_OPTIONS" ] && DEVENV_OPTIONS="$_entry" || DEVENV_OPTIONS="$DEVENV_OPTIONS $_entry"
+        ;;
+      *)  # Unknown option
+        usage 1
+        ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+  break
 done
-shift $((OPTIND - 1))
+unset _entry _val
 
 
 
@@ -165,21 +200,37 @@ runif() {
   fi
 }
 
+# Check if a runtime (container, sandbox) with the name passed as a parameter
+# exists.
+runtime_exists() {
+  if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+    "$DEVENV_ORCHESTRATOR" ps -qa | grep -qxF "$1" >/dev/null 2>&1
+  else
+    [ -n "$("$DEVENV_ORCHESTRATOR" ps -qa --filter "name=^/?${1}\$" 2>/dev/null)" ]
+  fi
+}
+
 # Pick container orchestrator. Default to podman, then docker. If neither is
 # found, exit with error.
 if [ -z "$DEVENV_ORCHESTRATOR" ]; then
-  if command -v podman >/dev/null 2>&1; then
+  if command -v msb >/dev/null 2>&1; then
+    DEVENV_ORCHESTRATOR=msb
+  elif command -v podman >/dev/null 2>&1; then
     DEVENV_ORCHESTRATOR=podman
   elif command -v docker >/dev/null 2>&1; then
     DEVENV_ORCHESTRATOR=docker
   else
-    error "No container orchestrator found. Please install podman or docker."
+    error "No orchestrator found. Please install msb, podman or docker."
   fi
 else
   if ! command -v "$DEVENV_ORCHESTRATOR" >/dev/null 2>&1; then
-    error "Container orchestrator not found: %s" "$DEVENV_ORCHESTRATOR"
+    error "Orchestrator not found: %s" "$DEVENV_ORCHESTRATOR"
   fi
 fi
+
+DEVENV_SANDBOXING=Container
+[ "$DEVENV_ORCHESTRATOR" = "msb" ] && DEVENV_SANDBOXING=Sandbox
+DEVENV_SANDBOXING_LCASE=$(printf "%s" "$DEVENV_SANDBOXING" | tr '[:upper:]' '[:lower:]')
 
 # Pick private SSH key to use. Default to best guess from .ssh directory. This
 # sorts because we prefer ed25519 keys over rsa keys.
@@ -244,7 +295,7 @@ fi
 # name.
 if [ -z "$DEVENV_NAME" ]; then
   DEVENV_NAME=$(basename "$(realpath "$root")")
-  info "Using container name: %s" "$DEVENV_NAME"
+  info "Using %s name: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
 fi
 
 # When no tunnel name is given, construct one based on the hostname and the name
@@ -272,16 +323,16 @@ if ! printf %s\\n "$DEVENV_IMAGE" | grep -qE '^localhost/'; then
     error "Failed to pull image: %s" "$DEVENV_IMAGE"
 fi
 
-# Remove the container if it already exists.
-if "$DEVENV_ORCHESTRATOR" container list -qa --filter name="$DEVENV_NAME" | grep -q .; then
-  info "Container '%s' already exists, removing it." "$DEVENV_NAME"
-  runif "$DEVENV_ORCHESTRATOR" container rm -f "$DEVENV_NAME" || \
-    error "Failed to remove container: %s" "$DEVENV_NAME"
+# Remove the devenv runtime (container, sandbox) if it already exists.
+if runtime_exists "$DEVENV_NAME"; then
+  info "%s '%s' already exists, removing it." "$DEVENV_SANDBOXING" "$DEVENV_NAME"
+  runif "$DEVENV_ORCHESTRATOR" "$DEVENV_SANDBOXING_LCASE" rm -f "$DEVENV_NAME" || \
+    error "Failed to remove %s: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
 fi
 
 # When using a volume, check if it exists. If not, create it.
 if ! [ -d "$root" ]; then
-  if ! "$DEVENV_ORCHESTRATOR" volume ls | grep -Fq "$root"; then
+  if ! "$DEVENV_ORCHESTRATOR" volume ls | grep -qF "$root"; then
     runif "$DEVENV_ORCHESTRATOR" volume create "$root" || \
       error "Failed to create volume: %s" "$root"
   fi
@@ -290,15 +341,25 @@ fi
 # Now start constructing the command to run. make sure what was left of the
 # options/arguments that were passed to this script are passed to the container
 # entrypoint.
-set -- \
-    -v "$root:/home/coder:Z" \
-    "$DEVENV_IMAGE" \
-      "$@"
+if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+  MOUNT_OPTS="uid=1000,gid=1000"
+  # msb requires an explicit -- between the image and the command arguments.
+  set -- \
+      -v "$root:/home/coder:$MOUNT_OPTS" \
+      "$DEVENV_IMAGE" \
+        -- "$@"
+else
+  MOUNT_OPTS="Z"
+  set -- \
+      -v "$root:/home/coder:$MOUNT_OPTS" \
+      "$DEVENV_IMAGE" \
+        "$@"
+fi
 
 if [ -n "$DEVENV_IDENTITY" ]; then
   set -- \
-    -v "$DEVENV_IDENTITY:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY"):Z,ro" \
-    -v "${DEVENV_IDENTITY}.pub:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY").pub:Z,ro" \
+    -v "$DEVENV_IDENTITY:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY"):$MOUNT_OPTS,ro" \
+    -v "${DEVENV_IDENTITY}.pub:/home/coder/.ssh/$(basename "$DEVENV_IDENTITY").pub:$MOUNT_OPTS,ro" \
     "$@"
 fi
 
@@ -311,14 +372,22 @@ set -- \
 # interactive mode, with a terminal attached, and remove the container when it
 # exits.
 if [ "$DEVENV_DETACH" = "1" ]; then
-  info "Starting container '%s' in background" "$DEVENV_NAME"
-  set -- --restart unless-stopped -d "$@"
-else
-  info "Starting self-destructing container '%s' in foreground" "$DEVENV_NAME"
-  if [ -t 0 ]; then
-    set -- -it --rm "$@"
+  info "Starting %s '%s' in background" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
+  if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+    set -- -d "$@"
   else
-    set -- -t --rm "$@"
+    set -- --restart unless-stopped -d "$@"
+  fi
+else
+  info "Starting self-destructing %s '%s' in foreground" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
+  if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+    set -- -t "$@"
+  else
+    if [ -t 0 ]; then
+      set -- -it --rm "$@"
+    else
+      set -- -t --rm "$@"
+    fi
   fi
 fi
 
@@ -337,7 +406,7 @@ if [ "$DEVENV_ORCHESTRATOR" = "podman" ]; then
   else
     set -- --privileged "$@"
   fi
-else
+elif [ "$DEVENV_ORCHESTRATOR" = "docker" ]; then
   if [ -n "$DEVENV_RUNTIME" ]; then
     set -- --runtime="$DEVENV_RUNTIME" --privileged "$@"
   else
@@ -351,7 +420,8 @@ for _env in $(env | grep -E '^TUNNEL_' | cut -d= -f1); do
 done
 
 # Now finalize the command to start the container.
-set -- "$DEVENV_ORCHESTRATOR" container run "$@"
+# shellcheck disable=SC2086 # We want word splitting for DEVENV_OPTIONS
+set -- "$DEVENV_ORCHESTRATOR" "$DEVENV_SANDBOXING_LCASE" run $DEVENV_OPTIONS "$@"
 
 # Replace the current shell with the command to run the container.
 runif exec "$@"
