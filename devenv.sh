@@ -200,6 +200,16 @@ runif() {
   fi
 }
 
+# Check if a runtime (container, sandbox) with the name passed as a parameter
+# exists.
+runtime_exists() {
+  if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+    "$DEVENV_ORCHESTRATOR" ps -qa | grep -qxF "$1" >/dev/null 2>&1
+  else
+    [ -n "$("$DEVENV_ORCHESTRATOR" ps -qa --filter "name=^/?${1}\$" 2>/dev/null)" ]
+  fi
+}
+
 # Pick container orchestrator. Default to podman, then docker. If neither is
 # found, exit with error.
 if [ -z "$DEVENV_ORCHESTRATOR" ]; then
@@ -314,7 +324,7 @@ if ! printf %s\\n "$DEVENV_IMAGE" | grep -qE '^localhost/'; then
 fi
 
 # Remove the devenv runtime (container, sandbox) if it already exists.
-if "$DEVENV_ORCHESTRATOR" ps -qa | grep -qF "$DEVENV_NAME" >/dev/null 2>&1; then
+if runtime_exists "$DEVENV_NAME"; then
   info "%s '%s' already exists, removing it." "$DEVENV_SANDBOXING" "$DEVENV_NAME"
   runif "$DEVENV_ORCHESTRATOR" "$DEVENV_SANDBOXING_LCASE" rm -f "$DEVENV_NAME" || \
     error "Failed to remove %s: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
