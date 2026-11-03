@@ -13,6 +13,15 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 # directory. Set to "-" to not pass any key.
 : "${DEVENV_IDENTITY:=""}"
 
+# GitHub token to pass to the environment, or path to a file containing the
+# token. Default to the token of the gh CLI, when logged in. Set to "-" to not
+# pass any token.
+: "${DEVENV_GITHUB_TOKEN:=""}"
+
+# Directory where to store GitHub tokens before they are mounted into the
+# environments, one sub-directory per environment.
+: "${DEVENV_STATE_DIR:="${XDG_STATE_HOME:-"$HOME/.local/state"}/devenv"}"
+
 # Name of the container to use. When empty, will use the name of the volume or
 # the directory name. Existing container under that name will be removed and
 # (re-)created.
@@ -67,6 +76,7 @@ Options:
   -o <name>   Container orchestrator to use. Default picks first of msb, podman or docker.
   -r <name>   Container runtime to use, default is to prefer krun on podman, when possible.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
+  -T <token>  GitHub token, or path to file with token, to pass to container. Default: from gh CLI, when logged in. For no token, use "-".
   -v          Increase verbosity level. Can be used multiple times.
   -h          Show this help message and exit.
   --opt <val> Pass additional options to the container runner, blindly.
@@ -126,7 +136,7 @@ unset _ifs _rc_path
 # RC file or environment variables.
 while [ $# -gt 0 ]; do
   OPTIND=1
-  while getopts ":di:I:N:o:t:r:nvh-:" opt; do
+  while getopts ":di:I:N:o:t:T:r:nvh-:" opt; do
     case "$opt" in
       d) # Detach mode, run the container in the background.
         DEVENV_DETACH=1;;
@@ -144,6 +154,8 @@ while [ $# -gt 0 ]; do
         DEVENV_RUNTIME="$OPTARG";;
       t) # Name of the tunnel to use. Default to hostname-containername.
         DEVENV_TUNNEL="$OPTARG";;
+      T) # GitHub token, or path to file with token. Default to token from gh CLI
+        DEVENV_GITHUB_TOKEN="$OPTARG";;
       v) # Increase verbosity level. Can be used multiple times.
         DEVENV_VERBOSE=$((DEVENV_VERBOSE + 1));;
       h) # Show help
@@ -232,6 +244,33 @@ DEVENV_SANDBOXING=Container
 [ "$DEVENV_ORCHESTRATOR" = "msb" ] && DEVENV_SANDBOXING=Sandbox
 DEVENV_SANDBOXING_LCASE=$(printf "%s" "$DEVENV_SANDBOXING" | tr '[:upper:]' '[:lower:]')
 
+# Pick GitHub token to use. Default to the token of the gh CLI, when installed
+# and logged in at github.com.
+if [ -z "$DEVENV_GITHUB_TOKEN" ]; then
+  if command -v gh >/dev/null 2>&1; then
+    DEVENV_GITHUB_TOKEN=$(gh auth token --hostname github.com 2>/dev/null || true)
+    if [ -z "$DEVENV_GITHUB_TOKEN" ]; then
+      warn "gh CLI is not logged in at github.com, will not forward a GitHub token."
+    else
+      info "Using GitHub token from gh CLI"
+    fi
+  else
+    info "No gh CLI found, will not forward a GitHub token."
+  fi
+fi
+# When token is set to "-", unset it to avoid passing any token, including a
+# TUNNEL_GITHUB_TOKEN that would otherwise be passed through the environment.
+if [ "$DEVENV_GITHUB_TOKEN" = "-" ]; then
+  DEVENV_GITHUB_TOKEN=
+  unset TUNNEL_GITHUB_TOKEN
+fi
+# Tokens never contain slashes, so this is a path to a file that should exist.
+if [ -n "$DEVENV_GITHUB_TOKEN" ] && ! [ -f "$DEVENV_GITHUB_TOKEN" ]; then
+  case "$DEVENV_GITHUB_TOKEN" in
+    */*) error "GitHub token file not found: %s" "$DEVENV_GITHUB_TOKEN";;
+  esac
+fi
+
 # Pick private SSH key to use. Default to best guess from .ssh directory. This
 # sorts because we prefer ed25519 keys over rsa keys.
 if [ -z "$DEVENV_IDENTITY" ]; then
@@ -294,7 +333,8 @@ fi
 # When no container name is given, use the name of the volume or the directory
 # name.
 if [ -z "$DEVENV_NAME" ]; then
-  DEVENV_NAME=$(basename "$(realpath "$root")")
+  # Some realpath implementations fail on volume names, i.e. non-existing paths.
+  DEVENV_NAME=$(basename "$(realpath "$root" 2>/dev/null || printf %s "$root")")
   info "Using %s name: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
 fi
 
@@ -338,6 +378,30 @@ if ! [ -d "$root" ]; then
   fi
 fi
 
+# Arrange for the GitHub token to be in a file that can be mounted into the
+# environment. Tokens given as values are stored under the state directory,
+# readable by the current user only. Using a file rather than an environment
+# variable keeps the token out of the output of inspect commands.
+DEVENV_GITHUB_TOKEN_FILE=
+if [ -n "$DEVENV_GITHUB_TOKEN" ]; then
+  if [ -f "$DEVENV_GITHUB_TOKEN" ]; then
+    DEVENV_GITHUB_TOKEN_FILE=$(realpath "$DEVENV_GITHUB_TOKEN")
+  else
+    DEVENV_GITHUB_TOKEN_FILE=${DEVENV_STATE_DIR%/}/${DEVENV_NAME}/github-token
+    if [ "$DEVENV_DRY_RUN" = "1" ]; then
+      info "Dry-run mode, would store GitHub token in: %s" "$DEVENV_GITHUB_TOKEN_FILE"
+    else
+      (
+        umask 077
+        mkdir -p "$(dirname "$DEVENV_GITHUB_TOKEN_FILE")"
+        printf '%s\n' "$DEVENV_GITHUB_TOKEN" > "$DEVENV_GITHUB_TOKEN_FILE"
+      ) || error "Failed to store GitHub token in: %s" "$DEVENV_GITHUB_TOKEN_FILE"
+      chmod 600 "$DEVENV_GITHUB_TOKEN_FILE"
+      trace "Stored GitHub token in: %s" "$DEVENV_GITHUB_TOKEN_FILE"
+    fi
+  fi
+fi
+
 # Now start constructing the command to run. make sure what was left of the
 # options/arguments that were passed to this script are passed to the container
 # entrypoint.
@@ -354,6 +418,14 @@ else
       -v "$root:/home/coder:$MOUNT_OPTS" \
       "$DEVENV_IMAGE" \
         "$@"
+fi
+
+# Mount the GitHub token where the entrypoint expects it by default, i.e.
+# TUNNEL_GITHUB_TOKEN_FILE.
+if [ -n "$DEVENV_GITHUB_TOKEN_FILE" ]; then
+  set -- \
+    -v "$DEVENV_GITHUB_TOKEN_FILE:/run/secrets/github-token:$MOUNT_OPTS,ro" \
+    "$@"
 fi
 
 if [ -n "$DEVENV_IDENTITY" ]; then

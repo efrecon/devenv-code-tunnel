@@ -62,6 +62,12 @@ running in the foreground and offering these features:
   If there was an existing container running under that name, it will be removed.
 - The VS Code tunnel will be called after `<hostname>-devenv`,
   where `<hostname>` will be the actual name of the host that the command is run on.
+- When the [`gh`][gh] CLI is installed and logged in on the host,
+  its token is passed to the environment so that `git` and `gh` work at GitHub without logging in again,
+  see [GitHub Authentication](#github-authentication).
+  Use `-T` to pass another token, or `-T -` to pass none.
+- Your private SSH key, best guess from `$HOME/.ssh`, is also passed to the environment.
+  Use `-i` to pass another key, or `-i -` to pass none.
 - The `-v` option will be passed to the entrypoint of the container, providing for more information in the logs of the container.
   You can pass any [option](#quick-options-tunnelsh-run-down) recognized by the [entrypoint](#quick-options-tunnelsh-run-down).
 - First RC file found will have been sourced.
@@ -75,6 +81,7 @@ running in the foreground and offering these features:
   - /usr/local/etc/devenvrc
 
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
+[gh]: https://cli.github.com/
 
 Quick start: run this one-liner to fetch [`devenv.sh`](./devenv.sh) directly from GitHub.
 This example will only print the help through the `-h` option,
@@ -160,6 +167,9 @@ The script takes the following options.
   a file named after the name of the tunnel (with a `.txt` extension) will be maintained to store access details.
   For additional security, you should make that GIST private.
   This requires the `git` feature to be installed.
+  Both SSH (`git@gist.github.com:<id>.git`) and HTTPS (`https://gist.github.com/<id>.git`) clone URLs are accepted.
+  Pushing requires either a [GitHub token](#github-authentication) with access to gists,
+  or an SSH key registered at GitHub.
 - `-s` is the port for the SSH server inside the container.
   The default is `2222`.
   This port will be used to connect to the container via SSH, and also to connect to the cloudflare tunnel.
@@ -172,6 +182,76 @@ The script takes the following options.
   Specify a `-` to not reprint anything.
 
 [gist]: https://gist.github.com/efrecon/a9addf9f5812212366ede103bfc211f6
+
+### GitHub Authentication
+
+A GitHub token can be passed to the environment,
+so that you can `git clone`, `git push` and use `gh` against GitHub without having to log in again,
+and so that the [gist](#quick-options-tunnelsh-run-down) given to `-G` can be updated.
+
+#### Passing the Token
+
+[`devenv.sh`](./devenv.sh) picks the token as follows:
+
+- By default, it uses the token of the [`gh`][gh] CLI on the host, i.e. the output of `gh auth token`,
+  when `gh` is installed and logged in at `github.com`.
+- `-T <token>` (or `DEVENV_GITHUB_TOKEN`) passes another token,
+  either the token itself or the path to a file containing it.
+- `-T -` passes no token at all.
+  This also prevents a `TUNNEL_GITHUB_TOKEN` variable from being passed to the environment.
+
+A token given as a value is stored, readable by you only, under `$XDG_STATE_HOME/devenv/<name>/github-token`
+(`~/.local/state/devenv/<name>/github-token` by default),
+where `<name>` is the name of the environment.
+The file is mounted read-only at `/run/secrets/github-token` inside the environment,
+which keeps the token out of the output of `docker inspect` or `podman inspect`.
+
+When not using `devenv.sh`, e.g. with `docker run` or `compose`,
+mount a file containing the token at `/run/secrets/github-token`,
+or set the `TUNNEL_GITHUB_TOKEN` environment variable.
+The variable takes precedence over the file,
+and `TUNNEL_GITHUB_TOKEN_FILE` changes the location of the file.
+
+#### Inside the Environment
+
+At start, the github [service](./etc/init.d/35-github.sh):
+
+- Copies the token to `/usr/local/etc/github/token`, readable by the `coder` user only.
+  The token is purposely **not** stored in the home directory,
+  as the home directory is often a directory of the host:
+  it could end up in one of your projects.
+  For the same reason, avoid `gh auth login` and `git credential-store` inside the environment.
+- Configures `git` (`/etc/gitconfig`) with a credential helper that presents the token to `github.com` and `gist.github.com`.
+  Other forges are not affected.
+- Exports the token as `GH_TOKEN`, so `gh` works out of the box,
+  both in terminals opened through the VS Code tunnel and in SSH sessions.
+- When no private SSH key was passed (`-i -`),
+  rewrites SSH URLs at GitHub, e.g. `git@github.com:owner/repo.git`, to HTTPS,
+  so that SSH URLs, including those of existing clones in the home directory, keep working.
+  When an SSH key was passed, SSH URLs are left untouched and use the key.
+
+#### Permissions
+
+The token needs the following permissions:
+cloning and pushing to repositories, reading organizations for `gh`, and,
+when using `-G`, writing to gists.
+
+| Token                         | Permissions                                                                                                                                                                       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gh` CLI (default)            | `repo`, `read:org` and `gist` by default. Run `gh auth refresh -s workflow` on the host to be able to push changes to GitHub Actions workflows.                                    |
+| Classic personal access token | `repo`, `read:org`, `gist`, and `workflow` to push changes to workflows.                                                                                                          |
+| Fine-grained access token     | Repository permissions: *Contents* (read and write), *Metadata* (read), and as needed *Pull requests*, *Issues* and *Workflows*. Account permissions: *Gists* (read and write). |
+
+Notes:
+
+- Fine-grained tokens only give access to the repositories of a single owner (you, or one organization),
+  and organizations might have to approve them.
+  Classic tokens and the `gh` token give access to all repositories you can access.
+- Organizations using SAML single sign-on require classic tokens to be [authorized][sso] for each organization.
+- Prefer tokens with an expiration date and only the permissions you need.
+  Unlike the token of the `gh` CLI, they can be revoked without affecting your host.
+
+[sso]: https://docs.github.com/en/enterprise-cloud@latest/authentication/authenticating-with-saml-single-sign-on/authorizing-a-personal-access-token-for-use-with-saml-single-sign-on
 
 ## Security
 
@@ -187,6 +267,12 @@ When running using `podman` or `docker`, it is recommended to use the `--privile
 This is a security issue, but is mandatory to be able to run a separate Docker daemon inside the containers.
 The daemon will gracefully refuse to start whenever the container is detected to not have enough privileges.
 It is possible to pass, e.g. the socket of the Docker daemon running on the host to the containers.
+
+By default, your GitHub token and your private SSH key are passed to the environments.
+Any process running in an environment, e.g. package installation scripts, editor extensions or AI agents,
+can read them and act as you at GitHub.
+Use `-T -` and `-i -` to pass neither,
+or pass a [token](#github-authentication) restricted to what the environment needs.
 
 ## Official Images
 

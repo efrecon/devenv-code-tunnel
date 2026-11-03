@@ -59,6 +59,17 @@ done
 # Github user to fetch keys from
 : "${TUNNEL_GITHUB_USER:=""}"
 
+# GitHub token for HTTPS authentication at github.com and gist.github.com. Takes
+# precedence over the content of TUNNEL_GITHUB_TOKEN_FILE.
+: "${TUNNEL_GITHUB_TOKEN:=""}"
+
+# File to read the GitHub token from, this is where devenv.sh mounts it.
+: "${TUNNEL_GITHUB_TOKEN_FILE:="/run/secrets/github-token"}"
+
+# Where the github service stores the GitHub token for use by git and gh. This
+# is outside of the home directory, as it is often mounted from the host.
+: "${TUNNEL_GITHUB_TOKEN_STORE:="${TUNNEL_PREFIX}/etc/github/token"}"
+
 # Services to start. When empty, all services will be started.
 : "${TUNNEL_SERVICES:=""}"
 
@@ -70,7 +81,7 @@ done
 # example.
 : "${TUNNEL_REEXPOSE:="-"}"
 
-# Gist where to publish tunnel details
+# Gist where to publish tunnel details, SSH or HTTPS clone URL.
 : "${TUNNEL_GIST:=""}"
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -192,6 +203,16 @@ export CODER_INTERACTIVE  # Perdure colorization in the logs
 # the foreground. Some of these will respawn in the background.
 delegate "service" "$TUNNEL_SERVICES_DIR" "$TUNNEL_SERVICES" '??-*.sh' >/dev/null
 
+# Make the GitHub token stored by the github service available to gh in the
+# terminals started from the tunnels. Login shells get it from /etc/profile.d.
+# git does not need it, it uses the credential helper set by the service.
+if [ -z "${GH_TOKEN:-}" ] && [ -r "$TUNNEL_GITHUB_TOKEN_STORE" ]; then
+  GH_TOKEN=$(cat "$TUNNEL_GITHUB_TOKEN_STORE")
+  export GH_TOKEN
+  verbose "Exported GitHub token from %s as GH_TOKEN" "$TUNNEL_GITHUB_TOKEN_STORE"
+fi
+unset TUNNEL_GITHUB_TOKEN
+
 # Start the Internet hook to perform extra setup
 if [ -n "$TUNNEL_HOOK" ]; then
   info "Running hook: %s" "$TUNNEL_HOOK"
@@ -202,7 +223,8 @@ fi
 if [ -n "$TUNNEL_GIST" ]; then
   if command_present git; then
     GIST_DIR=$(mktemp -tu 'gist-XXXXXX')
-    if "$LWRAP" git clone "$TUNNEL_GIST" "$GIST_DIR"; then
+    # Fail instead of prompting for credentials, nobody is there to answer.
+    if GIT_TERMINAL_PROMPT=0 "$LWRAP" git clone "$TUNNEL_GIST" "$GIST_DIR"; then
       # Decide upon a (good?) name
       if [ -z "$TUNNEL_NAME" ]; then
         GIST_FILENAME=tunnel-$(hostname)
