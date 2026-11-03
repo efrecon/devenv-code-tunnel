@@ -65,12 +65,13 @@ for file in "$@"; do
     (
       cd "$(dirname "$file")" || error "Failed to change directory to $(dirname "$file")"
       verbose "Pushing changes to %s to git repository" "$file"
-      "$GIST_LWRAP" git pull
+      # Fail instead of prompting for credentials, nobody is there to answer.
+      GIT_TERMINAL_PROMPT=0 "$GIST_LWRAP" git pull
       "$GIST_LWRAP" git add "$(basename "$file")"
       if git status --porcelain | grep -qF "$(basename "$file")"; then
         debug "Changes detected in %s" "$file"
         "$GIST_LWRAP" git commit -m "Update tunnel details at $(date)"
-        "$GIST_LWRAP" git push
+        GIT_TERMINAL_PROMPT=0 "$GIST_LWRAP" git push
       else
         debug "No changes detected in %s" "$file"
       fi
