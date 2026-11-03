@@ -1,0 +1,153 @@
+#!/bin/sh
+
+# Shell sanity. Stop on errors, undefined variables and pipeline errors.
+set -eu
+# shellcheck disable=SC3040 # now part of POSIX, but not everywhere yet!
+if set -o | grep -q 'pipefail'; then set -o pipefail; fi
+
+# Absolute location of the script where this script is located.
+GITHUB_ROOTDIR=$( cd -P -- "$(dirname -- "$(command -v -- "$(realpath "$0")")")" && pwd -P )
+
+# Hurry up and find the libraries
+for lib in log common system; do
+  for d in ../../lib ../lib lib; do
+    if [ -d "${GITHUB_ROOTDIR}/$d" ] && [ -f "${GITHUB_ROOTDIR}/$d/${lib}.sh" ]; then
+      # shellcheck disable=SC1090
+      . "${GITHUB_ROOTDIR}/$d/${lib}.sh"
+      break
+    fi
+  done
+done
+
+# Arrange to set the CODER_BIN variable to the name of the script
+bin_name
+
+
+# Level of verbosity, the higher the more verbose. All messages are sent to the
+# file at GITHUB_LOG.
+: "${GITHUB_VERBOSE:="${TUNNEL_VERBOSE:-"0"}"}"
+
+# Where to send logs
+: "${GITHUB_LOG:="${TUNNEL_LOG:-"2"}"}"
+
+: "${GITHUB_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
+
+# Environment file to load for reading defaults from.
+: "${GITHUB_DEFAULTS:="${GITHUB_ROOTDIR}/../${CODER_BIN}.env"}"
+
+# GitHub token for HTTPS authentication at GitHub. Takes precedence over the
+# content of GITHUB_TOKEN_FILE.
+: "${GITHUB_TOKEN:="${TUNNEL_GITHUB_TOKEN:-""}"}"
+
+# File to read the GitHub token from.
+: "${GITHUB_TOKEN_FILE:="${TUNNEL_GITHUB_TOKEN_FILE:-"/run/secrets/github-token"}"}"
+
+# Where to store the GitHub token for use by git and gh. Keep this outside of
+# the home directory, as it is often mounted from the host.
+: "${GITHUB_TOKEN_STORE:="${TUNNEL_GITHUB_TOKEN_STORE:-"${GITHUB_PREFIX}/etc/github/token"}"}"
+
+# Profile script exporting the GitHub token as GH_TOKEN in login shells.
+: "${GITHUB_PROFILE:="/etc/profile.d/github-token.sh"}"
+
+# Domains at which the GitHub token is used.
+: "${GITHUB_HOSTS:="github.com gist.github.com"}"
+
+
+log_init GITHUB
+
+# Load defaults
+[ -n "$GITHUB_DEFAULTS" ] && read_envfile "$GITHUB_DEFAULTS" GITHUB
+
+
+# Print the GitHub token, from the variable or the file, empty when none.
+github_token() {
+  if [ -n "$GITHUB_TOKEN" ]; then
+    printf %s\\n "$GITHUB_TOKEN"
+  elif [ -f "$GITHUB_TOKEN_FILE" ]; then
+    # The file might be owned by another user when mounted from the host.
+    if [ -r "$GITHUB_TOKEN_FILE" ]; then
+      cat "$GITHUB_TOKEN_FILE"
+    else
+      as_root cat "$GITHUB_TOKEN_FILE"
+    fi
+  fi
+}
+
+# Return success when a private SSH key is present in the .ssh directory.
+has_ssh_identity() {
+  for _key in "${HOME}/.ssh"/id_*; do
+    [ -f "$_key" ] || continue
+    case "$_key" in
+      *.pub) continue;;
+    esac
+    return 0
+  done
+  return 1
+}
+
+# Configure git, at the system level, to authenticate at GitHub using the token
+# stored at the path passed as a parameter. Without parameter, remove that
+# configuration. When there is no SSH key, also rewrite SSH URLs to HTTPS so
+# that cloning git@github.com:owner/repo.git works.
+github_git_config() {
+  command_present git || return 0
+  for _host in $GITHUB_HOSTS; do
+    as_root git config --system --unset-all "credential.https://${_host}.helper" || true
+    as_root git config --system --unset-all "url.https://${_host}/.insteadOf" || true
+  done
+  [ -z "${1:-}" ] && return 0
+
+  # Read-only helper: only answers get requests, never stores nor erases. The
+  # token is read at each request, so it can be replaced without restarting.
+  # shellcheck disable=SC2016 # Expanded by the shell run by git, not here
+  _helper='!f() { if [ "$1" = get ]; then printf "username=x-access-token\npassword=%s\n" "$(cat "'"$1"'")"; fi; }; f'
+  for _host in $GITHUB_HOSTS; do
+    as_root git config --system "credential.https://${_host}.helper" "$_helper"
+    verbose "Configured git to authenticate at %s using token from %s" "$_host" "$1"
+  done
+
+  if has_ssh_identity; then
+    debug "SSH key found in %s, keeping SSH URLs at GitHub" "${HOME}/.ssh"
+  else
+    for _host in $GITHUB_HOSTS; do
+      as_root git config --system --add "url.https://${_host}/.insteadOf" "git@${_host}:"
+      as_root git config --system --add "url.https://${_host}/.insteadOf" "ssh://git@${_host}/"
+      verbose "No SSH key, rewriting SSH URLs at %s to HTTPS" "$_host"
+    done
+  fi
+}
+
+# Install the GitHub token, if any, for use by git and gh. Remove all traces of
+# a previous token otherwise, e.g. when the container is restarted.
+authenticate_github() {
+  _token=$(github_token | tr -d '[:space:]')
+  if [ -z "$_token" ]; then
+    verbose "No GitHub token provided, no HTTPS authentication at GitHub"
+    as_root rm -f "$GITHUB_TOKEN_STORE" "$GITHUB_PROFILE"
+    github_git_config
+    return 0
+  fi
+
+  _dir=$(dirname "$GITHUB_TOKEN_STORE")
+  as_root mkdir -p "$_dir"
+  as_root chown "$(id -u):$(id -g)" "$_dir"
+  chmod 700 "$_dir"
+  ( umask 077 && printf %s\\n "$_token" > "$GITHUB_TOKEN_STORE" )
+  chmod 600 "$GITHUB_TOKEN_STORE"
+  verbose "Stored GitHub token in %s" "$GITHUB_TOKEN_STORE"
+
+  as_root tee "$GITHUB_PROFILE" >/dev/null <<EOF
+# Generated by ${CODER_BIN}, do not edit. Export the GitHub token for gh.
+if [ -z "\${GH_TOKEN:-}" ] && [ -r "${GITHUB_TOKEN_STORE}" ]; then
+  GH_TOKEN=\$(cat "${GITHUB_TOKEN_STORE}")
+  export GH_TOKEN
+fi
+EOF
+  as_root chmod 644 "$GITHUB_PROFILE"
+  verbose "Exporting GitHub token as GH_TOKEN in login shells via %s" "$GITHUB_PROFILE"
+
+  github_git_config "$GITHUB_TOKEN_STORE"
+}
+
+
+authenticate_github
