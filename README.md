@@ -70,15 +70,22 @@ running in the foreground and offering these features:
   Use `-i` to pass another key, or `-i -` to pass none.
 - The `-v` option will be passed to the entrypoint of the container, providing for more information in the logs of the container.
   You can pass any [option](#quick-options-tunnelsh-run-down) recognized by the [entrypoint](#quick-options-tunnelsh-run-down).
-- First RC file found will have been sourced.
+- All env files found will have been read, in order, later files overriding earlier ones.
   Variable starting with `DEVENV_` control the behaviour of `devenv.sh`.
   Variable starting with `TUNNEL_` are automatically passed to the entrypoint.
-  RC files are looked at:
-  - $XDG_CONFIG_HOME/devenvrc
-  - $HOME/.devenvrc
-  - $(pwd)/.devenvrc
-  - /etc/devenvrc
-  - /usr/local/etc/devenvrc
+  All other variables are ignored.
+  Env files named `.devenv.env` and `devenv.env` (see `DEVENV_ENVFILES`) are looked for
+  in the following directories (see `DEVENV_PATH`):
+  - /etc
+  - /usr/local/etc
+  - $XDG_CONFIG_HOME
+  - $HOME
+  - $(pwd)
+
+  Env files are not sourced, they only contain `KEY=VALUE` lines.
+  Values can be quoted and are taken literally: `$VAR`, `$(cmd)` or `` `cmd` `` are not expanded.
+  Blank lines, comments and a leading `export` are allowed.
+  See [`devenv.env`](./devenv.env) for an example.
 
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 [gh]: https://cli.github.com/

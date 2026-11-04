@@ -47,8 +47,10 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 # Default XDG config directory.
 : "${XDG_CONFIG_HOME:="$HOME/.config"}"
 
-# Path where to find the RC file to source, first file found will be used.
-: "${DEVENV_RC_PATHS:="$XDG_CONFIG_HOME/devenvrc:$HOME/.devenvrc:$(pwd)/.devenvrc:/etc/devenvrc:/usr/local/etc/devenvrc"}"
+# Colon-separated directories where to look for env files, and space-separated
+# names of the env files to look for in each directory. All files found are read.
+: "${DEVENV_PATH:="/etc:/usr/local/etc:$XDG_CONFIG_HOME:$HOME:$(pwd)"}"
+: "${DEVENV_ENVFILES:=".devenv.env devenv.env"}"
 
 # Verbosity level for this script.
 : "${DEVENV_VERBOSE:=1}"
@@ -88,8 +90,10 @@ If no volume or directory is given, the current directory will be used.
 
 Everything else is passed to the container, as is.
 
-First found file from $DEVENV_RC_PATHS is sourced before parsing the options.
-Export DEVENV_ or TUNNEL_ variables to set defaults for $DEVENV_BIN or the container entrypoint.
+All files named after $DEVENV_ENVFILES in directories from $DEVENV_PATH are read,
+in order, before parsing the options. They contain KEY=VALUE lines, values are
+never evaluated. Only DEVENV_ and TUNNEL_ variables are recognised.
+Set DEVENV_ or TUNNEL_ variables to set defaults for $DEVENV_BIN or the container entrypoint.
 
 Examples:
   $DEVENV_BIN devenv -v;  # Creates and use a devenv volume, passing -v to the container entrypoint.
@@ -119,21 +123,83 @@ warn() { _log WRN "$@"; }
 error() { _log ERR "$@" && exit 1; }
 
 
-# Source the first RC file found in the colon-separated DEVENV_RC_PATHS.
+# Read the env file at $1, made of KEY=VALUE lines. Blank lines, comments and an
+# optional leading "export" are allowed. Values can be single- or double-quoted,
+# unquoted values end at a whitespace-preceded #. Values are never evaluated.
+# Only DEVENV_ and TUNNEL_ variables are set. TUNNEL_ variables are exported so
+# they can be passed to the container, DEVENV_ variables stay local.
+# shellcheck disable=SC2094 # $1 is only mentioned in logs, never written to
+env_load() {
+  _cr=$(printf '\r')
+  _lineno=0
+  while IFS= read -r _line || [ -n "$_line" ]; do
+    _lineno=$((_lineno + 1))
+    # Remove DOS line endings and leading whitespace.
+    _line=${_line%"$_cr"}
+    _line=${_line#"${_line%%[![:space:]]*}"}
+    case "$_line" in
+      ""|"#"*) continue;;
+      export[[:space:]]*)
+        _line=${_line#export}
+        _line=${_line#"${_line%%[![:space:]]*}"}
+        ;;
+    esac
+    case "$_line" in
+      *=*) ;;
+      *) warn "%s:%d: Not a KEY=VALUE line, ignored" "$1" "$_lineno"; continue;;
+    esac
+
+    _name=${_line%%=*}
+    _name=${_name%"${_name##*[![:space:]]}"}
+    case "$_name" in
+      *[!A-Za-z0-9_]*)
+        warn "%s:%d: Invalid variable name %s, ignored" "$1" "$_lineno" "$_name"; continue;;
+      DEVENV_*|TUNNEL_*) ;;
+      *)
+        warn "%s:%d: %s is neither DEVENV_ nor TUNNEL_, ignored" "$1" "$_lineno" "$_name"; continue;;
+    esac
+
+    _value=${_line#*=}
+    _value=${_value#"${_value%%[![:space:]]*}"}
+    case "$_value" in
+      \"*) _value=${_value#\"}; _value=${_value%%\"*};;
+      \'*) _value=${_value#\'}; _value=${_value%%\'*};;
+      *)
+        _value=${_value%%[[:space:]]#*}
+        _value=${_value%"${_value##*[![:space:]]}"}
+        ;;
+    esac
+
+    trace "%s:%d: Setting %s" "$1" "$_lineno" "$_name"
+    case "$_name" in
+      TUNNEL_*) export "$_name=$_value";;
+      # Safe: $_name is validated above, and $_value is not expanded by eval.
+      *) eval "$_name=\$_value";;
+    esac
+  done < "$1"
+  unset _cr _lineno _line _name _value
+}
+
+# Read all env files with names from the space-separated DEVENV_ENVFILES, found
+# in the directories of the colon-separated DEVENV_PATH. Files are read in
+# order, so later files override settings from earlier ones.
 _ifs=$IFS; IFS=:
-for _rc_path in $DEVENV_RC_PATHS; do
-  if [ -f "$_rc_path" ]; then
-    info "Sourcing RC file: %s" "$_rc_path"
-    # shellcheck disable=SC1090
-    . "$_rc_path"
-    break
-  fi
+for _env_dir in $DEVENV_PATH; do
+  [ -d "$_env_dir" ] || continue
+  IFS=$_ifs
+  for _env_name in $DEVENV_ENVFILES; do
+    if [ -f "${_env_dir%/}/$_env_name" ]; then
+      info "Reading env file: %s" "${_env_dir%/}/$_env_name"
+      env_load "${_env_dir%/}/$_env_name"
+    fi
+  done
+  IFS=:
 done
 IFS=$_ifs
-unset _ifs _rc_path
+unset _ifs _env_dir _env_name
 
 # Now parse the options. Do it here so we can override the defaults set by the
-# RC file or environment variables.
+# env files or environment variables.
 while [ $# -gt 0 ]; do
   OPTIND=1
   while getopts ":di:I:N:o:t:T:r:nvh-:" opt; do
