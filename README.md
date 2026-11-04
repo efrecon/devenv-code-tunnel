@@ -82,13 +82,12 @@ running in the foreground and offering these features:
   - /usr/local/etc
   - $XDG_CONFIG_HOME
   - $HOME
-  - $(pwd)
 
   Env files are not sourced, they only contain `KEY=VALUE` lines.
   Values can be quoted and are taken literally: `$VAR`, `$(cmd)` or `` `cmd` `` are not expanded.
   Blank lines, comments and a leading `export` are allowed.
   `DEVENV_PATH` and `DEVENV_ENVFILES` can only be set from the environment.
-  See [`devenv.env`](./devenv.env) for an example.
+  See [`example/devenv.env`](./example/devenv.env) for an example.
 
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 [gh]: https://cli.github.com/
