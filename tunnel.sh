@@ -84,6 +84,11 @@ done
 # Gist where to publish tunnel details, SSH or HTTPS clone URL.
 : "${TUNNEL_GIST:=""}"
 
+# Publish the vscode device authorization code to the gist. Set to 0 to only
+# print it to the container output: anyone able to read the gist could use the
+# code to authorize the device with their own account.
+: "${TUNNEL_CODE_AUTH_PUBLISH:="1"}"
+
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="tunnel starter"
 while getopts "a:fg:G:k:l:L:n:p:s:S:T:vh" opt; do
@@ -273,7 +278,7 @@ fi
 # Start tunnels in the background, collect supervisor PIDs for signal forwarding.
 # Run delegate in the current shell (not a subshell) so supervise.sh processes
 # are direct children of tunnel.sh and wait() works in the signal handler.
-_TUNNEL_PIDS_FILE=$(mktemp)
+_TUNNEL_PIDS_FILE=$(mktemp_ext tunnels pid)
 delegate "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 > "$_TUNNEL_PIDS_FILE"
 _TUNNEL_PIDS=$(cut -f2 "$_TUNNEL_PIDS_FILE" | tr '\n' ' ')
 rm -f "$_TUNNEL_PIDS_FILE"

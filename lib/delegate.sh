@@ -218,6 +218,33 @@ spawn() {
 }
 
 
+# Spawn a command through the lwrap.sh log wrapper, as spawn does. Before
+# spawning, record where the log of the command is and its current size in
+# _SPAWN_LOG and _SPAWN_LOG_OFFSET. Pass both to when_infile to only consider
+# lines written by this run of the command. Requires wait.sh for file_size.
+# Usage: spawn_logged [-n name] <lwrap> -- <bin> [args...]
+# Must not be called in a subshell, e.g. $(...), or the variables are lost.
+spawn_logged() {
+  _sl_name=
+  if [ "${1:-}" = "-n" ]; then
+    _sl_name=${2:-}
+    shift 2
+  fi
+  [ -z "${1:-}" ] && error "spawn_logged: No lwrap wrapper given"
+  _sl_lwrap=$1
+  shift
+  [ "${1:-}" = "--" ] && shift
+  [ -z "${1:-}" ] && error "spawn_logged: No executable given"
+  [ -z "$_sl_name" ] && _sl_name=$(basename "$1")
+
+  _SPAWN_LOG=$("$_sl_lwrap" -L -- "$1")
+  _SPAWN_LOG_OFFSET=$(file_size "$_SPAWN_LOG")
+  trace "Log of %s at %s, from byte %d" "$_sl_name" "$_SPAWN_LOG" "$_SPAWN_LOG_OFFSET"
+  spawn -n "$_sl_name" -- "$_sl_lwrap" -- "$@"
+  unset _sl_name _sl_lwrap || true
+}
+
+
 # Start dependency scripts
 # $1 is the type of script, used in messages and for background/foreground
 # $2 is the directory to look for scripts

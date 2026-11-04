@@ -175,6 +175,10 @@ The script takes the following options.
   Under the root of that GIST,
   a file named after the name of the tunnel (with a `.txt` extension) will be maintained to store access details.
   For additional security, you should make that GIST private.
+  When the vscode tunnel needs to authorize the device,
+  the authorization URL and code are also published to the GIST.
+  Anyone able to read the GIST could use that code to authorize the device with their own account,
+  set `TUNNEL_CODE_AUTH_PUBLISH=0` to only print them to the container output.
   This requires the `git` feature to be installed.
   Both SSH (`git@gist.github.com:<id>.git`) and HTTPS (`https://gist.github.com/<id>.git`) clone URLs are accepted.
   Pushing requires either a [GitHub token](#github-authentication) with access to gists,

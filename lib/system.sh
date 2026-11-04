@@ -21,6 +21,36 @@ command_present() {
   fi
 }
 
+# Create a unique temporary file with an extension and print its path, e.g.
+# /tmp/auth.Ab3dEf.pid. busybox mktemp requires the template to end with
+# XXXXXX, so mktemp creates a unique base file, and the file with the extension
+# is created next to it without clobbering. The base file is kept until then,
+# so no other call can pick the same name in between.
+# $1: prefix of the file name, default to tmp
+# $2: extension, with or without the leading dot, may be empty
+# $3: directory, default to TMPDIR or /tmp
+mktemp_ext() {
+  _mt_ext=${2:-}
+  [ -n "$_mt_ext" ] && _mt_ext=.${_mt_ext#.}
+  _mt_dir=${3:-${TMPDIR:-/tmp}}
+  while true; do
+    _mt_base=$(mktemp "${_mt_dir%/}/${1:-tmp}.XXXXXX") || return 1
+    if [ -z "$_mt_ext" ]; then
+      printf %s\\n "$_mt_base"
+      break
+    fi
+    # Create with the same restrictive permissions as mktemp, failing if the
+    # file already exists (set -C).
+    if ( umask 077; set -C; : > "${_mt_base}${_mt_ext}" ) 2>/dev/null; then
+      rm -f "$_mt_base"
+      printf %s\\n "${_mt_base}${_mt_ext}"
+      break
+    fi
+    rm -f "$_mt_base"
+  done
+  unset _mt_ext _mt_dir _mt_base || true
+}
+
 # Run the command passed as arguments as root, i.e. with sudo if
 # available/necessary. Generate an error if not possible.
 as_root() {
@@ -39,7 +69,7 @@ as_root() {
 # This is because su is evil and -c option only takes a single command...
 su_user() {
   _USR=$1; shift
-  _tmpf=$(mktemp)
+  _tmpf=$(mktemp_ext su_user sh)
   printf '#!%s\n' "/bin/sh" > "$_tmpf"
   printf "exec" >> "$_tmpf"
   for a in "$@"; do

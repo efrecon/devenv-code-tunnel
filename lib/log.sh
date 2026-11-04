@@ -130,6 +130,18 @@ reprint() {
   done
 }
 
+# Publish the content of stdin: print it to the log and append it to the gist
+# file, then timestamp the gist file to indicate when it was last updated. When
+# the gist file is empty, the content is only printed to the log.
+# $1: the gist file, may be empty.
+# $2: path to the timestamp.sh orchestration script.
+gist_publish() {
+  reprint "${1:-}"
+  if [ -n "${1:-}" ] && [ -n "${2:-}" ]; then
+    "$2" -s 0 -- "$1" || true
+  fi
+}
+
 # Get the content of the variable which name is passed as an argument.
 get_var() { eval printf "%s\\\n" "\$${1:-}" || true; }
 

@@ -73,13 +73,13 @@ json2sha256() {
 authorize_forges() {
   if printf %s\\n "$FORGES_SUPPORTED" | grep -qF 'github.com'; then
     # Download fingerprints reported by GH API
-    _fingerprints=$(mktemp "${TMPDIR:-/tmp}/json.XXXXXX")
+    _fingerprints=$(mktemp_ext github-meta json)
     download https://api.github.com/meta "$_fingerprints"
   fi
 
   for _domain in $FORGES_SUPPORTED; do
     verbose "Adding %s keys to %s" "$_domain" "${HOME}/.ssh/known_hosts"
-    _forge_keys=$(mktemp "${TMPDIR:-/tmp}/known_hosts.XXXXXX")
+    _forge_keys=$(mktemp_ext known_hosts)
     ssh-keyscan "$_domain" | grep -vE -e '^#' -e '^\s+$' > "$_forge_keys"
     for _crypto in RSA ECDSA ED25519; do
       if grep -F "$_domain" "${HOME}/.ssh/known_hosts" | grep -qF "$(to_lower "${_crypto}")" ; then

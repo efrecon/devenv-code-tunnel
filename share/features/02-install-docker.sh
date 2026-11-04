@@ -38,7 +38,7 @@ if ! command_present "docker"; then
   if is_os_family alpine; then
     install_packages docker docker-cli-buildx docker-cli-compose fuse-overlayfs
   else
-    _official=$(mktemp)
+    _official=$(mktemp_ext docker-install sh)
     download "$INSTALL_DOCKER_URL" "$_official"
 
     if [ -n "$INSTALL_DOCKER_SHA512" ]; then
@@ -53,7 +53,7 @@ if ! command_present "docker"; then
       fi
 
       # Download the exact commit from GitHub for cross-verification
-      _raw=$(mktemp)
+      _raw=$(mktemp_ext docker-install-raw sh)
       raw_url="https://raw.githubusercontent.com/docker/docker-install/${commit_sha}/install.sh"
       download "$raw_url" "$_raw"
 
