@@ -59,6 +59,26 @@ dir_ownership() {
 }
 
 
+# Print the extension of the file at the end of the URL passed as an argument,
+# without the leading dot. Query strings and fragments are ignored. Prints
+# nothing when there is no (sensible) extension.
+url_extension() {
+  _ue_base=$(basename "${1%%[?#]*}")
+  case "$_ue_base" in
+    *.*) printf %s\\n "${_ue_base##*.}" | grep -E '^[A-Za-z0-9]+$' || true;;
+  esac
+  unset _ue_base || true
+}
+
+
+# Print the name passed as an argument without its .tar.gz or .tgz extension.
+tgz_stem() {
+  _ts_name=${1%.tar.gz}
+  printf %s\\n "${_ts_name%.tgz}"
+  unset _ts_name || true
+}
+
+
 # $1 name of file at remote location
 # $2 URL where to find checksums
 # $3 local file to check (empty: same as $1)
@@ -67,7 +87,7 @@ internet_checksum() {
   [ -z "$1" ] && error "internet_checksum: no remote file name given"
   [ -z "$2" ] && error "internet_checksum: no url given"
   debug "Verifying checksum for %s using %s" "$1" "$2"
-  _tmp_sums=$(mktemp)
+  _tmp_sums=$(mktemp_ext checksums txt)
   # Remove non-printable characters to avoid issues with Windows line endings
   # and bogus content from some PowerShell hashes.
   download "$2" | LC_ALL=C tr -cd '\n\040-\176' > "$_tmp_sums"
@@ -92,7 +112,11 @@ internet_checksum() {
 # generates a log line to make this more apparent.
 internet_script_installer() {
   [ -z "$1" ] && error "internet_script_installer: no url given"
-  _tmp_script=$(mktemp -t "${2:-"$(basename "$1")"}.XXXXXX")
+  # Keep the extension of the script, if any, at the end of the temporary file.
+  _script_ext=$(url_extension "$1")
+  _tmp_script=${2:-"$(basename "${1%%[?#]*}")"}
+  [ -n "$_script_ext" ] && _tmp_script=${_tmp_script%."$_script_ext"}
+  _tmp_script=$(mktemp_ext "$_tmp_script" "$_script_ext")
   download "$1" "$_tmp_script"
   if [ -n "${3:-}" ]; then
     checksum "$_tmp_script" "$3" "$2"
@@ -133,9 +157,8 @@ internet_bin_installer() {
 
   # declare shortcuts for the arguments and download the file
   _tgt_bin=${3:-"$(basename "$1")"}
-  _ext="${1##*.}"
-  [ "$_ext" = "$_tgt_bin" ] && _ext=""
-  _tmp_bin=$(mktemp -t "${_tgt_bin}.XXXXXX")
+  _ext=$(url_extension "$1")
+  _tmp_bin=$(mktemp_ext "${_tgt_bin}" "$_ext")
   download "$1" "$_tmp_bin"
 
   # Verify checksum if provided
@@ -186,7 +209,7 @@ internet_bintgz_installer() {
 
   # declare shortcuts for the arguments and download the file
   _tgt_bin=${3:-"$(basename "$1")"}
-  _tmp_tgz=$(mktemp -t "${_tgt_bin}.XXXXXX")
+  _tmp_tgz=$(mktemp_ext "$(tgz_stem "$_tgt_bin")" tar.gz)
   download "$1" "$_tmp_tgz"
 
   # Verify checksum if provided
@@ -239,7 +262,7 @@ internet_tgz_installer() {
 
   # declare shortcuts for the arguments and download the file
   _tgt=${3:-"$(basename "$1")"}
-  _tmp_tgz=$(mktemp -t "${_tgt}.XXXXXX")
+  _tmp_tgz=$(mktemp_ext "$(tgz_stem "$_tgt")" tar.gz)
   download "$1" "$_tmp_tgz"
 
   # Verify checksum if provided
@@ -294,7 +317,7 @@ internet_deb_installer() {
 
   # declare shortcuts for the arguments and download the file
   _tgt=${3:-"$(basename "$1")"}
-  _tmp_deb=$(mktemp -t "${_tgt}.XXXXXX")
+  _tmp_deb=$(mktemp_ext "${_tgt%.deb}" deb)
   download "$1" "$_tmp_deb"
 
   # Verify checksum if provided

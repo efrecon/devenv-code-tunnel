@@ -78,7 +78,7 @@ LOGROTATE_LWRAP="$LOGROTATE_ROOTDIR/lwrap.sh"
 
 # Create a temporary file for the logrotate configuration, arrange to remove it
 # when we are done.
-config=$(mktemp -t logrotate.XXXXXX)
+config=$(mktemp_ext logrotate conf)
 trap 'rm -f "$config"; trap - EXIT; exit' EXIT INT HUP TERM
 
 # Add a header to the logrotate configuration file

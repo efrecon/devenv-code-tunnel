@@ -72,9 +72,9 @@ tunnel_start() {
   # all remaining arguments blindly to the command.
   unset_varset TUNNEL
 
-  # Record the size of the log, so tunnel_wait only considers lines from this run.
-  _CLOUDFLARE_LOG_OFFSET=$(file_size "$CLOUDFLARE_LOG")
-  spawn -n cloudflared -- \
+  # Records the log location and size, so tunnel_wait only considers lines
+  # from this run.
+  spawn_logged -n cloudflared \
     "$CLOUDFLARE_LWRAP" -- \
       "$CLOUDFLARE_BIN" tunnel \
         --no-autoupdate \
@@ -88,7 +88,7 @@ tunnel_info() {
   public_key=$(tunnel_pubkey)
   verbose "Cloudflare tunnel started at %s" "$1"
 
-  reprint "$CLOUDFLARE_GIST_FILE" <<EOF
+  gist_publish "$CLOUDFLARE_GIST_FILE" "$CLOUDFLARE_TIMESTAMP" <<EOF
 
 cloudflare tunnel running, run the following command to connect securely:
     ssh-keygen -R $CLOUDFLARE_HOSTNAME && echo '$CLOUDFLARE_HOSTNAME $public_key' >> ~/.ssh/known_hosts && ssh -o ProxyCommand='cloudflared access tcp --hostname $1' $(id -un)@$CLOUDFLARE_HOSTNAME
@@ -106,14 +106,12 @@ Host $CLOUDFLARE_HOSTNAME
   User $(id -un)
 
 EOF
-  # Timestamp the gist file to indicate when it was last updated.
-  [ -n "$CLOUDFLARE_GIST_FILE" ] && "$CLOUDFLARE_TIMESTAMP" -s 0 -- "$CLOUDFLARE_GIST_FILE" || true
 }
 
 
 tunnel_wait() {
   debug "Wait for cloudflare tunnel to start..."
-  url=$(when_infile "$_CLOUDFLARE_LOG_OFFSET" "$CLOUDFLARE_LOG" 'E' \
+  url=$(when_infile "$_SPAWN_LOG_OFFSET" "$_SPAWN_LOG" 'E' \
           'https://.*\.trycloudflare.com' - | grep -oE 'https://.*\.trycloudflare.com')
   tunnel_info "$url"
 }

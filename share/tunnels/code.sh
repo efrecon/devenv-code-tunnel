@@ -36,6 +36,9 @@ bin_name
 : "${CODE_GIST_FILE:="${TUNNEL_GIST_FILE:-""}"}"
 : "${CODE_PROVIDER:="${TUNNEL_PROVIDER:-"github"}"}"
 : "${CODE_FORCE:="${TUNNEL_FORCE:-"0"}"}"
+# Publish the device authorization code to the gist, when one is used. Anyone
+# who can read the gist could use the code to authorize the device first.
+: "${CODE_AUTH_PUBLISH:="${TUNNEL_CODE_AUTH_PUBLISH:-"1"}"}"
 
 : "${CODE_STORAGE:="${TUNNEL_CODE_STORAGE:-"${HOME}/.vscode-tunnel"}"}"
 : "${CODE_ORIGINAL_NAME:="${TUNNEL_ORIGINAL_NAME:-""}"}"
@@ -76,8 +79,9 @@ tunnel_logged_in() {
 
 # Wrapper around code tunnel. Will log automatically.
 code_tunnel() { "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
+# Records the log location and size in _SPAWN_LOG and _SPAWN_LOG_OFFSET.
 code_tunnel_bg() {
-  spawn "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"
+  spawn_logged -n code "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"
 }
 
 
@@ -93,31 +97,43 @@ tunnel_login() {
   # Start reprinting the logs, remember the PID of that process.
   spawn "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG"
 
-  # Watch the logs for the device authorization line and propagate it to the
-  # gist (and container output). Runs in the background since the login might
-  # end without ever printing it.
-  _CODE_LOG_OFFSET=$(file_size "$CODE_LOG")
-  when_infile "$_CODE_LOG_OFFSET" "$CODE_LOG" 'E' \
-    'use code [A-Za-z0-9-]+' tunnel_auth_info >/dev/null &
+  # Login at the provider in the background.
+  code_tunnel_bg user login --provider "$CODE_PROVIDER" >/dev/null
+  _login_pid=$(spawn_latest)
+
+  # Watch the logs of the login for the device authorization line and propagate
+  # it to the gist (and container output). Runs in the background since the
+  # login might end without ever printing it. The PID file allows to stop the
+  # watcher (and its tail process) once login has ended.
+  _CODE_AUTH_PIDFILE=$(mktemp_ext auth pid)
+  (
+    _WHEN_INFILE_PIDFILE=$_CODE_AUTH_PIDFILE
+    when_infile "$_SPAWN_LOG_OFFSET" "$_SPAWN_LOG" 'E' \
+      'use code [A-Za-z0-9-]+' tunnel_auth_info >/dev/null
+  ) &
   _auth_watcher=$!
 
-  # Login at the provider in the background and wait for the process to end.
-  code_tunnel_bg user login --provider "$CODE_PROVIDER"
-  spawn_wait "$(spawn_latest)"
-  kill "$_auth_watcher" 2>/dev/null || true
+  # Wait for the login to end. Capture the exit code instead of letting set -e
+  # abort, so the watcher is always stopped.
+  _login_rc=0
+  spawn_wait "$_login_pid" || _login_rc=$?
+  when_infile_stop "$_CODE_AUTH_PIDFILE"
+  wait "$_auth_watcher" 2>/dev/null || true
+  rm -f "$_CODE_AUTH_PIDFILE"
 
   # Kill the log re-printer tree, we might have children and signals might not
   # be propagated. Note: we cannot kill the process group, as it would kill too
   # many processes and the - semantic isn't supported on busybox.
-  verbose "Logged in at %s" "$CODE_PROVIDER"
   spawn_kill -t -r "login cleanup" # Kill all spawned processes, including the logger
+  [ "$_login_rc" -eq 0 ] || error "Login at $CODE_PROVIDER failed with exit code $_login_rc"
+  verbose "Logged in at %s" "$CODE_PROVIDER"
 }
 
 
-# Start the tunnel. Record the size of the log beforehand, so tunnel_wait only
-# considers lines from this run (and not from earlier runs or failed attempts).
+# Start the tunnel. code_tunnel_bg records the log location and size, so
+# tunnel_wait only considers lines from this run (and not from earlier runs or
+# failed attempts).
 tunnel_start() {
-  _CODE_LOG_OFFSET=$(file_size "$CODE_LOG")
   if [ -z "$CODE_NAME" ]; then
     code_tunnel_bg --accept-server-license-terms --random-name "$@"
   else
@@ -143,7 +159,15 @@ tunnel_auth_info() {
   _auth_url=$(printf %s\\n "$1" | grep -oE 'https?://[^ ]+' | head -n 1)
   _auth_code=$(printf %s\\n "$1" | grep -oE 'use code [A-Za-z0-9-]+' | sed -E 's/^use code //')
   verbose "Device authorization required at %s with code %s" "$_auth_url" "$_auth_code"
-  reprint "$CODE_GIST_FILE" <<EOF
+
+  # Anyone able to read the gist could use the code to authorize the device
+  # with their own account. Allow to only print it to the container output.
+  _auth_gist=$CODE_GIST_FILE
+  if ! is_true "$CODE_AUTH_PUBLISH"; then
+    [ -n "$_auth_gist" ] && debug "Not publishing device authorization code to gist"
+    _auth_gist=
+  fi
+  gist_publish "$_auth_gist" "$CODE_TIMESTAMP" <<EOF
 
 (vs)code tunnel requires device authorization at $CODE_PROVIDER. Open:
     $_auth_url
@@ -151,7 +175,6 @@ and enter the code:
     $_auth_code
 
 EOF
-  [ -n "$CODE_GIST_FILE" ] && "$CODE_TIMESTAMP" -s 0 -- "$CODE_GIST_FILE" || true
   return 0
 }
 
@@ -159,14 +182,12 @@ EOF
 tunnel_info() {
   # Log URL, also make sure it appears in the container output.
   verbose "Code tunnel started at %s" "$1"
-  reprint "$CODE_GIST_FILE" <<EOF
+  gist_publish "$CODE_GIST_FILE" "$CODE_TIMESTAMP" <<EOF
 
 (vs)code tunnel running, access it from your browser at the following URL:
     $1
 
 EOF
-  # Timestamp the gist file to indicate when it was last updated.
-  [ -n "$CODE_GIST_FILE" ] && "$CODE_TIMESTAMP" -s 0 -- "$CODE_GIST_FILE" || true
 }
 
 
@@ -174,11 +195,13 @@ EOF
 # the ones originally given to tunnel_start, they are passed again on restarts.
 tunnel_wait() {
   # _CODE_RESTART_FLAG is inherited by the when_infile subshell so tunnel_restart
-  # can signal back without modifying _CODER_PIDS in the child.
-  _CODE_RESTART_FLAG=$(mktemp "${TMPDIR:-/tmp}/restart.XXXXXX")
+  # can signal back without modifying _CODER_PIDS in the child. Only reserve a
+  # unique name: the file must not exist until tunnel_restart creates it.
+  _CODE_RESTART_FLAG=$(mktemp_ext restart flag)
+  rm -f "$_CODE_RESTART_FLAG"
   debug "Wait for code tunnel to start..."
   while true; do
-    url=$(when_infile "$_CODE_LOG_OFFSET" "$CODE_LOG" 'E' \
+    url=$(when_infile "$_SPAWN_LOG_OFFSET" "$_SPAWN_LOG" 'E' \
             'error connecting to tunnel:' tunnel_restart \
             '(Open this link in your browser|➜\s+Open:)' - | grep -oE 'https?://.*') || true
     if [ -f "$_CODE_RESTART_FLAG" ]; then
