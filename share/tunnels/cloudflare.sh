@@ -72,6 +72,8 @@ tunnel_start() {
   # all remaining arguments blindly to the command.
   unset_varset TUNNEL
 
+  # Record the size of the log, so tunnel_wait only considers lines from this run.
+  _CLOUDFLARE_LOG_OFFSET=$(file_size "$CLOUDFLARE_LOG")
   spawn -n cloudflared -- \
     "$CLOUDFLARE_LWRAP" -- \
       "$CLOUDFLARE_BIN" tunnel \
@@ -111,7 +113,7 @@ EOF
 
 tunnel_wait() {
   debug "Wait for cloudflare tunnel to start..."
-  url=$(when_infile "$CLOUDFLARE_LOG" 'E' \
+  url=$(when_infile "$_CLOUDFLARE_LOG_OFFSET" "$CLOUDFLARE_LOG" 'E' \
           'https://.*\.trycloudflare.com' - | grep -oE 'https://.*\.trycloudflare.com')
   tunnel_info "$url"
 }

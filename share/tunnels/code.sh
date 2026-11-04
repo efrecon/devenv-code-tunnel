@@ -96,7 +96,8 @@ tunnel_login() {
   # Watch the logs for the device authorization line and propagate it to the
   # gist (and container output). Runs in the background since the login might
   # end without ever printing it.
-  when_infile "$CODE_LOG" 'E' \
+  _CODE_LOG_OFFSET=$(file_size "$CODE_LOG")
+  when_infile "$_CODE_LOG_OFFSET" "$CODE_LOG" 'E' \
     'use code [A-Za-z0-9-]+' tunnel_auth_info >/dev/null &
   _auth_watcher=$!
 
@@ -113,8 +114,10 @@ tunnel_login() {
 }
 
 
-# Start the tunnel
+# Start the tunnel. Record the size of the log beforehand, so tunnel_wait only
+# considers lines from this run (and not from earlier runs or failed attempts).
 tunnel_start() {
+  _CODE_LOG_OFFSET=$(file_size "$CODE_LOG")
   if [ -z "$CODE_NAME" ]; then
     code_tunnel_bg --accept-server-license-terms --random-name "$@"
   else
@@ -167,21 +170,22 @@ EOF
 }
 
 
-# Wait for the tunnel to be started and print out its URL
+# Wait for the tunnel to be started and print out its URL. All arguments are
+# the ones originally given to tunnel_start, they are passed again on restarts.
 tunnel_wait() {
   # _CODE_RESTART_FLAG is inherited by the when_infile subshell so tunnel_restart
   # can signal back without modifying _CODER_PIDS in the child.
   _CODE_RESTART_FLAG=$(mktemp "${TMPDIR:-/tmp}/restart.XXXXXX")
   debug "Wait for code tunnel to start..."
   while true; do
-    url=$(when_infile "$CODE_LOG" 'E' \
+    url=$(when_infile "$_CODE_LOG_OFFSET" "$CODE_LOG" 'E' \
             'error connecting to tunnel:' tunnel_restart \
             '(Open this link in your browser|➜\s+Open:)' - | grep -oE 'https?://.*') || true
     if [ -f "$_CODE_RESTART_FLAG" ]; then
       rm -f "$_CODE_RESTART_FLAG"
       [ "$CODE_RESTART" -lt 0 ] && break
       sleep "$CODE_RESTART"
-      tunnel_start
+      tunnel_start "$@"
       continue
     fi
     break
@@ -236,7 +240,7 @@ if [ -z "$CODE_REEXPOSE" ] || printf %s\\n "$CODE_REEXPOSE" | grep -qF 'code'; t
   spawn "$CODE_LOGGER" -s "$CODE_BIN" -- "$CODE_LOG"
 fi
 tunnel_start "$@"
-tunnel_wait
+tunnel_wait "$@"
 
 CODE_PID=$(spawn_latest)
 trace "Code tunnel running as PID %d, waiting for it to exit.." "$CODE_PID"

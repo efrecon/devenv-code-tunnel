@@ -36,25 +36,44 @@ _match_in_pairs() {
 }
 
 
-# Watch the content of a file and whenever a line matches an expression, call a
-# function with the content of the line. When the function returns true, end the
-# loop and print the matching line. Otherwise, continue to watch the file. When
-# the function is -, do not call it.
-# $1: the file to watch
-# $2: the grep matching format, e.g. F or E.
-# $3 and further: a pattern, then a function, and so on.
-when_infile() {
-  [ -z "${1:-}" ] && error "when_infile: No file path given"
-  [ -z "${2:-}" ] && error "when_infile: No grep matching format given"
-  wait_file "$1"
+# Print the current size of a file in bytes, 0 when it does not exist (yet).
+# Record this before starting a process that writes to the file, and pass it to
+# when_infile so that only lines written by that process are considered.
+file_size() {
+  [ -z "${1:-}" ] && error "file_size: No file path given"
+  if [ -f "$1" ]; then
+    wc -c < "$1" | tr -d '[:space:]'
+  else
+    printf '0\n'
+  fi
+}
 
-  _fpath=$1
-  _opt=$2
-  shift 2
+
+# Watch the content of a file, starting at a byte offset, and whenever a line
+# matches an expression, call a function with the content of the line. When the
+# function returns true, end the loop and print the matching line. Otherwise,
+# continue to watch the file. When the function is -, do not call it.
+# $1: byte offset to start watching from, as returned by file_size. Content
+#     before that offset is ignored. Lines written between taking the offset
+#     and calling this function are not lost.
+# $2: the file to watch
+# $3: the grep matching format, e.g. F or E.
+# $4 and further: a pattern, then a function, and so on.
+when_infile() {
+  [ -z "${1:-}" ] && error "when_infile: No byte offset given"
+  [ -z "${2:-}" ] && error "when_infile: No file path given"
+  [ -z "${3:-}" ] && error "when_infile: No grep matching format given"
+
+  _offset=$1
+  _fpath=$2
+  _opt=$3
+  shift 3
+  wait_file "$_fpath"
+
   # We use a sub-shell so the main while loop can run independently and return
   # as soon as the condition is met but will keep running until it is met. See:
-  # https://superuser.com/a/900134
-  ( tail -f -- "$_fpath" & ) | while IFS= read -r _line; do
+  # https://superuser.com/a/900134. tail -c +N is 1-based, hence the +1.
+  ( tail -c "+$((_offset + 1))" -f -- "$_fpath" & ) | while IFS= read -r _line; do
     _fn=$(_match_in_pairs "$_line" "$_opt" "$@" || true)
     if [ -n "$_fn" ]; then
       trace "'%s' matches, sending for processing to %s" "$_line" "$_fn"

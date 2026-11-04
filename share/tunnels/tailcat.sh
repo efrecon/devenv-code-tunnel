@@ -80,6 +80,8 @@ tunnel_configure() {
 
 
 tunnel_start() {
+  # Record the size of the log, so tunnel_wait only considers lines from this run.
+  _TAILCAT_LOG_OFFSET=$(file_size "$TAILCAT_LOG")
   spawn -n tailcat -- \
     "$TAILCAT_LWRAP" -- \
       "$TAILCAT_BIN" --key "$TAILCAT_HOSTNAME" serve "$TAILCAT_SSH" "$@" > /dev/null
@@ -116,8 +118,8 @@ EOF
 
 
 tunnel_wait() {
-  debug "Wait for cloudflare tunnel to start..."
-  addr=$(when_infile "$TAILCAT_LOG" 'E' \
+  debug "Wait for tailcat tunnel to start..."
+  addr=$(when_infile "$_TAILCAT_LOG_OFFSET" "$TAILCAT_LOG" 'E' \
           'tc[A-Za-z0-9_-]{30,250}' - | grep -oE 'tc[A-Za-z0-9_-]{30,250}')
   tunnel_info "$addr"
 }
