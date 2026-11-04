@@ -93,9 +93,17 @@ tunnel_login() {
   # Start reprinting the logs, remember the PID of that process.
   spawn "$CODE_LOGGER" -s "$CODER_BIN" -- "$CODE_LOG"
 
+  # Watch the logs for the device authorization line and propagate it to the
+  # gist (and container output). Runs in the background since the login might
+  # end without ever printing it.
+  when_infile "$CODE_LOG" 'E' \
+    'use code [A-Za-z0-9-]+' tunnel_auth_info >/dev/null &
+  _auth_watcher=$!
+
   # Login at the provider in the background and wait for the process to end.
   code_tunnel_bg user login --provider "$CODE_PROVIDER"
   spawn_wait "$(spawn_latest)"
+  kill "$_auth_watcher" 2>/dev/null || true
 
   # Kill the log re-printer tree, we might have children and signals might not
   # be propagated. Note: we cannot kill the process group, as it would kill too
@@ -122,6 +130,25 @@ tunnel_restart() {
   CODE_PID=$(spawn_latest)
   [ -n "$CODE_PID" ] && spawn_kill -t -r "restart" "$CODE_PID"
   touch "$_CODE_RESTART_FLAG"
+  return 0
+}
+
+
+# Print out the device authorization details found in the log line passed as an
+# argument, also to the gist file. Returns 0 so when_infile stops watching.
+tunnel_auth_info() {
+  _auth_url=$(printf %s\\n "$1" | grep -oE 'https?://[^ ]+' | head -n 1)
+  _auth_code=$(printf %s\\n "$1" | grep -oE 'use code [A-Za-z0-9-]+' | sed -E 's/^use code //')
+  verbose "Device authorization required at %s with code %s" "$_auth_url" "$_auth_code"
+  reprint "$CODE_GIST_FILE" <<EOF
+
+(vs)code tunnel requires device authorization at $CODE_PROVIDER. Open:
+    $_auth_url
+and enter the code:
+    $_auth_code
+
+EOF
+  [ -n "$CODE_GIST_FILE" ] && "$CODE_TIMESTAMP" -s 0 -- "$CODE_GIST_FILE" || true
   return 0
 }
 
