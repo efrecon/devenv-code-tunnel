@@ -47,10 +47,13 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 # Default XDG config directory.
 : "${XDG_CONFIG_HOME:="$HOME/.config"}"
 
-# Colon-separated directories where to look for env files, and space-separated
-# names of the env files to look for in each directory. All files found are read.
+# Colon-separated directories where to look for env files
 : "${DEVENV_PATH:="/etc:/usr/local/etc:$XDG_CONFIG_HOME:$HOME"}"
-: "${DEVENV_ENVFILES:=".devenv.env devenv.env"}"
+
+# space-separated names of the env files to look for in each directory. Order
+# kind of matters: hidden files for "secret settings" should come last and
+# override.
+: "${DEVENV_ENVFILES:="devenv.env .devenv.env"}"
 
 # Verbosity level for this script.
 : "${DEVENV_VERBOSE:=1}"

@@ -76,7 +76,7 @@ running in the foreground and offering these features:
   Variable starting with `DEVENV_` control the behaviour of `devenv.sh`.
   Variable starting with `TUNNEL_` are automatically passed to the entrypoint.
   All other variables are ignored.
-  Env files named `.devenv.env` and `devenv.env` (see `DEVENV_ENVFILES`) are looked for
+  Env files named `devenv.env` and `.devenv.env` (see `DEVENV_ENVFILES`) are looked for
   in the following directories (see `DEVENV_PATH`):
   - /etc
   - /usr/local/etc
