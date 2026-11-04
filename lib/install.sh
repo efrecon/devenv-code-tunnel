@@ -48,12 +48,13 @@ checksum() {
 }
 
 
-dir_owner() {
-  [ -z "$1" ] && error "dir_owner: no directory given"
+# Print the uid:gid owning directory $1, or its closest existing parent.
+dir_ownership() {
+  [ -z "$1" ] && error "dir_ownership: no directory given"
   if [ -d "$1" ]; then
-    stat -c %u "$1"
+    stat -c %u:%g "$1"
   else
-    dir_owner "$(dirname "$1")"
+    dir_ownership "$(dirname "$1")"
   fi
 }
 
@@ -147,7 +148,8 @@ internet_bin_installer() {
   fi
 
   # Copy into destination directory, respecting ownership
-  if [ "$(dir_owner "$2")" = "0" ]; then
+  _own=$(dir_ownership "$2")
+  if [ "${_own%%:*}" = "0" ]; then
     verbose "Installing %s to %s, as root" "$1" "${2%/}/$_tgt_bin"
     as_root mkdir -p "$2"
     if [ "$_ext" = "gz" ]; then
@@ -202,7 +204,8 @@ internet_bintgz_installer() {
   tar -C "$_tmp_d" --no-same-owner -zxf "$_tmp_tgz"
 
   # Find the target binary inside the tgz, respect ownership
-  if [ "$(dir_owner "$2")" = "0" ]; then
+  _own=$(dir_ownership "$2")
+  if [ "${_own%%:*}" = "0" ]; then
     verbose "Installing from %s to %s, as root" "$1" "${2%/}/$_tgt_bin"
     as_root mkdir -p "$2"
     as_root find "$_tmp_d" -name "${5:-$_tgt_bin}" -type f -exec mv -f \{\} "${2%/}/$_tgt_bin" \;
@@ -212,6 +215,11 @@ internet_bintgz_installer() {
     mkdir -p "$2"
     find "$_tmp_d" -name "${5:-$_tgt_bin}" -type f -exec mv -f \{\} "${2%/}/$_tgt_bin" \;
     chmod a+rx "${2%/}/$_tgt_bin"
+  fi
+  # When running as root, the binary would be owned by root: give it the owner
+  # and group of the target directory instead.
+  if [ "$(id -u)" = "0" ]; then
+    chown "$_own" "${2%/}/$_tgt_bin"
   fi
 
   # Clean up and return the path to the target binary
@@ -246,7 +254,8 @@ internet_tgz_installer() {
   # Extract into the target directory, respect ownership. Do not restore the
   # owners from the archive, they are meaningless here.
   _tgt_d=$2
-  if [ "$(dir_owner "$_tgt_d")" = "0" ]; then
+  _own=$(dir_ownership "$_tgt_d")
+  if [ "${_own%%:*}" = "0" ]; then
     verbose "Installing from %s to %s, as root" "$1" "$_tgt_d"
     as_root mkdir -p "$_tgt_d"
     shift 4
@@ -256,6 +265,18 @@ internet_tgz_installer() {
     mkdir -p "$_tgt_d"
     shift 4
     tar -C "$_tgt_d" --no-same-owner -zxf "$_tmp_tgz" "$@"
+  fi
+
+  # When running as root, extracted files would be owned by root: give them the
+  # owner and group of the target directory instead. Extract once more to a
+  # temporary directory to know which paths the extraction above produced, as
+  # tar options in $@ (e.g. --strip-components) change them.
+  if [ "$(id -u)" = "0" ]; then
+    _tmp_d=$(mktemp -d -t "${_tgt}.XXXXXX")
+    tar -C "$_tmp_d" --no-same-owner -zxf "$_tmp_tgz" "$@"
+    ( cd "$_tmp_d" && find . -mindepth 1 -print0 ) |
+      ( cd "$_tgt_d" && xargs -0 -r chown -h "$_own" )
+    rm -rf "$_tmp_d"
   fi
 
   # Clean up
@@ -286,7 +307,8 @@ internet_deb_installer() {
   fi
 
   # Install the deb package, respecting ownership
-  if [ "$(dir_owner "$2")" = "0" ]; then
+  _own=$(dir_ownership "$2")
+  if [ "${_own%%:*}" = "0" ]; then
     verbose "Installing from %s to %s, as root" "$1" "${2}"
     as_root mkdir -p "$2"
     as_root dpkg -i --force-depends --force-confold --force-confdef --instdir="${2%/}" "$_tmp_deb"
