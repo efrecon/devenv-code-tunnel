@@ -196,9 +196,10 @@ internet_bintgz_installer() {
     fi
   fi
 
-  # Extract to a temporary directory
+  # Extract to a temporary directory. Do not restore the owners from the
+  # archive, as they would be kept when moving the binary in place.
   _tmp_d=$(mktemp -d -t "${_tgt_bin}.XXXXXX")
-  tar -C "$_tmp_d" -zxf "$_tmp_tgz"
+  tar -C "$_tmp_d" --no-same-owner -zxf "$_tmp_tgz"
 
   # Find the target binary inside the tgz, respect ownership
   if [ "$(dir_owner "$2")" = "0" ]; then
@@ -242,18 +243,19 @@ internet_tgz_installer() {
     fi
   fi
 
-  # Find the target binary inside the tgz, respect ownership
+  # Extract into the target directory, respect ownership. Do not restore the
+  # owners from the archive, they are meaningless here.
   _tgt_d=$2
   if [ "$(dir_owner "$_tgt_d")" = "0" ]; then
     verbose "Installing from %s to %s, as root" "$1" "$_tgt_d"
     as_root mkdir -p "$_tgt_d"
     shift 4
-    as_root tar -C "$_tgt_d" -zxf "$_tmp_tgz" "$@"
+    as_root tar -C "$_tgt_d" --no-same-owner -zxf "$_tmp_tgz" "$@"
   else
     verbose "Installing from %s to %s" "$1" "$_tgt_d"
     mkdir -p "$_tgt_d"
     shift 4
-    tar -C "$_tgt_d" -zxf "$_tmp_tgz" "$@"
+    tar -C "$_tgt_d" --no-same-owner -zxf "$_tmp_tgz" "$@"
   fi
 
   # Clean up
