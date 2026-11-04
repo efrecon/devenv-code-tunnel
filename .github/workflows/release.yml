@@ -1,0 +1,58 @@
+name: release
+
+# Build and push all images when a GitHub release is published. On release
+# events, github.ref is refs/tags/<tag>, so the checkout in _build.yml builds
+# the tagged commit and docker/metadata-action tags the images with the exact
+# git tag (type=ref,event=tag, part of its default tags).
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  repository:
+    runs-on: ubuntu-26.04
+    permissions: {}
+    outputs:
+      repository: ${{ steps.extract.outputs.repository }}
+    steps:
+      -
+        name: extract
+        id: extract
+        run: |
+          repository=$(printf %s\\n "${{ github.repository }}" | cut -d'/' -f2)
+          printf 'repository=%s\n' "$repository" >> $GITHUB_OUTPUT
+
+  all-in-one:
+    uses: ./.github/workflows/_build.yml
+    needs: repository
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        os: [alpine, debian, ubuntu]
+    with:
+      image: ${{ github.repository_owner }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}
+      os: ${{ matrix.os }}
+      username: ${{ github.actor }}
+    secrets:
+      password: ${{ secrets.GITHUB_TOKEN }}
+
+  minimal:
+    uses: ./.github/workflows/_build.yml
+    needs: repository
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        os: [alpine, debian, ubuntu]
+    with:
+      image: ${{ github.repository_owner }}/${{ needs.repository.outputs.repository }}-${{ matrix.os }}-minimal
+      os: ${{ matrix.os }}
+      build-args: |
+        INSTALL_FEATURES=sudo codecli cloudflare git
+      username: ${{ github.actor }}
+    secrets:
+      password: ${{ secrets.GITHUB_TOKEN }}
