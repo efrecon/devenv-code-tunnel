@@ -49,7 +49,7 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 # Colon-separated directories where to look for env files, and space-separated
 # names of the env files to look for in each directory. All files found are read.
-: "${DEVENV_PATH:="/etc:/usr/local/etc:$XDG_CONFIG_HOME:$HOME:$(pwd)"}"
+: "${DEVENV_PATH:="/etc:/usr/local/etc:$XDG_CONFIG_HOME:$HOME"}"
 : "${DEVENV_ENVFILES:=".devenv.env devenv.env"}"
 
 # Verbosity level for this script.
