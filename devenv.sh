@@ -93,7 +93,9 @@ Everything else is passed to the container, as is.
 
 All files named after $DEVENV_ENVFILES in directories from $DEVENV_PATH are read,
 in order, before parsing the options. They contain KEY=VALUE lines, values are
-never evaluated. Only DEVENV_ and TUNNEL_ variables are recognised.
+never evaluated. Only DEVENV_ and TUNNEL_ variables are recognised, variables
+already in the environment take precedence. DEVENV_PATH and DEVENV_ENVFILES can
+only be set from the environment.
 Set DEVENV_ or TUNNEL_ variables to set defaults for $DEVENV_BIN or the container entrypoint.
 
 Examples:
@@ -110,7 +112,9 @@ EOF
 main() {
   # Read all env files with names from the space-separated DEVENV_ENVFILES, found
   # in the directories of the colon-separated DEVENV_PATH. Files are read in
-  # order, so later files override settings from earlier ones.
+  # order, so later files override settings from earlier ones. Variables
+  # already in the environment take precedence: remember their names first.
+  _env_names=" $(env | { grep -oE '^(DEVENV|TUNNEL)_[A-Za-z0-9_]*=' || true; } | tr -d = | tr '\n' ' ')"
   _ifs=$IFS; IFS=:
   for _env_dir in $DEVENV_PATH; do
     [ -d "$_env_dir" ] || continue
@@ -124,7 +128,7 @@ main() {
     IFS=:
   done
   IFS=$_ifs
-  unset _ifs _env_dir _env_name
+  unset _ifs _env_dir _env_name _env_names
 
   # Now parse the options. Do it here so we can override the defaults set by the
   # env files or environment variables.
@@ -385,8 +389,10 @@ error() { _log ERR "$@" && exit 1; }
 # Read the env file at $1, made of KEY=VALUE lines. Blank lines, comments and an
 # optional leading "export" are allowed. Values can be single- or double-quoted,
 # unquoted values end at a whitespace-preceded #. Values are never evaluated.
-# Only DEVENV_ and TUNNEL_ variables are set. TUNNEL_ variables are exported so
-# they can be passed to the container, DEVENV_ variables stay local.
+# Only DEVENV_ and TUNNEL_ variables are set, except DEVENV_PATH and
+# DEVENV_ENVFILES, and except those which names are in $_env_names, i.e. already
+# in the environment. TUNNEL_ variables are exported so they can be passed to
+# the container, DEVENV_ variables stay local.
 # shellcheck disable=SC2094 # $1 is only mentioned in logs, never written to
 env_load() {
   _cr=$(printf '\r')
@@ -413,9 +419,16 @@ env_load() {
     case "$_name" in
       *[!A-Za-z0-9_]*)
         warn "%s:%d: Invalid variable name %s, ignored" "$1" "$_lineno" "$_name"; continue;;
+      DEVENV_PATH|DEVENV_ENVFILES)
+        warn "%s:%d: %s can only be set from the environment, ignored" "$1" "$_lineno" "$_name"; continue;;
       DEVENV_*|TUNNEL_*) ;;
       *)
         warn "%s:%d: %s is neither DEVENV_ nor TUNNEL_, ignored" "$1" "$_lineno" "$_name"; continue;;
+    esac
+
+    case "$_env_names" in
+      *" $_name "*)
+        trace "%s:%d: %s already set in environment, ignored" "$1" "$_lineno" "$_name"; continue;;
     esac
 
     _value=${_line#*=}
@@ -424,7 +437,10 @@ env_load() {
       \"*) _value=${_value#\"}; _value=${_value%%\"*};;
       \'*) _value=${_value#\'}; _value=${_value%%\'*};;
       *)
+        # Strip comments before trimming, as "KEY= # comment" is an empty value.
+        _value=${_line#*=}
         _value=${_value%%[[:space:]]#*}
+        _value=${_value#"${_value%%[![:space:]]*}"}
         _value=${_value%"${_value##*[![:space:]]}"}
         ;;
     esac

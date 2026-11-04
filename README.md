@@ -71,6 +71,8 @@ running in the foreground and offering these features:
 - The `-v` option will be passed to the entrypoint of the container, providing for more information in the logs of the container.
   You can pass any [option](#quick-options-tunnelsh-run-down) recognized by the [entrypoint](#quick-options-tunnelsh-run-down).
 - All env files found will have been read, in order, later files overriding earlier ones.
+  Variables already set in the environment take precedence over env files,
+  and options given on the command line take precedence over both.
   Variable starting with `DEVENV_` control the behaviour of `devenv.sh`.
   Variable starting with `TUNNEL_` are automatically passed to the entrypoint.
   All other variables are ignored.
@@ -85,6 +87,7 @@ running in the foreground and offering these features:
   Env files are not sourced, they only contain `KEY=VALUE` lines.
   Values can be quoted and are taken literally: `$VAR`, `$(cmd)` or `` `cmd` `` are not expanded.
   Blank lines, comments and a leading `export` are allowed.
+  `DEVENV_PATH` and `DEVENV_ENVFILES` can only be set from the environment.
   See [`devenv.env`](./devenv.env) for an example.
 
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
