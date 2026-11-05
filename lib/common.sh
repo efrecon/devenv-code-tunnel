@@ -78,8 +78,17 @@ assert_version() {
 }
 
 
+# Print $1 (default 16) random characters from the tr set at $2 (default
+# alphanumerical). Read bounded chunks of random bytes: with tr reading all of
+# /dev/urandom, head would close the pipe early, and tr would be killed by
+# SIGPIPE, failing callers using pipefail.
 generate_random() {
-  LC_ALL=C tr -dc "${2:-"a-zA-Z0-9"}" < /dev/urandom | head -c "${1:-16}"
+  _gr=
+  while [ "${#_gr}" -lt "${1:-16}" ]; do
+    _gr=${_gr}$(head -c 64 /dev/urandom | LC_ALL=C tr -dc "${2:-"a-zA-Z0-9"}")
+  done
+  printf %s "$_gr" | cut -c "1-${1:-16}" | tr -d '\n'
+  unset _gr
 }
 
 
@@ -108,21 +117,30 @@ find_inpath() {
 export_varset() {
   [ -z "$1" ] && error "export_varset: no var prefix given"
   while IFS= read -r varname; do
+    # No variable with that prefix gives an empty line.
+    [ -z "$varname" ] && continue
     # shellcheck disable=SC2163 # We want to export the name of the variable
     export "$varname"
   done <<EOF
-$(set | grep "^${1}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
+$(_varset_names "$1")
 EOF
 }
 
 unset_varset() {
-  [ -z "$1" ] && error "export_varset: no var prefix given"
+  [ -z "$1" ] && error "unset_varset: no var prefix given"
   while IFS= read -r varname; do
+    [ -z "$varname" ] && continue
     # shellcheck disable=SC2163 # We want to unset the name of the variable
     unset "$varname"
   done <<EOF
-$(set | grep "^${1}_" | sed -E 's/^([A-Z_]+)=.*/\1/g')
+$(_varset_names "$1")
 EOF
+}
+
+# Print the names of the variables starting with the prefix passed as an
+# argument, followed by an underscore.
+_varset_names() {
+  set | sed -n -E "s/^(${1}_[A-Za-z0-9_]*)=.*/\\1/p"
 }
 
 

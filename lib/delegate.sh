@@ -42,13 +42,11 @@ init_get() {
 }
 
 
-# Catch up the list of PIDs in _CODER_PIDS, removing any that have exited, add
-# the ones passed as arguments if they are alive.
+# Catch up the list of PIDs in _CODER_PIDS, removing any that have exited.
 _spawn_update() {
-  # Reconstruct the list of alive PIDs, by checking each PID in _CODER_PIDS. Any
-  # PID passed as argument is to be added to the list, if it is alive.
+  # Reconstruct the list of alive PIDs, by checking each PID in _CODER_PIDS.
   _alive_pids=
-  for _pid in $_CODER_PIDS "$@"; do
+  for _pid in $_CODER_PIDS; do
     [ -z "${_pid:-}" ] && continue
     if kill -0 "$_pid" 2>/dev/null; then
       if [ -z "$_alive_pids" ]; then
@@ -64,9 +62,18 @@ _spawn_update() {
 
 
 # Wait for the process with PID passed as $1 to exit. Returns the exit code of
-# the process, or 0 if the process was already dead.
+# the process, or 0 if it is unknown.
 _spawn_wait() {
   [ -z "${1:-}" ] && return 0
+
+  # The process may already have exited and been reaped by the shell. wait
+  # still returns its exit code then, or 127 when the PID is unknown.
+  if ! kill -0 "$1" 2>/dev/null; then
+    _wrc=0
+    wait "$1" 2>/dev/null || _wrc=$?
+    [ "$_wrc" -eq 127 ] && _wrc=0
+    return "$_wrc"
+  fi
 
   # Re-enter wait if interrupted by a signal before the process actually exits
   while kill -0 "$1" 2>/dev/null; do
@@ -126,6 +133,7 @@ spawn_kill() {
   _sigspec=TERM
   _tree=0
   _reason=unknown
+  OPTIND=1 # bash keeps OPTIND between calls to getopts
   while getopts "r:s:t-" opt; do
     case "$opt" in
       r) # Specify the reason for logging purposes
@@ -170,6 +178,7 @@ spawn_kill() {
 # Spawn a process in the background, and return its PID.
 spawn() {
   _name=
+  OPTIND=1 # bash keeps OPTIND between calls to getopts
   while getopts "n:-" opt; do
     case "$opt" in
       n) # Specify the name for logging purposes
@@ -199,7 +208,10 @@ spawn() {
 
   # Prune dead PIDs before appending, so the list only holds live processes. Add
   # the new PID to the list of live processes.
-  _spawn_update "$_spawned"
+  # Always remember the PID, even when the process has already exited, so that
+  # spawn_wait can collect its exit code.
+  _spawn_update
+  _CODER_PIDS="${_CODER_PIDS:+"$_CODER_PIDS "}$_spawned"
   debug "Spawned %s with PID %d" "$_name" "$_spawned"
 
   # Install process-wide signal handlers if not already done.
@@ -223,6 +235,8 @@ spawn() {
 # _SPAWN_LOG and _SPAWN_LOG_OFFSET. Pass both to when_infile to only consider
 # lines written by this run of the command. Requires wait.sh for file_size.
 # Usage: spawn_logged [-n name] <lwrap> -- <bin> [args...]
+# When given, the name is also the name of the log file, which is useful when
+# <bin> is a wrapper, e.g. clear.sh. Otherwise, the log is named after <bin>.
 # Must not be called in a subshell, e.g. $(...), or the variables are lost.
 spawn_logged() {
   _sl_name=
@@ -235,12 +249,18 @@ spawn_logged() {
   shift
   [ "${1:-}" = "--" ] && shift
   [ -z "${1:-}" ] && error "spawn_logged: No executable given"
-  [ -z "$_sl_name" ] && _sl_name=$(basename "$1")
 
-  _SPAWN_LOG=$("$_sl_lwrap" -L -- "$1")
-  _SPAWN_LOG_OFFSET=$(file_size "$_SPAWN_LOG")
-  trace "Log of %s at %s, from byte %d" "$_sl_name" "$_SPAWN_LOG" "$_SPAWN_LOG_OFFSET"
-  spawn -n "$_sl_name" -- "$_sl_lwrap" -- "$@"
+  if [ -n "$_sl_name" ]; then
+    _SPAWN_LOG=$("$_sl_lwrap" -L -n "$_sl_name" -- "$1")
+    _SPAWN_LOG_OFFSET=$(file_size "$_SPAWN_LOG")
+    trace "Log of %s at %s, from byte %d" "$_sl_name" "$_SPAWN_LOG" "$_SPAWN_LOG_OFFSET"
+    spawn -n "$_sl_name" -- "$_sl_lwrap" -n "$_sl_name" -- "$@"
+  else
+    _SPAWN_LOG=$("$_sl_lwrap" -L -- "$1")
+    _SPAWN_LOG_OFFSET=$(file_size "$_SPAWN_LOG")
+    trace "Log of %s at %s, from byte %d" "$1" "$_SPAWN_LOG" "$_SPAWN_LOG_OFFSET"
+    spawn -n "$(basename "$1")" -- "$_sl_lwrap" -- "$@"
+  fi
   unset _sl_name _sl_lwrap || true
 }
 

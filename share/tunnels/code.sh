@@ -77,8 +77,7 @@ tunnel_logged_in() {
   return 1
 }
 
-# Wrapper around code tunnel. Will log automatically.
-code_tunnel() { "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"; }
+# Wrapper around code tunnel, in the background. Will log automatically.
 # Records the log location and size in _SPAWN_LOG and _SPAWN_LOG_OFFSET.
 code_tunnel_bg() {
   spawn_logged -n code "$CODE_LWRAP" -- "$CODE_BIN" tunnel "$@"
@@ -135,15 +134,16 @@ tunnel_login() {
 # failed attempts).
 tunnel_start() {
   if [ -z "$CODE_NAME" ]; then
-    code_tunnel_bg --accept-server-license-terms --random-name "$@"
+    code_tunnel_bg --accept-server-license-terms --random-name "$@" >/dev/null
   else
-    code_tunnel_bg --accept-server-license-terms --name "$CODE_NAME" "$@"
+    code_tunnel_bg --accept-server-license-terms --name "$CODE_NAME" "$@" >/dev/null
   fi
 }
 
 
 # Kill the current tunnel and set the restart flag; returns 0 to stop when_infile
 # so the parent loop can call tunnel_start and capture the new PID.
+# shellcheck disable=SC2329 # Called by when_infile
 tunnel_restart() {
   warn "Error in tunnel: $1"
   CODE_PID=$(spawn_latest)
@@ -155,6 +155,7 @@ tunnel_restart() {
 
 # Print out the device authorization details found in the log line passed as an
 # argument, also to the gist file. Returns 0 so when_infile stops watching.
+# shellcheck disable=SC2329 # Called by when_infile
 tunnel_auth_info() {
   _auth_url=$(printf %s\\n "$1" | grep -oE 'https?://[^ ]+' | head -n 1)
   _auth_code=$(printf %s\\n "$1" | grep -oE 'use code [A-Za-z0-9-]+' | sed -E 's/^use code //')
@@ -221,7 +222,7 @@ tunnel_wait() {
 CODER_DESCR="vscode tunnel starter"
 
 # Initialize
-log_init TUNNEL
+log_init CODE
 
 # Load defaults
 [ -n "$CODE_DEFAULTS" ] && read_envfile "$CODE_DEFAULTS" CODE
