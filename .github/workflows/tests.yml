@@ -1,0 +1,49 @@
+name: tests
+
+# Run the unit tests of the shared libraries and orchestration tools, in the
+# same distributions as the images are built from. Installation scripts are not
+# covered here, they are exercised by building the images.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-26.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # busybox sh and tools
+          - image: alpine:3.24
+            deps: apk add -q git logrotate inotify-tools bash
+          # dash and GNU tools
+          - image: debian:trixie-slim
+            deps: apt-get -qq update && apt-get -qq install -y git logrotate >/dev/null
+          - image: ubuntu:26.04
+            deps: apt-get -qq update && apt-get -qq install -y git logrotate >/dev/null
+          # bash in POSIX mode: bash enters it when invoked as sh, so make
+          # /bin/sh point to bash. This also covers the #!/bin/sh scripts that
+          # the tested scripts call themselves. Fail early if not in POSIX mode.
+          - image: debian:trixie-slim
+            variant: bash as sh
+            deps: >-
+              apt-get -qq update && apt-get -qq install -y git logrotate >/dev/null &&
+              ln -sf bash /bin/sh &&
+              sh -c "set -o" | grep -qE "^posix[[:space:]]+on"
+    name: unit (${{ matrix.image }}${{ matrix.variant && format(', {0}', matrix.variant) || '' }})
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Run tests
+        run: |
+          docker run --rm --init \
+            -v "$PWD:/src:ro" \
+            -w /src \
+            "${{ matrix.image }}" \
+            sh -c '${{ matrix.deps }} && tests/run.sh'

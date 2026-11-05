@@ -63,7 +63,8 @@ shift $((OPTIND - 1))
 timestamp_set() {
   _timestamp=$(date '+%Y%m%d-%H%M%S%z')
   # Ensure that the header is escaped properly for use in regex and replacement in sed.
-  _timestamp_header_regex=$(printf '%s\n' "$TIMESTAMP_HEADER" | sed 's/[][\\.^$*]/\\&/g')
+  # | is the delimiter of the sed command below, so it must be escaped as well.
+  _timestamp_header_regex=$(printf '%s\n' "$TIMESTAMP_HEADER" | sed 's/[][\\.^$*|]/\\&/g')
   _timestamp_header_replacement=$(printf '%s\n' "$TIMESTAMP_HEADER" | sed 's/[\\&|]/\\&/g')
 
   if grep -q "^${_timestamp_header_regex}" "$TIMESTAMP_PATH"; then
