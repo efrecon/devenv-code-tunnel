@@ -156,6 +156,11 @@ configure_dropbear() {
     fi
   done
   collect_github_keys "${SSHD_CONFIG_USER}/authorized_keys"
+  # Without keys, start anyway, nobody will be able to login over ssh.
+  touch "${SSHD_CONFIG_USER}/authorized_keys"
+  if ! [ -s "${SSHD_CONFIG_USER}/authorized_keys" ]; then
+    warn "No public keys authorized, nobody can login over ssh. Use -g or mount a key under ~/.ssh"
+  fi
   sort -u -o "${SSHD_CONFIG_USER}/authorized_keys" "${SSHD_CONFIG_USER}/authorized_keys"
   chmod go-rwx "${SSHD_CONFIG_USER}/authorized_keys"
   elevate_if "$1" chown "$1" "${SSHD_CONFIG_USER}/authorized_keys"

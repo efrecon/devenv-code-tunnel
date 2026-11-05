@@ -43,3 +43,16 @@ test_log_is_appended() {
 test_requires_command() {
   assert_fails run_orchestration lwrap
 }
+
+test_log_name_option() {
+  assert_eq "$TUNNEL_PREFIX/log/realname.log" \
+    "$(run_orchestration lwrap -L -n realname -- "$TEST_TMPDIR/mytool.sh")"
+  run_orchestration lwrap -n realname -- "$TEST_TMPDIR/mytool.sh" named || true
+  assert_contains "$(cat "$TUNNEL_PREFIX/log/realname.log")" "out named"
+  assert_no_file "$TUNNEL_PREFIX/log/mytool.log"
+}
+
+test_log_name_from_environment() {
+  assert_eq "$TUNNEL_PREFIX/log/fromenv.log" \
+    "$(LWRAP_NAME=fromenv run_orchestration lwrap -L -- "$TEST_TMPDIR/mytool.sh")"
+}

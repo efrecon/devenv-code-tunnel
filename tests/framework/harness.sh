@@ -36,6 +36,36 @@ run_orchestration() {
   ${TESTS_SHELL:-sh} "$_ro_script" "$@"
 }
 
+# Run a script of the project, relative to its root, with the shell under test,
+# e.g. run_script share/tunnels/code.sh --some-arg
+run_script() {
+  _rs_script=${PROJECT_ROOT}/$1
+  shift
+  # shellcheck disable=SC2086 # TESTS_SHELL can contain arguments
+  ${TESTS_SHELL:-sh} "$_rs_script" "$@"
+}
+
+# Restrict PATH to the system directories, preceded by FAKEBIN, a directory
+# where fake_cmd creates fake commands. This keeps tools installed on the host
+# (docker, gh, code, etc.) out of the way.
+fake_path() {
+  FAKEBIN=$TEST_TMPDIR/fakebin
+  mkdir -p "$FAKEBIN"
+  PATH=$FAKEBIN:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+  export PATH FAKEBIN
+}
+
+# Create a fake command named $1 in FAKEBIN, with the content of stdin.
+fake_cmd() {
+  [ -n "${FAKEBIN:-}" ] || fake_path
+  make_script "${FAKEBIN}/$1"
+}
+
+# Skip the test unless running as root, e.g. in the containers used at GitHub.
+require_root() {
+  [ "$(id -u)" = "0" ] || skip "requires root"
+}
+
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
   exit 1

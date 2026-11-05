@@ -1,8 +1,10 @@
 # Tests
 
-Unit tests for the shared libraries in [`lib`](../lib/) and the orchestration
-tools in [`share/orchestration`](../share/orchestration/). Installation scripts
-(`share/features`) are not tested here: they run every time an image is built.
+Tests for the shared libraries in [`lib`](../lib/), the orchestration tools in
+[`share/orchestration`](../share/orchestration/), the tunnel scripts in
+[`share/tunnels`](../share/tunnels/) and [`devenv.sh`](../devenv.sh), plus a
+smoke test of the built images. Installation scripts (`share/features`) are not
+tested here: they run every time an image is built.
 
 The tests are plain POSIX shell, so they run with the same shells and tools as
 the images: busybox on Alpine, dash and GNU tools on Debian and Ubuntu. They
@@ -32,6 +34,28 @@ docker run --rm --init -v "$PWD:/src:ro" -w /src alpine:3.24 \
 
 Tests needing a missing tool (`git`, `logrotate`, `bash`) are skipped.
 
+## What is tested where
+
+| Directory                          | What                                                                 |
+|------------------------------------|----------------------------------------------------------------------|
+| [`lib`](lib/)                      | Shared libraries. Tests needing root (users, packages) are skipped unless run as root, as in the containers at GitHub. |
+| [`orchestration`](orchestration/)  | Orchestration tools, run as separate processes.                      |
+| [`tunnels`](tunnels/)              | Tunnel scripts, against fake `code`, `cloudflared`, `tailcat` and `nc` commands. |
+| [`devenv`](devenv/)                | `devenv.sh`, against fake `docker`, `podman` and `msb` commands.      |
+| [`smoke.sh`](smoke.sh)             | Not a unit test: starts a built image and checks it runs. Called for each platform when building images, before they get tagged. |
+
+```bash
+tests/smoke.sh ghcr.io/efrecon/devenv-code-tunnel-alpine:main
+```
+
+Tests using fake commands restrict `PATH` to the system directories. When a
+real tool is installed there, tests that need it to be absent are skipped,
+they will never run against a real orchestrator or tunnel.
+
+All shell scripts are also linted with [shellcheck] for every pull request.
+
+[shellcheck]: https://www.shellcheck.net/
+
 ## Writing tests
 
 - Test files are named `test_*.sh` and placed in the directory mirroring what
@@ -42,8 +66,9 @@ Tests needing a missing tool (`git`, `logrotate`, `bash`) are skipped.
 - `TUNNEL_` variables of the caller are removed and `TUNNEL_PREFIX` points into
   the temporary directory, so logs from orchestration tools stay there.
 - Helpers and assertions are in [`framework/harness.sh`](framework/harness.sh):
-  `load_lib`, `run_orchestration`, `assert_eq <expected> <actual>`,
-  `assert_match`, `assert_contains`, `assert_fails`, `wait_until`, `skip`, etc.
+  `load_lib`, `run_orchestration`, `run_script`, `fake_path`, `fake_cmd`,
+  `assert_eq <expected> <actual>`, `assert_match`, `assert_contains`,
+  `assert_fails`, `wait_until`, `skip`, `require_root`, etc.
 - Pass the code to `wait_until` in single quotes, so it is evaluated at each
   try: `wait_until 5 '[ "$(count)" -ge 1 ]'`.
 - Stop the background processes a test starts, e.g. with `kill_tree` from

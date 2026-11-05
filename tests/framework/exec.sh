@@ -6,6 +6,9 @@
 # $2: name of the test function to run
 
 set -eu
+# Same shell options as the scripts of the project.
+# shellcheck disable=SC3040 # Not in all shells, hence the test
+if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 
 TESTS_ROOT=$( cd -P -- "$(dirname -- "$0")/.." && pwd -P )
 PROJECT_ROOT=$( cd -P -- "${TESTS_ROOT}/.." && pwd -P )
@@ -23,6 +26,9 @@ unset_prefix() {
 }
 unset_prefix TUNNEL
 unset_prefix CODER
+unset_prefix DEVENV
+unset_prefix GH
+unset GITHUB_TOKEN XDG_CONFIG_HOME XDG_STATE_HOME XDG_CACHE_HOME XDG_DATA_HOME
 TUNNEL_PREFIX=$TEST_TMPDIR/prefix
 export TUNNEL_PREFIX
 

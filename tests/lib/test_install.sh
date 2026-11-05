@@ -183,3 +183,24 @@ test_internet_script_installer_returns_script_status() {
   internet_script_installer https://example.com/fail.sh "" "" || rc=$?
   assert_eq 3 "$rc"
 }
+
+test_internet_deb_installer() {
+  require_root
+  require_cmd dpkg dpkg-deb apt-get
+  pkg=$TEST_TMPDIR/pkg
+  mkdir -p "$pkg/DEBIAN" "$pkg/opt/devenv-test"
+  cat > "$pkg/DEBIAN/control" <<'EOF2'
+Package: devenv-test
+Version: 1.0
+Architecture: all
+Maintainer: Tests <tests@example.com>
+Description: Package for the tests of devenv-code-tunnel
+EOF2
+  printf 'installed\n' > "$pkg/opt/devenv-test/hello.txt"
+  dpkg-deb --build "$pkg" "$SRC/devenv-test_1.0_all.deb" >/dev/null
+  internet_deb_installer https://example.com/devenv-test_1.0_all.deb / "" "$(_sha256 "$SRC/devenv-test_1.0_all.deb")" >/dev/null 2>&1
+  assert_eq "installed" "$(cat /opt/devenv-test/hello.txt)"
+  assert_true dpkg -s devenv-test
+  dpkg -r devenv-test >/dev/null 2>&1 || true
+  _assert_no_leftovers
+}

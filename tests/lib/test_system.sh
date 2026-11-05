@@ -130,3 +130,100 @@ test_as_root_runs_directly_as_root() {
   [ "$(id -u)" = "0" ] || skip "not running as root"
   assert_eq 0 "$(as_root id -u)"
 }
+
+test_is_musl_os() {
+  if [ -f /etc/alpine-release ]; then
+    assert_true is_musl_os
+  elif [ -f /etc/debian_version ]; then
+    assert_false is_musl_os
+  else
+    skip "unknown distribution"
+  fi
+}
+
+test_get_distro_version() {
+  [ -f /etc/os-release ] || skip "no /etc/os-release"
+  version=$(sed -n -E 's/^VERSION_ID="?([^"]*)"?$/\1/p' /etc/os-release)
+  assert_eq "$version" "$(get_distro_version)"
+}
+
+test_install_ondemand_only_installs_missing() {
+  # Replace the package installer, record what would be installed.
+  # shellcheck disable=SC2329 # Called by install_ondemand
+  install_packages() { echo "$*" >> "$TEST_TMPDIR/installed"; }
+  install_ondemand <<'EOF2'
+sh
+missing-command-xyz some-package
+other-missing-xyz
+- always-package
+EOF2
+  assert_eq "some-package
+other-missing-xyz
+always-package" "$(cat "$TEST_TMPDIR/installed")"
+}
+
+# Users created by the tests below, unique per test.
+_test_user() { printf 'dt%s\n' "$(generate_random 6 'a-z')"; }
+
+_require_user_tools() {
+  require_root
+  require_cmd adduser chpasswd getent su
+}
+
+test_create_user_and_group() {
+  _require_user_tools
+  user=$(_test_user)
+  create_user "$user:${user}grp"
+  assert_contains "$(getent passwd "$user")" "$user:"
+  assert_contains "$(getent group "${user}grp")" "${user}grp:"
+  assert_true test -d "$(home_dir "$user")"
+  assert_eq "$(home_dir "$user")/.local" "$(user_local_dir "$user")"
+  shell=$(getent passwd "$user" | cut -d: -f7)
+  assert_true test -x "$shell"
+}
+
+test_create_existing_user_fails() {
+  _require_user_tools
+  user=$(_test_user)
+  create_user "$user"
+  assert_fails create_user "$user"
+}
+
+test_create_user_with_prefix_of_existing_user() {
+  _require_user_tools
+  user=$(_test_user)
+  create_user "${user}long"
+  create_user "$user"
+  assert_contains "$(getent passwd "$user")" "$user:"
+}
+
+test_xdg_user_dirs_owned_by_user() {
+  _require_user_tools
+  user=$(_test_user)
+  create_user "$user"
+  xdg_user_dirs "$user"
+  home=$(home_dir "$user")
+  for d in .config .cache .local/share .local/state .local/bin; do
+    assert_true test -d "$home/$d"
+    assert_eq "$user" "$(stat -c %U "$home/$d")" "owner of $d"
+  done
+}
+
+test_make_owned_dir() {
+  _require_user_tools
+  user=$(_test_user)
+  create_user "$user"
+  make_owned_dir "$TEST_TMPDIR/a/b" "$user"
+  assert_eq "$user" "$(stat -c %U "$TEST_TMPDIR/a/b")"
+}
+
+test_as_user_and_su_user() {
+  _require_user_tools
+  user=$(_test_user)
+  create_user "$user"
+  # The user must be able to read the temporary script of su_user.
+  TMPDIR=/tmp
+  assert_eq "$user" "$(su_user "$user" id -un)"
+  assert_eq "$user" "$(as_user "$user" id -un)"
+  assert_eq "root" "$(as_user root id -un)" "no switch when already that user"
+}

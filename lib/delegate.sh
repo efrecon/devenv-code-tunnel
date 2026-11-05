@@ -235,6 +235,8 @@ spawn() {
 # _SPAWN_LOG and _SPAWN_LOG_OFFSET. Pass both to when_infile to only consider
 # lines written by this run of the command. Requires wait.sh for file_size.
 # Usage: spawn_logged [-n name] <lwrap> -- <bin> [args...]
+# When given, the name is also the name of the log file, which is useful when
+# <bin> is a wrapper, e.g. clear.sh. Otherwise, the log is named after <bin>.
 # Must not be called in a subshell, e.g. $(...), or the variables are lost.
 spawn_logged() {
   _sl_name=
@@ -247,12 +249,18 @@ spawn_logged() {
   shift
   [ "${1:-}" = "--" ] && shift
   [ -z "${1:-}" ] && error "spawn_logged: No executable given"
-  [ -z "$_sl_name" ] && _sl_name=$(basename "$1")
 
-  _SPAWN_LOG=$("$_sl_lwrap" -L -- "$1")
-  _SPAWN_LOG_OFFSET=$(file_size "$_SPAWN_LOG")
-  trace "Log of %s at %s, from byte %d" "$_sl_name" "$_SPAWN_LOG" "$_SPAWN_LOG_OFFSET"
-  spawn -n "$_sl_name" -- "$_sl_lwrap" -- "$@"
+  if [ -n "$_sl_name" ]; then
+    _SPAWN_LOG=$("$_sl_lwrap" -L -n "$_sl_name" -- "$1")
+    _SPAWN_LOG_OFFSET=$(file_size "$_SPAWN_LOG")
+    trace "Log of %s at %s, from byte %d" "$_sl_name" "$_SPAWN_LOG" "$_SPAWN_LOG_OFFSET"
+    spawn -n "$_sl_name" -- "$_sl_lwrap" -n "$_sl_name" -- "$@"
+  else
+    _SPAWN_LOG=$("$_sl_lwrap" -L -- "$1")
+    _SPAWN_LOG_OFFSET=$(file_size "$_SPAWN_LOG")
+    trace "Log of %s at %s, from byte %d" "$1" "$_SPAWN_LOG" "$_SPAWN_LOG_OFFSET"
+    spawn -n "$(basename "$1")" -- "$_sl_lwrap" -- "$@"
+  fi
   unset _sl_name _sl_lwrap || true
 }
 

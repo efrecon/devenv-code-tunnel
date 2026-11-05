@@ -51,6 +51,19 @@ test_generate_random_length_and_charset() {
   assert_eq 16 "$(generate_random | wc -c | tr -d ' ')" "default length"
 }
 
+test_generate_random_with_pipefail() {
+  set -o | grep -q pipefail || skip "no pipefail in this shell"
+  # A SIGPIPE in the pipeline is racy, try several times.
+  # shellcheck disable=SC3040 # Only when supported, see above
+  set -o pipefail
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    rc=0
+    r=$(generate_random) || rc=$?
+    assert_eq 0 "$rc" "exit code of generate_random with pipefail"
+    assert_eq 16 "${#r}"
+  done
+}
+
 test_find_inpath_prefers_path() {
   assert_eq "$(command -v sh)" "$(find_inpath sh /nonexistent)"
 }
@@ -80,6 +93,21 @@ test_export_varset_exports_prefixed_variables() {
   export_varset MYPFX
   # shellcheck disable=SC2016 # Expanded by the child shell
   assert_eq "1:two:" "$(sh -c 'echo "${MYPFX_ONE:-}:${MYPFX_TWO:-}:${OTHER_ONE:-}"')"
+}
+
+test_varset_without_matching_variables() {
+  export_varset NOSUCHPREFIX
+  unset_varset NOSUCHPREFIX
+}
+
+test_export_varset_keeps_values_intact() {
+  MYPFX_with_lower2='a value with spaces'
+  MYPFX_X2="it's quoted"
+  export_varset MYPFX
+  assert_eq "a value with spaces|it's quoted" \
+    "$(sh -c 'echo "${MYPFX_with_lower2:-}|${MYPFX_X2:-}"')"
+  unset_varset MYPFX
+  assert_eq "|" "${MYPFX_with_lower2:-}|${MYPFX_X2:-}"
 }
 
 test_unset_varset_unsets_prefixed_variables() {

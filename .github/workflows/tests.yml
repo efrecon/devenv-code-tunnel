@@ -1,8 +1,9 @@
 name: tests
 
-# Run the unit tests of the shared libraries and orchestration tools, in the
-# same distributions as the images are built from. Installation scripts are not
-# covered here, they are exercised by building the images.
+# Run the tests of the shared libraries, orchestration tools, tunnel scripts and
+# devenv.sh, in the same distributions as the images are built from, and lint
+# all shell scripts. Installation scripts are not covered here, they are
+# exercised by building the images.
 on:
   pull_request:
   workflow_dispatch:
@@ -22,16 +23,16 @@ jobs:
             deps: apk add -q git logrotate inotify-tools bash
           # dash and GNU tools
           - image: debian:trixie-slim
-            deps: apt-get -qq update && apt-get -qq install -y git logrotate >/dev/null
+            deps: apt-get -qq update && apt-get -qq install -y git logrotate adduser >/dev/null
           - image: ubuntu:26.04
-            deps: apt-get -qq update && apt-get -qq install -y git logrotate >/dev/null
+            deps: apt-get -qq update && apt-get -qq install -y git logrotate adduser >/dev/null
           # bash in POSIX mode: bash enters it when invoked as sh, so make
           # /bin/sh point to bash. This also covers the #!/bin/sh scripts that
           # the tested scripts call themselves. Fail early if not in POSIX mode.
           - image: debian:trixie-slim
             variant: bash as sh
             deps: >-
-              apt-get -qq update && apt-get -qq install -y git logrotate >/dev/null &&
+              apt-get -qq update && apt-get -qq install -y git logrotate adduser >/dev/null &&
               ln -sf bash /bin/sh &&
               sh -c "set -o" | grep -qE "^posix[[:space:]]+on"
     name: unit (${{ matrix.image }}${{ matrix.variant && format(', {0}', matrix.variant) || '' }})
@@ -40,6 +41,8 @@ jobs:
         name: Checkout
         uses: actions/checkout@v7
       -
+        # Tests run as root in the containers, which also covers the functions
+        # creating users or installing packages.
         name: Run tests
         run: |
           docker run --rm --init \
@@ -47,3 +50,28 @@ jobs:
             -w /src \
             "${{ matrix.image }}" \
             sh -c '${{ matrix.deps }} && tests/run.sh'
+
+  shellcheck:
+    runs-on: ubuntu-26.04
+    steps:
+      -
+        name: Checkout
+        uses: actions/checkout@v7
+      -
+        name: Lint shell scripts
+        run: |
+          # All tracked shell scripts, by extension or shebang.
+          files=$(git ls-files | while IFS= read -r f; do
+            case "$f" in
+              *.sh) printf '%s\n' "$f";;
+              *) head -n 1 "$f" 2>/dev/null | grep -qE '^#!.*/(env )?(ba|da|a)?sh' && printf '%s\n' "$f";;
+            esac
+          done)
+          # shellcheck disable=SC2086 # One file per word
+          docker run --rm \
+            -v "$PWD:/mnt:ro" \
+            -w /mnt \
+            koalaman/shellcheck:v0.11.0 \
+              --external-sources \
+              --shell=sh \
+              $files

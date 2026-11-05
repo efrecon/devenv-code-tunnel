@@ -196,7 +196,8 @@ create_user() {
     NEW_GROUP=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f2)
   fi
 
-  if grep -q "^$NEW_USER" /etc/passwd; then
+  # Exact match, a mere prefix of an existing user name is another user.
+  if getent passwd "$NEW_USER" >/dev/null 2>&1; then
     error "%s already exists!" "$NEW_USER"
   else
     if ! getent group "$NEW_GROUP" >/dev/null 2>&1; then

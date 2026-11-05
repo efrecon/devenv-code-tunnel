@@ -116,3 +116,65 @@ exit 1
 EOF
   assert_fails delegate "test" "$TEST_TMPDIR/init" "" "*.sh" 0
 }
+
+test_daemonize_restarts_in_background() {
+  load_lib log common system wait delegate
+  make_script "$TEST_TMPDIR/daemon.sh" <<EOF2
+#!/bin/sh
+set -eu
+for lib in log common system delegate; do . "$PROJECT_ROOT/lib/\$lib.sh"; done
+if [ -z "\${MYDAEMON_STARTED:-}" ]; then
+  MYDAEMON_STARTED=\$\$
+  echo "\$\$" > "$TEST_TMPDIR/foreground"
+  daemonize MYDAEMON "\$@"
+fi
+echo "\$\$ \$MYDAEMON_STARTED \$*" > "$TEST_TMPDIR/background"
+EOF2
+  "$TEST_TMPDIR/daemon.sh" one two
+  wait_until 5 '[ -s "$TEST_TMPDIR/background" ]'
+  read -r bg_pid started args < "$TEST_TMPDIR/background" || true
+  fg_pid=$(cat "$TEST_TMPDIR/foreground")
+  assert_ne "$fg_pid" "$bg_pid" "runs in another process"
+  assert_eq "$fg_pid" "$started" "prefixed variables exported"
+  assert_eq "one two" "$(cut -d' ' -f3- "$TEST_TMPDIR/background")" "arguments passed"
+}
+
+test_delegate_in_background_with_supervise() {
+  # delegate looks for supervise.sh relative to the calling script.
+  mkdir -p "$TEST_TMPDIR/bin" "$TEST_TMPDIR/share" "$TEST_TMPDIR/init"
+  ln -s "$PROJECT_ROOT/share/orchestration" "$TEST_TMPDIR/share/orchestration"
+  for s in 10-first 20-second; do
+    make_script "$TEST_TMPDIR/init/$s.sh" <<EOF2
+#!/bin/sh
+echo "$s \$*" > "$TEST_TMPDIR/$s.ran"
+EOF2
+  done
+  make_script "$TEST_TMPDIR/bin/runner.sh" <<EOF2
+#!/bin/sh
+set -eu
+for lib in log common system delegate; do . "$PROJECT_ROOT/lib/\$lib.sh"; done
+delegate "test" "$TEST_TMPDIR/init" "" "*.sh" 1 arg
+wait
+EOF2
+  out=$("$TEST_TMPDIR/bin/runner.sh")
+  assert_match "$(printf '%s\n' "$out" | head -n 1)" "^first	[0-9]+$" "name and PID of supervisor"
+  assert_match "$(printf '%s\n' "$out" | tail -n 1)" "^second	[0-9]+$"
+  assert_eq "10-first arg" "$(cat "$TEST_TMPDIR/10-first.ran")"
+  assert_eq "20-second arg" "$(cat "$TEST_TMPDIR/20-second.ran")"
+}
+
+test_spawn_logged_names_log_after_wrapped_command() {
+  make_script "$TEST_TMPDIR/wrapper.sh" <<'EOF2'
+#!/bin/sh
+exec "$@"
+EOF2
+  make_script "$TEST_TMPDIR/talker.sh" <<'EOF2'
+#!/bin/sh
+echo "talking $1"
+EOF2
+  spawn_logged -n talker "$(orchestration lwrap)" -- "$TEST_TMPDIR/wrapper.sh" "$TEST_TMPDIR/talker.sh" wrapped >/dev/null
+  assert_eq "$TUNNEL_PREFIX/log/talker.log" "$_SPAWN_LOG"
+  assert_eq "talking wrapped" "$(when_infile "$_SPAWN_LOG_OFFSET" "$_SPAWN_LOG" E '^talking' -)"
+  spawn_wait "$(spawn_latest)"
+  assert_no_file "$TUNNEL_PREFIX/log/wrapper.log"
+}
