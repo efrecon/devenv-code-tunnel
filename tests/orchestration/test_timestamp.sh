@@ -33,6 +33,17 @@ test_custom_header_with_special_characters() {
   assert_match "$(cat "$FILE")" "^Seen \[at\] a\|b & c\.: ${TS_RE}$"
 }
 
+test_pipe_in_header_is_literal() {
+  # With \| as alternation, "^A\|B: " would match the first line, and the
+  # timestamp would never be added.
+  printf 'A note\nother B: line\n' > "$FILE"
+  run_orchestration timestamp -s 0 -H 'A|B: ' -- "$FILE"
+  assert_match "$(tail -n 1 "$FILE")" "^A\|B: ${TS_RE}$" "timestamp added"
+  assert_eq "A note" "$(head -n 1 "$FILE")" "other lines untouched"
+  run_orchestration timestamp -s 0 -H 'A|B: ' -- "$FILE"
+  assert_eq 3 "$(wc -l < "$FILE" | tr -d ' ')" "updated in place"
+}
+
 test_path_from_environment() {
   : > "$FILE"
   TIMESTAMP_PATH=$FILE run_orchestration timestamp -s 0
