@@ -128,6 +128,19 @@ test_get_var() {
   MY_VARIABLE="some value"
   assert_eq "some value" "$(get_var MY_VARIABLE)"
   assert_eq "" "$(get_var MY_UNSET_VARIABLE_XYZ 2>/dev/null)"
+  _under_score1="ok"
+  assert_eq "ok" "$(get_var _under_score1)"
+}
+
+test_get_var_rejects_invalid_names() {
+  marker=$TEST_TMPDIR/injected
+  for name in "" 1ABC "A-B" "A B" 'A}' 'X;touch $marker' "\$(touch $marker)" \
+              "\`touch $marker\`" 'A:-$(touch x)'; do
+    out=$(get_var "$name"; echo end)
+    assert_eq "
+end" "$out" "empty line for '$name'"
+  done
+  assert_no_file "$marker" "nothing executed"
 }
 
 test_log_init_from_prefixed_variables() {
