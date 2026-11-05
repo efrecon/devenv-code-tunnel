@@ -342,7 +342,7 @@ ps_children() (
     # The name of the executable appears at the beginning between parenthesis.
     # Remove it.
     # Processes may exit while we are scanning, skip them.
-    _stat=$(sed -E 's/\([^)]+\)\s//g' < "$_f" 2>/dev/null) || continue
+    _stat=$(sed -E 's/\([^)]+\)\s//g' 2>/dev/null < "$_f" ) || continue
     # If the parent process (3rd item) is the process passed as a parameter,
     # then we should count it.
     # shellcheck disable=SC2086 # We want to expand the arguments
