@@ -67,15 +67,15 @@ tunnel_pubkey() {
 
 
 tunnel_start() {
-  # Remove all TUNNEL_ variables from the environment, since cloudflared
-  # respects some of them and we force settings through the command line. Pass
-  # all remaining arguments blindly to the command.
-  unset_varset TUNNEL
-
-  # Records the log location and size, so tunnel_wait only considers lines
-  # from this run.
+  # Remove all TUNNEL_ variables from the environment of cloudflared only, since
+  # it respects some of them and we force settings through the command line.
+  # This script, and lwrap.sh, still need them. Pass all remaining arguments
+  # blindly to the command. Records the log location and size, so tunnel_wait
+  # only considers lines from this run. The log is named after cloudflared, not
+  # clear.sh.
   spawn_logged -n cloudflared \
     "$CLOUDFLARE_LWRAP" -- \
+      "$CLOUDFLARE_CLEAR" -p TUNNEL -- \
       "$CLOUDFLARE_BIN" tunnel \
         --no-autoupdate \
         --protocol "${CLOUDFLARE_PROTOCOL}" \
@@ -137,9 +137,11 @@ CLOUDFLARE_ORCHESTRATION_DIR=${CLOUDFLARE_ROOTDIR}/../orchestration
 CLOUDFLARE_LOGGER=${CLOUDFLARE_ORCHESTRATION_DIR}/logger.sh
 CLOUDFLARE_LWRAP=${CLOUDFLARE_ORCHESTRATION_DIR}/lwrap.sh
 CLOUDFLARE_TIMESTAMP=${CLOUDFLARE_ORCHESTRATION_DIR}/timestamp.sh
+CLOUDFLARE_CLEAR=${CLOUDFLARE_ORCHESTRATION_DIR}/clear.sh
 [ -x "$CLOUDFLARE_LOGGER" ] || error "Cannot find logger.sh"
 [ -x "$CLOUDFLARE_LWRAP" ] || error "Cannot find lwrap.sh"
 [ -x "$CLOUDFLARE_TIMESTAMP" ] || error "Cannot find timestamp.sh"
+[ -x "$CLOUDFLARE_CLEAR" ] || error "Cannot find clear.sh"
 CLOUDFLARE_LOG=$("$CLOUDFLARE_LWRAP" -L -- "$CLOUDFLARE_BIN")
 
 check_command nc || error "nc is not installed. Please install it first."

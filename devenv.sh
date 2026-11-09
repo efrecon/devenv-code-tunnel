@@ -240,6 +240,13 @@ main() {
     root="$(pwd)"
   fi
 
+  # Orchestrators take relative paths without a leading / for volume names: pass
+  # directories with their full path to mount them. Physical path (-P), as
+  # mounting through symlinks is not portable.
+  if [ -d "$root" ]; then
+    root=$(cd -P -- "$root" && pwd -P) || error "Cannot resolve directory: %s" "$root"
+  fi
+
   # Shift over the double dash, if present.
   [ -n "${1:-}" ] && [ "$1" = "--" ] && shift
 

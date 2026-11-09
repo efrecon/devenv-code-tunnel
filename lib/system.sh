@@ -196,7 +196,8 @@ create_user() {
     NEW_GROUP=$(printf %s\\n "${1:-$INSTALL_USER}" | cut -d: -f2)
   fi
 
-  if grep -q "^$NEW_USER" /etc/passwd; then
+  # Exact match, a mere prefix of an existing user name is another user.
+  if getent passwd "$NEW_USER" >/dev/null 2>&1; then
     error "%s already exists!" "$NEW_USER"
   else
     if ! getent group "$NEW_GROUP" >/dev/null 2>&1; then
@@ -341,7 +342,8 @@ ps_children() (
   for _f in /proc/[0-9]*/stat; do
     # The name of the executable appears at the beginning between parenthesis.
     # Remove it.
-    _stat=$(sed -E 's/\([^)]+\)\s//g' < "$_f")
+    # Processes may exit while we are scanning, skip them.
+    _stat=$(sed -E 's/\([^)]+\)\s//g' 2>/dev/null < "$_f" ) || continue
     # If the parent process (3rd item) is the process passed as a parameter,
     # then we should count it.
     # shellcheck disable=SC2086 # We want to expand the arguments

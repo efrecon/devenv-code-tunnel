@@ -168,6 +168,12 @@ jobs:
             ${{ inputs.build-args }}
             INSTALL_IMAGE=${{ needs.prepare.outputs.image }}
       -
+        # Before the image gets tagged in the merge job, so a broken image is
+        # never tagged. Runners are native for each platform.
+        name: Smoke test
+        run: |
+          tests/smoke.sh "${{ env.REGISTRY_IMAGE }}@${{ steps.build.outputs.digest }}"
+      -
         name: Export digest
         run: |
           mkdir -p /tmp/digests

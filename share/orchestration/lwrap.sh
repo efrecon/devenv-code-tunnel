@@ -29,16 +29,21 @@ bin_name
 : "${LWRAP_LOG:=2}"
 : "${LWRAP_PREFIX:="${TUNNEL_PREFIX:-"/usr/local"}"}"
 : "${LWRAP_PRINT:=0}"
+# Name of the log file, without extension. Default to the clean name of the
+# command, set it when the command is a wrapper, e.g. clear.sh.
+: "${LWRAP_NAME:=""}"
 # Environment file to load for reading defaults from.
 : "${LWRAP_DEFAULTS:="${LWRAP_ROOTDIR}/../../etc/${CODER_BIN}.env"}"
 
 
 # shellcheck disable=SC2034 # Used for logging/usage
 CODER_DESCR="Auto logger wrapper"
-while getopts "Lvh-" opt; do
+while getopts "Ln:vh-" opt; do
   case "$opt" in
     L) # Print target log file and exit
       LWRAP_PRINT=1;;
+    n) # Name of the log file, default to the clean name of the command
+      LWRAP_NAME="$OPTARG";;
     v) # Increase verbosity, repeat to increase
       LWRAP_VERBOSE=$((LWRAP_VERBOSE + 1));;
     h) # Show help
@@ -62,7 +67,7 @@ log_init LWRAP
 # Load defaults
 [ -n "$LWRAP_DEFAULTS" ] && read_envfile "$LWRAP_DEFAULTS" LWRAP
 unset CODER_BIN
-bin_name "$1"
+bin_name "${LWRAP_NAME:-"$1"}"
 
 # Decide upon location of log
 LWRAP_LOG="${LWRAP_PREFIX}/log/${CODER_BIN}.log"

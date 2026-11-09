@@ -142,8 +142,18 @@ gist_publish() {
   fi
 }
 
-# Get the content of the variable which name is passed as an argument.
-get_var() { eval printf "%s\\\n" "\$${1:-}" || true; }
+# Get the content of the variable which name is passed as an argument. Prints
+# an empty line when the name is not a valid shell identifier, so that nothing
+# else than a variable name ever reaches eval.
+get_var() {
+  case "${1:-}" in
+    "" | [0-9]* | *[!A-Za-z0-9_]*)
+      printf '\n'
+      return 0
+      ;;
+  esac
+  eval "printf '%s\\n' \"\${${1}:-}\"" || true
+}
 
 # Initialize the logging system. When an argument is passed, it is used to find
 # the variables that contain verbosity and logging output information. When none
