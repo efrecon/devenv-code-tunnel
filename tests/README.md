@@ -33,6 +33,9 @@ docker run --rm --init -v "$PWD:/src:ro" -w /src alpine:3.24 \
 ```
 
 Tests needing a missing tool (`git`, `logrotate`, `bash`) are skipped.
+Tests needing root are skipped unless run as root.
+As root, they create user accounts and install a package, which can remain after the run:
+only run the tests as root in a disposable container, as above.
 
 ## What is tested where
 
@@ -64,6 +67,11 @@ All shell scripts are also linted with [shellcheck] for every pull request.
   It runs in its own shell process, with `set -eu`,
   in an empty temporary directory that is also `TMPDIR` and `TEST_TMPDIR`.
   A `setup` function, when present, runs before each test.
+- The temporary directory does not isolate changes to the system itself.
+  As root, and with the user tools available (`adduser`, `chpasswd`, `getent`, `su`),
+  tests marked with `require_root` create user accounts with their home directories, which are never removed,
+  and the `.deb` test installs a package, which stays installed when the test fails before removing it.
+  Run tests as root only in a disposable container, as shown above, never directly on a host you care about.
 - `TUNNEL_` variables of the caller are removed and `TUNNEL_PREFIX` points into the temporary directory,
   so logs from orchestration tools stay there.
 - Helpers and assertions are in [`framework/harness.sh`](framework/harness.sh):
