@@ -63,11 +63,11 @@ done
 # precedence over the content of TUNNEL_GITHUB_TOKEN_FILE.
 : "${TUNNEL_GITHUB_TOKEN:=""}"
 
-# File to read the GitHub token from, this is where devenv.sh mounts it.
+# File to read the GitHub token from, mounted there by devenv.sh.
 : "${TUNNEL_GITHUB_TOKEN_FILE:="/run/secrets/github-token"}"
 
-# Where the github service stores the GitHub token for use by git and gh. This
-# is outside of the home directory, as it is often mounted from the host.
+# Where the github service stores the GitHub token for use by git and gh.
+# Outside of home directory.
 : "${TUNNEL_GITHUB_TOKEN_STORE:="${TUNNEL_PREFIX}/etc/github/token"}"
 
 # Services to start. When empty, all services will be started.
@@ -84,9 +84,8 @@ done
 # Gist where to publish tunnel details, SSH or HTTPS clone URL.
 : "${TUNNEL_GIST:=""}"
 
-# Publish the vscode device authorization code to the gist. Set to 0 to only
-# print it to the container output: anyone able to read the gist could use the
-# code to authorize the device with their own account.
+# Publish the vscode device authorization code to the gist. GISTs should be
+# private, so on by default for improved devex.
 : "${TUNNEL_CODE_AUTH_PUBLISH:="1"}"
 
 # shellcheck disable=SC2034 # Used for logging/usage
@@ -243,7 +242,6 @@ if [ -n "$TUNNEL_GIST" ]; then
       fi
       verbose "Storing tunnel details in %s" "$TUNNEL_GIST_FILE"
 
-      # TODO: Capture the values from the gist instead, when at github? owner, etc.
       (
         cd "$GIST_DIR" || error "Failed to change directory to $GIST_DIR"
         if ! "$LWRAP" git config get user.name; then
@@ -266,8 +264,9 @@ if [ -n "$TUNNEL_GIST" ]; then
         fi
       )
 
-      # Timestamp the gist file at regular intervals.
-      spawn "${TUNNEL_ORCHESTRATION_DIR}/timestamp.sh" -- "$TUNNEL_GIST_FILE" >/dev/null
+      # Timestamp the gist file at regular intervals. Signal the whole tree, as
+      # timestamp.sh does not stop its sleep.
+      spawn -t "${TUNNEL_ORCHESTRATION_DIR}/timestamp.sh" -- "$TUNNEL_GIST_FILE" >/dev/null
     else
       warn "Failed to clone gist %s" "$TUNNEL_GIST"
     fi
@@ -275,43 +274,28 @@ if [ -n "$TUNNEL_GIST" ]; then
 fi
 [ -n "${TUNNEL_GIST_FILE:-}" ] && export TUNNEL_GIST_FILE
 
-# Start tunnels in the background, collect supervisor PIDs for signal forwarding.
-# Run delegate in the current shell (not a subshell) so supervise.sh processes
-# are direct children of tunnel.sh and wait() works in the signal handler.
-_TUNNEL_PIDS_FILE=$(mktemp_ext tunnels pid)
-delegate "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 > "$_TUNNEL_PIDS_FILE"
-_TUNNEL_PIDS=$(cut -f2 "$_TUNNEL_PIDS_FILE" | tr '\n' ' ')
-rm -f "$_TUNNEL_PIDS_FILE"
-
-tunnel_signal() {
-  for _pid in $_TUNNEL_PIDS; do
-    debug "Forwarding signal %s to PID %d" "$1" "$_pid"
-    kill "-$1" "$_pid" 2>/dev/null || true
-  done
-}
-# Only called for TERM/EXIT, not INT: terminal already delivered INT to the group
-_tunnel_wait() {
-  for _pid in $_TUNNEL_PIDS; do
-    wait "$_pid" 2>/dev/null || true
-  done
-}
-trap 'tunnel_signal HUP;  trap - HUP;  kill -HUP  $$' HUP
-trap 'tunnel_signal INT;  trap - INT;  kill -INT  $$' INT
-trap 'tunnel_signal TERM; _tunnel_wait; trap - TERM; kill -TERM $$' TERM
-trap 'tunnel_signal TERM; _tunnel_wait' EXIT
+# Start tunnels in the background, each under a supervisor started through
+# spawn, as all other background processes of this script. The traps installed
+# by spawn forward signals to all of them, and wait for them on TERM and at exit.
+delegate "tunnel" "$TUNNEL_TUNNELS_DIR" "$TUNNEL_TUNNELS" "*.sh" 1 >/dev/null
 
 # Push the tunnel details to the gist whenever the TUNNEL_GIST_FILE is changed.
 # Note that cloudflared tunnels will be established soonish, but code tunnels
 # might take time as they might require interaction with the user to authorize
-# the device.
+# the device. Signal the whole tree, notify.sh does not stop its inotifywait.
 if [ -n "${TUNNEL_GIST_FILE:-}" ]; then
-  spawn \
+  spawn -t \
     "${TUNNEL_ORCHESTRATION_DIR}/notify.sh" \
       -f "$TUNNEL_GIST_FILE" \
       -- \
         "${TUNNEL_ORCHESTRATION_DIR}/gist.sh" -- "$TUNNEL_GIST_FILE" >/dev/null
 fi
 
+# Run forever, signals stop everything through the traps installed by spawn.
+# Sleep in the background: wait returns as soon as a trapped signal arrives, so
+# the trap runs at once. A foreground sleep would delay it until the sleep ends.
+# The interrupted sleep is short-lived, and dies on its own.
 while true; do
-  sleep 5
+  sleep 5 &
+  wait "$!" || true
 done

@@ -54,6 +54,60 @@ EOF
   wait_until 5 '[ "$(_sleepers)" -eq 0 ]'
 }
 
+test_spawned_as_tree_is_killed_as_tree() {
+  [ -d /proc/self ] || skip "no /proc"
+  make_script "$TEST_TMPDIR/parent.sh" <<'EOF'
+#!/bin/sh
+sleep 31 &
+wait
+EOF
+  spawn -t "$TEST_TMPDIR/parent.sh" >/dev/null
+  wait_until 5 '[ "$(_sleepers)" -ge 1 ]'
+  # No -t: only processes spawned with -t are killed as trees.
+  spawn_kill -r "test"
+  spawn_wait || true
+  wait_until 5 '[ "$(_sleepers)" -eq 0 ]'
+  assert_eq "" "$_CODER_TREE_PIDS" "dead PIDs forgotten"
+}
+
+test_spawned_without_tree_only_kills_process() {
+  [ -d /proc/self ] || skip "no /proc"
+  make_script "$TEST_TMPDIR/parent.sh" <<'EOF'
+#!/bin/sh
+sleep 31 &
+echo $! > "$1"
+wait
+EOF
+  spawn "$TEST_TMPDIR/parent.sh" "$TEST_TMPDIR/child" >/dev/null
+  wait_until 5 '[ -s "$TEST_TMPDIR/child" ]'
+  spawn_kill -r "test"
+  spawn_wait || true
+  child=$(cat "$TEST_TMPDIR/child")
+  assert_true is_running "$child"
+  kill "$child"
+}
+
+test_traps_signal_tree_of_spawned_processes() {
+  [ -d /proc/self ] || skip "no /proc"
+  make_script "$TEST_TMPDIR/runner.sh" <<EOF
+#!/bin/sh
+set -eu
+for lib in log common system delegate; do . "$PROJECT_ROOT/lib/\$lib.sh"; done
+make_parent() { printf '#!/bin/sh\nsleep 31 &\nwait\n' > "\$1"; chmod a+x "\$1"; }
+make_parent "$TEST_TMPDIR/p1.sh"
+spawn -t "$TEST_TMPDIR/p1.sh" >/dev/null
+while true; do sleep 1; done
+EOF
+  # Directly, not through a function: \$! must be the shell running runner.sh
+  # shellcheck disable=SC2086 # TESTS_SHELL can contain arguments
+  ${TESTS_SHELL:-sh} "$TEST_TMPDIR/runner.sh" &
+  runner=$!
+  wait_until 5 '[ "$(_sleepers)" -ge 1 ]'
+  kill -TERM "$runner"
+  wait "$runner" 2>/dev/null || true
+  wait_until 10 '[ "$(_sleepers)" -eq 0 ]'
+}
+
 test_spawn_logged_records_log_and_offset() {
   make_script "$TEST_TMPDIR/talker.sh" <<'EOF'
 #!/bin/sh
@@ -154,11 +208,14 @@ EOF2
 set -eu
 for lib in log common system delegate; do . "$PROJECT_ROOT/lib/\$lib.sh"; done
 delegate "test" "$TEST_TMPDIR/init" "" "*.sh" 1 arg
+echo "\$_CODER_PIDS" > "$TEST_TMPDIR/tracked"
 wait
 EOF2
   out=$("$TEST_TMPDIR/bin/runner.sh")
   assert_match "$(printf '%s\n' "$out" | head -n 1)" "^first	[0-9]+$" "name and PID of supervisor"
   assert_match "$(printf '%s\n' "$out" | tail -n 1)" "^second	[0-9]+$"
+  assert_eq "$(printf '%s\n' "$out" | cut -f2 | tr '\n' ' ' | sed 's/ $//')" \
+    "$(cat "$TEST_TMPDIR/tracked")" "supervisors tracked by spawn"
   assert_eq "10-first arg" "$(cat "$TEST_TMPDIR/10-first.ran")"
   assert_eq "20-second arg" "$(cat "$TEST_TMPDIR/20-second.ran")"
 }

@@ -1,6 +1,11 @@
 #!/bin/sh
 
+# Space-separated PIDs of the processes started with spawn, still running.
 : "${_CODER_PIDS:=}"
+# Subset of _CODER_PIDS: processes whose whole tree is to be signalled, see
+# spawn -t.
+: "${_CODER_TREE_PIDS:=}"
+# 1 once spawn has installed its signal traps, so they are installed only once.
 : "${_CODER_TRAPPED:=0}"
 
 # Restart the script in the background, with the same arguments. You may pass a
@@ -42,22 +47,37 @@ init_get() {
 }
 
 
-# Catch up the list of PIDs in _CODER_PIDS, removing any that have exited.
-_spawn_update() {
-  # Reconstruct the list of alive PIDs, by checking each PID in _CODER_PIDS.
+# Print the PIDs passed as arguments that are still alive, space-separated.
+_spawn_alive() {
   _alive_pids=
-  for _pid in $_CODER_PIDS; do
-    [ -z "${_pid:-}" ] && continue
+  for _pid in "$@"; do
+    [ -z "$_pid" ] && continue
     if kill -0 "$_pid" 2>/dev/null; then
-      if [ -z "$_alive_pids" ]; then
-        _alive_pids="$_pid"
-      else
-        _alive_pids="$_alive_pids $_pid"
-      fi
+      _alive_pids="${_alive_pids:+"$_alive_pids "}$_pid"
     fi
   done
-  _CODER_PIDS=$_alive_pids
+  printf '%s\n' "$_alive_pids"
   unset _alive_pids _pid || true
+}
+
+
+# Catch up the lists of PIDs in _CODER_PIDS and _CODER_TREE_PIDS, removing any
+# that have exited, so reused PIDs are not mistaken.
+_spawn_update() {
+  # shellcheck disable=SC2086 # One PID per word
+  _CODER_PIDS=$(_spawn_alive $_CODER_PIDS)
+  # shellcheck disable=SC2086 # One PID per word
+  _CODER_TREE_PIDS=$(_spawn_alive $_CODER_TREE_PIDS)
+}
+
+
+# Succeed when the PID passed as an argument was spawned with -t, i.e. its
+# whole tree is to be signalled.
+_spawn_is_tree() {
+  case " $_CODER_TREE_PIDS " in
+    *" $1 "*) return 0;;
+  esac
+  return 1
 }
 
 
@@ -126,9 +146,10 @@ spawn_latest() {
 }
 
 
-# Send a signal to the process tree of each PID passed as argument, or to all
-# PIDs in _CODER_PIDS if no arguments are passed. The signal to send is from the
-# -s option, defaults to TERM.
+# Send a signal to each PID passed as argument, or to all PIDs in _CODER_PIDS if
+# no arguments are passed. The signal to send is from the -s option, defaults to
+# TERM. With -t, signal the whole process tree of each PID. Without, only the
+# processes spawned with -t get their whole tree signalled.
 spawn_kill() {
   _sigspec=TERM
   _tree=0
@@ -160,9 +181,10 @@ spawn_kill() {
 
   # Kill the processes, or their trees.
   for _pid in $_kill_pids; do
-    if [ "$_tree" -eq 1 ]; then
+    if [ "$_tree" -eq 1 ] || _spawn_is_tree "$_pid"; then
       debug "Killing tree of PID %d with signal %s. Reason: %s" "$_pid" "$_sigspec" "$_reason"
-      kill_tree "$_pid" "$_sigspec" >/dev/null
+      # Processes of the tree may already be gone, do not fail on them.
+      kill_tree "$_pid" "$_sigspec" >/dev/null 2>&1 || true
     else
       debug "Killing PID %d with signal %s. Reason: %s" "$_pid" "$_sigspec" "$_reason"
       kill "-$_sigspec" "$_pid" 2>/dev/null || true
@@ -175,14 +197,20 @@ spawn_kill() {
 }
 
 
-# Spawn a process in the background, and return its PID.
+# Spawn a process in the background, and return its PID. Signals received by
+# the calling script are forwarded to spawned processes, which are waited for
+# on TERM and at exit. With -t, signals go to the whole tree of the process: use
+# it for programs that do not pass signals to their own children.
 spawn() {
   _name=
+  _spawn_tree=0
   OPTIND=1 # bash keeps OPTIND between calls to getopts
-  while getopts "n:-" opt; do
+  while getopts "n:t-" opt; do
     case "$opt" in
       n) # Specify the name for logging purposes
         _name=$OPTARG;;
+      t) # Signal the whole process tree
+        _spawn_tree=1;;
       -) # End of options, file name to follow
         break;;
       *)  # Unknown option
@@ -212,6 +240,7 @@ spawn() {
   # spawn_wait can collect its exit code.
   _spawn_update
   _CODER_PIDS="${_CODER_PIDS:+"$_CODER_PIDS "}$_spawned"
+  [ "$_spawn_tree" = "1" ] && _CODER_TREE_PIDS="${_CODER_TREE_PIDS:+"$_CODER_TREE_PIDS "}$_spawned"
   debug "Spawned %s with PID %d" "$_name" "$_spawned"
 
   # Install process-wide signal handlers if not already done.
@@ -226,7 +255,7 @@ spawn() {
 
   # Return the PID of the spawned process, for convenience.
   printf %s\\n "$_spawned"
-  unset _bin _name _spawned || true
+  unset _bin _name _spawned _spawn_tree || true
 }
 
 
@@ -304,6 +333,7 @@ delegate() {
           debug "Spawning %s using %s" "$_s" "$_script"
           # Find the supervise.sh script
           _bindir=$(dirname "$0")
+          _supervise=
           for _d in share/orchestration ../share/orchestration; do
             if [ -d "${_bindir}/$_d" ]; then
               if [ -x "${_bindir}/$_d/supervise.sh" ]; then
@@ -314,8 +344,10 @@ delegate() {
           done
           [ -z "$_supervise" ] && error "Could not find supervise.sh!"
           debug "Using %s to supervise %s" "$_supervise" "$_script"
-          "$_supervise" -n "$_s" -b "$_script" -- "$@" &
-          printf %s\\t%d\\n "$_s" "$!"
+          # Through spawn, so the traps it installs forward signals to the
+          # supervisors, and wait for them. supervise.sh forwards to its child.
+          spawn -n "$_s" -- "$_supervise" -n "$_s" -b "$_script" -- "$@" >/dev/null
+          printf %s\\t%d\\n "$_s" "$(spawn_latest)"
         else
           debug "Running %s using %s" "$_s" "$_script"
           if ! ${INSTALL_OPTIMIZE:-} "$_script" "$@"; then
