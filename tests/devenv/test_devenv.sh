@@ -7,8 +7,34 @@
 
 IMAGE=ghcr.io/efrecon/devenv-code-tunnel-alpine:main
 
-setup() {
+# Commands that change what devenv.sh does when found: never resolve them on
+# the host, only as fakes. msb, podman and docker are orchestrators, krun is a
+# runtime picked by default, gh provides a GitHub token.
+HOST_HIDDEN="docker podman msb krun gh"
+
+# Restrict PATH to the fakes, and to SYSBIN: links to all the commands of the
+# system directories, except the ones in HOST_HIDDEN. Commands from the host
+# that devenv.sh would pick automatically are then not reachable at all, even
+# when their fake is removed.
+_isolated_path() {
   fake_path
+  SYSBIN=$TEST_TMPDIR/sysbin
+  mkdir -p "$SYSBIN"
+  for _d in /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin; do
+    [ -d "$_d" ] || continue
+    # One ln per directory, for speed. Existing links are not replaced, so the
+    # first directory wins, as in a PATH lookup: ignore the errors about them.
+    ln -s "$_d"/* "$SYSBIN/" 2>/dev/null || true
+  done
+  for _n in $HOST_HIDDEN; do
+    rm -f "$SYSBIN/$_n"
+  done
+  PATH=$FAKEBIN:$SYSBIN
+  export PATH
+}
+
+setup() {
+  _isolated_path
   FAKE_CALLS=$TEST_TMPDIR/calls
   FAKE_RUN=$TEST_TMPDIR/run
   FAKE_ENV=$TEST_TMPDIR/env
@@ -47,12 +73,20 @@ echo myhost.example.com
 EOF
 }
 
-# Only keep the orchestrators passed as arguments
+# Only keep the fake orchestrators passed as arguments. Skip the test if any of
+# the commands in HOST_HIDDEN still resolves to something else than a fake.
 _only() {
   for o in docker podman msb; do
     case " $* " in
       *" $o "*) ;;
       *) rm -f "$FAKEBIN/$o";;
+    esac
+  done
+  for o in $HOST_HIDDEN; do
+    _found=$(command -v "$o" 2>/dev/null || true)
+    case "$_found" in
+      "" | "$FAKEBIN/$o") ;;
+      *) skip "$o from the host is visible at $_found";;
     esac
   done
 }
@@ -77,11 +111,8 @@ test_orchestrator_preference() {
 }
 
 test_no_orchestrator() {
+  # Orchestrators from the host are not reachable, see _isolated_path and _only.
   _only
-  # Never run against a real orchestrator.
-  for o in docker podman msb; do
-    ! command -v "$o" >/dev/null 2>&1 || skip "$o installed on this system"
-  done
   rc=0
   _devenv -i - -T - "$WORK" || rc=$?
   assert_ne 0 "$rc"
@@ -255,10 +286,25 @@ test_podman_with_krun() {
   assert_not_contains "$args" "--privileged"
 }
 
-test_podman_privileged_by_default() {
+test_podman_privileged_without_krun() {
+  # krun is never visible from the host, see HOST_HIDDEN: _only skips otherwise.
   _only podman
+  assert_false command -v krun
   _devenv -i - -T - "$WORK"
   assert_match "$(_run_args)" '^\|--privileged\|--userns=keep-id:uid=1000,gid=1000\|'
+  assert_not_contains "$(_run_args)" "--runtime"
+}
+
+test_podman_prefers_krun_when_available() {
+  _only podman
+  fake_cmd krun <<'EOF'
+#!/bin/sh
+exit 0
+EOF
+  _devenv -i - -T - "$WORK"
+  args=$(_run_args)
+  assert_contains "$args" "|--runtime=krun|--user|0:0|-e|TUNNEL_CLOUDFLARE_PROTOCOL=http2|"
+  assert_not_contains "$args" "--privileged"
 }
 
 test_msb_sandbox() {
