@@ -102,6 +102,4 @@ EXPOSE 2222
 # Run behind tini, capturing the entire process group to properly teardown all
 # subprocesses.
 STOPSIGNAL SIGTERM
-# The -- is required: tini built against glibc (Debian, Ubuntu) would otherwise
-# parse options given to the container, e.g. -v, as its own.
 ENTRYPOINT [ "tini", "-s", "--", "tunnel.sh" ]
