@@ -64,6 +64,9 @@ All shell scripts are also linted with [shellcheck] for every pull request.
 - Test files are named `test_*.sh` and placed in the directory mirroring what they test,
   e.g. `tests/lib/test_wait.sh` for `lib/wait.sh`.
 - Each function named `test_*` is a test.
+  The runner only finds declarations written as `test_name() {` starting at column one,
+  with a name made of letters, digits and underscores, and no space before the parentheses.
+  Indented declarations, `test_name ()` or `function test_name` are silently ignored.
   It runs in its own shell process, with `set -eu`,
   in an empty temporary directory that is also `TMPDIR` and `TEST_TMPDIR`.
   A `setup` function, when present, runs before each test.
