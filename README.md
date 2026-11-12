@@ -89,6 +89,16 @@ running in the foreground and offering these features:
   `DEVENV_PATH` and `DEVENV_ENVFILES` can only be set from the environment.
   See [`example/devenv.env`](./example/devenv.env) for an example.
 
+Use `-d` to run the environment in the background instead.
+With `docker` and `podman`, it is then restarted when it stops, unless you stop it yourself.
+Restarting after a reboot depends on the orchestrator:
+
+- `docker` restarts it, as long as the Docker daemon starts at boot.
+- Rootless `podman` only restarts it after a reboot when `systemctl --user enable podman-restart.service` has been run,
+  and only before you log in when lingering is enabled for your user, see `loginctl enable-linger`.
+- `msb` has no restart policy: the sandbox is restarted neither when it stops nor after a reboot.
+  Restart it by hand.
+
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 [gh]: https://cli.github.com/
 

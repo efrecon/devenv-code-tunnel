@@ -62,6 +62,7 @@ case "$1" in
       shift 2
       printf '%s\n' "$@" > "$FAKE_RUN"
       { env | grep '^TUNNEL_' | sort; } > "$FAKE_ENV" || true
+      exit "${FAKE_RUN_RC:-0}"
     fi
     exit 0;;
 esac
@@ -199,10 +200,33 @@ test_local_image_not_pulled() {
 
 test_dry_run() {
   _only docker
-  _devenv -n -i - -T ghp_secret "$WORK"
+  run_script devenv.sh -n -i - -T ghp_secret "$WORK" > "$OUT" 2> "$TEST_TMPDIR/err" < /dev/null
   assert_no_file "$FAKE_RUN"
-  assert_contains "$(cat "$OUT")" "Dry-run mode, would run: docker container run"
+  # Only the final command is printed, on stdout. Other commands are logged.
+  assert_eq 1 "$(wc -l < "$OUT")" "single line on stdout"
+  assert_match "$(cat "$OUT")" '^docker container run '
+  assert_contains "$(cat "$TEST_TMPDIR/err")" "Dry-run mode, would run: docker image pull $IMAGE"
+  assert_not_contains "$(cat "$TEST_TMPDIR/err")" "would run: docker container run"
   assert_no_file "$HOME/.local/state/devenv/work/github-token" "token not stored"
+}
+
+test_dry_run_output_is_runnable() {
+  _only docker
+  # Force quoting: a directory and entrypoint arguments with special characters.
+  dir="$TEST_TMPDIR/my work"
+  mkdir -p "$dir"
+  run_script devenv.sh -n -i - -T - "$dir" -- -c "two words" "it's" '$HOME' > "$OUT" 2>/dev/null < /dev/null
+  cmd=$(cat "$OUT")
+  assert_contains "$cmd" "'$dir:/home/coder:Z'"
+  assert_contains "$cmd" " -c 'two words' 'it'\\''s' '\$HOME'"
+  assert_contains "$cmd" " --name 'my work' " "only arguments that need it are quoted"
+  assert_contains "$cmd" " -t --rm " "plain arguments are not quoted"
+  # Running the printed command must give the same arguments as a real run.
+  sh -c "$cmd"
+  dry=$(_run_args)
+  rm -f "$FAKE_RUN"
+  _devenv -i - -T - "$dir" -- -c "two words" "it's" '$HOME'
+  assert_eq "$(_run_args)" "$dry"
 }
 
 test_long_tunnel_name_is_truncated() {
@@ -312,6 +336,69 @@ test_msb_sandbox() {
   _devenv -i - -T - "$WORK" -- -v
   assert_contains "$(cat "$FAKE_CALLS")" "msb [sandbox] [run]"
   assert_eq "|-t|--name|work|--hostname|myhost-work|-v|$WORK:/home/coder:uid=1000,gid=1000|$IMAGE|--|-v|" "$(_run_args)"
+}
+
+test_msb_foreground_sandbox_is_removed() {
+  _only msb
+  _devenv -i - -T - "$WORK"
+  assert_eq "msb [remove] [-f] [work]" "$(tail -n 1 "$FAKE_CALLS")" "removed after the run"
+  assert_match "$(tail -n 2 "$FAKE_CALLS" | head -n 1)" '^msb \[sandbox\] \[run\] '
+}
+
+test_msb_foreground_exit_code() {
+  _only msb
+  rc=0
+  FAKE_RUN_RC=3 _devenv -i - -T - "$WORK" || rc=$?
+  assert_eq 3 "$rc" "exit code of the sandbox"
+  assert_eq "msb [remove] [-f] [work]" "$(tail -n 1 "$FAKE_CALLS")" "removed after a failure"
+}
+
+test_msb_detached_sandbox_is_kept() {
+  _only msb
+  _devenv -d -i - -T - "$WORK"
+  assert_match "$(tail -n 1 "$FAKE_CALLS")" '^msb \[sandbox\] \[run\] \[-d\] '
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[remove]"
+}
+
+test_docker_container_is_not_removed() {
+  # --rm takes care of it.
+  _only docker
+  _devenv -i - -T - "$WORK"
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[rm]"
+}
+
+test_msb_dry_run() {
+  _only msb
+  run_script devenv.sh -n -i - -T - "$WORK" > "$OUT" 2> "$TEST_TMPDIR/err" < /dev/null
+  assert_no_file "$FAKE_RUN"
+  assert_eq 1 "$(wc -l < "$OUT")" "single line on stdout"
+  assert_match "$(cat "$OUT")" '^msb sandbox run '
+  assert_contains "$(cat "$TEST_TMPDIR/err")" "Dry-run mode, would run: msb remove -f work"
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[remove]"
+}
+
+test_msb_signal_does_not_prevent_removal() {
+  _only msb
+  # A sandbox that runs until killed. Not through _devenv, as $! must be the
+  # shell running devenv.sh.
+  fake_cmd msb <<'EOF'
+#!/bin/sh
+{ printf 'msb'; printf ' [%s]' "$@"; printf '\n'; } >> "$FAKE_CALLS"
+if [ "$1" = sandbox ] && [ "$2" = run ]; then
+  echo "$$" > "$FAKE_RUN.pid"
+  exec sleep 30
+fi
+exit 0
+EOF
+  ${TESTS_SHELL:-sh} "$PROJECT_ROOT/devenv.sh" -i - -T - "$WORK" > "$OUT" 2>&1 < /dev/null &
+  pid=$!
+  wait_until 10 '[ -s "$FAKE_RUN.pid" ]'
+  kill -TERM "$pid"
+  sleep 0.5
+  assert_true is_running "$pid" "devenv.sh survives TERM while the sandbox runs"
+  kill -TERM "$(cat "$FAKE_RUN.pid")"
+  wait_until 10 '! is_running "$pid"'
+  assert_eq "msb [remove] [-f] [work]" "$(tail -n 1 "$FAKE_CALLS")" "removed after the signal"
 }
 
 test_env_files() {

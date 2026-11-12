@@ -145,7 +145,7 @@ main() {
           DEVENV_IDENTITY="$OPTARG";;
         I) # Docker image to use. Default to latest full image.
           DEVENV_IMAGE="$OPTARG";;
-        n) # Dry-run: just print the command that would be run, do not run it.
+        n) # Dry-run: just print the final command that would be run, do not run it.
           DEVENV_DRY_RUN=1;;
         N) # Name of the container to use. Default based on volume or directory name mounted.
           DEVENV_NAME="$OPTARG";;
@@ -371,6 +371,19 @@ main() {
   # shellcheck disable=SC2086 # We want word splitting for DEVENV_OPTIONS
   set -- "$DEVENV_ORCHESTRATOR" "$DEVENV_SANDBOXING_LCASE" run $DEVENV_OPTIONS "$@"
 
+  # msb only removes unnamed sandboxes once they exit, and has no equivalent to
+  # --rm. In the foreground, run the sandbox and remove it ourselves once it has
+  # exited. Catch INT and TERM so they reach msb without killing this shell
+  # before it has cleaned up. Caught signals are reset in msb, ignored would not.
+  if [ "$DEVENV_ORCHESTRATOR" = "msb" ] && [ "$DEVENV_DETACH" != "1" ]; then
+    trap true INT TERM
+    _rc=0
+    runif final "$@" || _rc=$?
+    runif "$DEVENV_ORCHESTRATOR" remove -f "$DEVENV_NAME" || \
+      warn "Failed to remove %s: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
+    exit "$_rc"
+  fi
+
   # Replace the current shell with the command to run the container.
   runif exec "$@"
 }
@@ -466,14 +479,41 @@ env_load() {
 }
 
 
+# Print the arguments as a command line that can be pasted into a shell. Only
+# arguments with characters special to the shell are single-quoted.
+shell_quote() {
+  _sep=
+  for _arg in "$@"; do
+    case "$_arg" in
+      "" | *[!A-Za-z0-9_@%+=:,./-]*)
+        _arg="'$(printf '%s' "$_arg" | sed "s/'/'\\\\''/g")'"
+        ;;
+    esac
+    printf '%s%s' "$_sep" "$_arg"
+    _sep=' '
+  done
+  printf '\n'
+  unset _sep _arg
+}
+
+# Run the command passed as arguments, unless in dry-run mode. When the first
+# argument is "exec" or "final", the rest is the final command: "exec" replaces
+# the current shell with it, "final" runs it and returns.
 runif() {
+  _runif_final=
+  case "$1" in
+    exec|final) _runif_final=$1; shift;;
+  esac
   if [ "$DEVENV_DRY_RUN" = "1" ]; then
-    if [ "$1" = "exec" ]; then
-      # When running in dry-run mode, we don't want to run the command, but
-      # rather print it.
-      shift
+    if [ -n "$_runif_final" ]; then
+      # When running in dry-run mode, we don't want to run the final command,
+      # but rather print it on stdout so it can be captured.
+      shell_quote "$@"
+    else
+      info "Dry-run mode, would run: %s" "$*"
     fi
-    info "Dry-run mode, would run: %s" "$*"
+  elif [ "$_runif_final" = "exec" ]; then
+    exec "$@"
   else
     "$@"
   fi
