@@ -30,7 +30,7 @@ done
 
 : "${INSTALL_CLAUDE_VERSION:="latest"}"
 : "${INSTALL_CLAUDE_ROOT:="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"}"
-: "${INSTALL_HERDR_URL:="https://herdr.dev/install.sh"}"
+: "${INSTALL_HERDR_MANIFEST:="https://herdr.dev/latest.json"}"
 
 log_init INSTALL
 
@@ -56,4 +56,21 @@ internet_bin_installer \
   "claude"
 verbose "Installed claude version %s to %s/claude" "$("$BINDIR/claude" --version)" "$BINDIR"
 
-HERDR_INSTALL_DIR="$BINDIR" internet_script_installer "$INSTALL_HERDR_URL" "" ""
+case "$(get_os)" in
+  linux) herdr_os=linux;;
+  darwin) herdr_os=macos;;
+  *) error "Unsupported Herdr OS: %s" "$(get_os)";;
+esac
+case "$(uname -m)" in
+  x86_64|amd64) herdr_arch=x86_64;;
+  aarch64|arm64) herdr_arch=aarch64;;
+  *) error "Unsupported Herdr architecture: %s" "$(uname -m)";;
+esac
+
+herdr_platform="${herdr_os}-${herdr_arch}"
+herdr_manifest=$(download "$INSTALL_HERDR_MANIFEST")
+herdr_url=$(printf '%s\n' "$herdr_manifest" | jq -er --arg platform "$herdr_platform" '.assets[$platform]')
+herdr_checksum=$(printf '%s\n' "$herdr_manifest" | jq -er --arg platform "$herdr_platform" '.sha256[$platform]')
+herdr_version=$(printf '%s\n' "$herdr_manifest" | jq -er '.version')
+internet_bin_installer "$herdr_url" "$BINDIR" "herdr" "$herdr_checksum"
+verbose "Installed Herdr version %s to %s/herdr" "$herdr_version" "$BINDIR"
