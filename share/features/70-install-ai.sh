@@ -30,6 +30,7 @@ done
 
 : "${INSTALL_CLAUDE_VERSION:="latest"}"
 : "${INSTALL_CLAUDE_ROOT:="https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases"}"
+: "${INSTALL_HERDR_URL:="https://herdr.dev/install.sh"}"
 
 log_init INSTALL
 
@@ -54,3 +55,5 @@ internet_bin_installer \
   "$BINDIR" \
   "claude"
 verbose "Installed claude version %s to %s/claude" "$("$BINDIR/claude" --version)" "$BINDIR"
+
+HERDR_INSTALL_DIR="$BINDIR" internet_script_installer "$INSTALL_HERDR_URL" "" ""
