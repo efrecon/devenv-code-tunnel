@@ -98,3 +98,32 @@ test_gist_file_cloned_and_named_after_tunnel() {
   kill -TERM "$TUNNEL_PID"
   wait "$TUNNEL_PID" 2>/dev/null || true
 }
+
+# Directories of the home owned by root are given to the user, but never
+# through symbolic links: chown would change their targets instead.
+test_home_ownership_skips_symbolic_links() {
+  [ -d /proc/self ] || skip "no /proc"
+  # Everything owned by root, record what would run elevated.
+  fake_cmd stat <<'EOS'
+#!/bin/sh
+echo 0
+EOS
+  fake_cmd sudo <<'EOS'
+#!/bin/sh
+printf '%s\n' "$*" >> "$TEST_TMPDIR/sudo"
+EOS
+  mkdir -p "$TEST_TMPDIR/ssh-target" "$TEST_TMPDIR/local-target/share"
+  ln -s "$TEST_TMPDIR/ssh-target" "$HOME/.ssh"
+  ln -s "$TEST_TMPDIR/local-target" "$HOME/.local"
+  # shellcheck disable=SC2086 # TESTS_SHELL can contain arguments
+  ${TESTS_SHELL:-sh} "$PROJECT_ROOT/tunnel.sh" -S - -T - -n smoketest > "$OUT" 2>&1 &
+  TUNNEL_PID=$!
+  # The last directory checked, all of them are done then.
+  wait_until 15 'grep -qF "not giving $HOME/.local/share" "$OUT"'
+  kill -TERM "$TUNNEL_PID"
+  wait "$TUNNEL_PID" 2>/dev/null || true
+  assert_eq "chown $(id -u):$(id -g) $HOME" "$(cat "$TEST_TMPDIR/sudo")" "only the home is given"
+  out=$(cat "$OUT")
+  assert_contains "$out" "$HOME/.ssh is a symbolic link owned by root"
+  assert_contains "$out" "$HOME/.local is a symbolic link owned by root, not giving $HOME/.local/share"
+}

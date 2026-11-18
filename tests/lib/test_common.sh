@@ -154,3 +154,34 @@ EOF
 test_read_envfile_missing_file_is_ignored() {
   assert_true read_envfile "$TEST_TMPDIR/missing.env" MYAPP
 }
+
+test_path_link_none() {
+  mkdir -p "$TEST_TMPDIR/top/a/b"
+  assert_fails path_link "$TEST_TMPDIR/top/a/b" "$TEST_TMPDIR/top"
+  assert_eq "" "$(path_link "$TEST_TMPDIR/top/a/b" "$TEST_TMPDIR/top" || true)"
+}
+
+test_path_link_finds_closest_link() {
+  mkdir -p "$TEST_TMPDIR/top" "$TEST_TMPDIR/target/b"
+  ln -s "$TEST_TMPDIR/target" "$TEST_TMPDIR/top/a"
+  assert_eq "$TEST_TMPDIR/top/a" "$(path_link "$TEST_TMPDIR/top/a/b" "$TEST_TMPDIR/top")" "link in a parent"
+  assert_eq "$TEST_TMPDIR/top/a" "$(path_link "$TEST_TMPDIR/top/a" "$TEST_TMPDIR/top")" "path itself"
+  # Dangling links and missing paths below them count as well.
+  ln -s "$TEST_TMPDIR/nowhere" "$TEST_TMPDIR/top/dangling"
+  assert_eq "$TEST_TMPDIR/top/dangling" "$(path_link "$TEST_TMPDIR/top/dangling/x" "$TEST_TMPDIR/top")"
+}
+
+test_path_link_stops_at_top() {
+  mkdir -p "$TEST_TMPDIR/target/top/a"
+  ln -s "$TEST_TMPDIR/target" "$TEST_TMPDIR/link"
+  # The link above the top is not looked at, the top itself is.
+  assert_fails path_link "$TEST_TMPDIR/link/top/a" "$TEST_TMPDIR/link/top"
+  assert_eq "$TEST_TMPDIR/link" "$(path_link "$TEST_TMPDIR/link/a" "$TEST_TMPDIR/link")"
+}
+
+test_path_link_ends_with_non_canonical_top() {
+  mkdir -p "$TEST_TMPDIR/top/a"
+  # The top never matches: walks up to / without looping forever.
+  assert_fails path_link "$TEST_TMPDIR/top/a" "$TEST_TMPDIR/top/"
+  assert_fails path_link "relative/path" "elsewhere"
+}

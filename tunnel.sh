@@ -177,9 +177,14 @@ verbose "Running tunnel starter as %s" "$(id -un)"
 # Volumes that carry their own ownership, e.g. msb disk volumes, are mounted
 # owned by root at first. Ensure the user owns these directories. Only take
 # over directories owned by root: others may be shared from the host, and
-# belong to a host user. Best effort: as_root would exit without sudo.
+# belong to a host user. Best effort: as_root would exit without sudo. Never
+# through symbolic links, in the directory or between it and the home: chown
+# would change their target, not what was checked.
 for _d in "$HOME" "$HOME/.ssh" "$HOME/.local" "$HOME/.local/share"; do
-  if [ -d "$_d" ] && [ "$(id -u)" != "0" ] && [ "$(stat -c %u "$_d")" = "0" ]; then
+  if _link=$(path_link "$_d" "$HOME"); then
+    [ "$(stat -c %u "$_link")" = "0" ] && \
+      warn "%s is a symbolic link owned by root, not giving %s to %s" "$_link" "$_d" "$(id -un)"
+  elif [ -d "$_d" ] && [ "$(id -u)" != "0" ] && [ "$(stat -c %u "$_d")" = "0" ]; then
     if command_present sudo; then
       verbose "Giving %s to %s" "$_d" "$(id -un)"
       as_root chown "$(id -u):$(id -g)" "$_d" || warn "Could not give %s to %s" "$_d" "$(id -un)"
@@ -188,7 +193,7 @@ for _d in "$HOME" "$HOME/.ssh" "$HOME/.local" "$HOME/.local/share"; do
     fi
   fi
 done
-unset _d
+unset _d _link
 # Create them as the user before dockerd does it as root.
 mkdir -p "$HOME/.local/share" || warn "Could not create %s" "$HOME/.local/share"
 
