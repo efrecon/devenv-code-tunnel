@@ -1,5 +1,9 @@
 # Tunneled dev environments in containers or microVMs
 
+> [!NOTE]
+> The large majority of this project was hand-written.
+> AI has been instrumental in quickly implementing new features lately.
+
 This project implements encapsulated development environments that run in microVMs or containers.
 Environments are designed to be accessed from anywhere through tunnels (e.g., Visual Studio Code).
 They require [`msb`][msb], `docker` or `podman` on the host, with optional support for [`krun`][krun].
