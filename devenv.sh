@@ -284,6 +284,14 @@ main() {
       error "Failed to pull image: %s" "$DEVENV_IMAGE"
   fi
 
+  # Look up an existing msb volume before anything is removed, so that a
+  # failure to list volumes leaves an existing sandbox untouched.
+  _vol_info=
+  if ! [ -d "$root" ] && [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+    _vol_info=$(msb_volume_info "$root") || \
+      error "Cannot list msb volumes, looking for: %s" "$root"
+  fi
+
   # Remove the devenv runtime (container, sandbox) if it already exists.
   if runtime_exists "$DEVENV_NAME"; then
     info "%s '%s' already exists, removing it." "$DEVENV_SANDBOXING" "$DEVENV_NAME"
@@ -297,7 +305,6 @@ main() {
   # when the home is an msb disk volume.
   if ! [ -d "$root" ]; then
     if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
-      _vol_info=$(msb_volume_info "$root")
       if [ -z "$_vol_info" ]; then
         msb_volume_create "$root"
       elif [ "${_vol_info%% *}" = "disk" ]; then
@@ -651,9 +658,11 @@ dockerd_option_append() {
 
 # Print the kind and capacity in bytes of the msb volume named $1, separated by
 # a space, e.g. "disk 1073741824" or "dir null". Print nothing when there is no
-# such volume. Reads the JSON listing, one field per line, without jq.
+# such volume, and fail when volumes cannot be listed. Reads the JSON listing,
+# one field per line, without jq.
 msb_volume_info() {
-  "$DEVENV_ORCHESTRATOR" volume ls --format json | awk -v want="$1" '
+  _vols=$("$DEVENV_ORCHESTRATOR" volume ls --format json) || return 1
+  printf '%s\n' "$_vols" | awk -v want="$1" '
     function val(line) {
       sub(/^[^:]*:[[:space:]]*/, "", line)
       sub(/,[[:space:]]*$/, "", line)
@@ -664,9 +673,13 @@ msb_volume_info() {
     /^[[:space:]]*"kind"[[:space:]]*:/ { kind = val($0) }
     /^[[:space:]]*"capacity_bytes"[[:space:]]*:/ { cap = val($0) }
     /^[[:space:]]*}/ {
-      if (name == want) { print kind, cap; exit }
+      # Read everything, so the listing never gets SIGPIPE.
+      if (name == want && !found) { print kind, cap; found = 1 }
       name = kind = cap = ""
     }'
+  _vols_rc=$?
+  unset _vols
+  return "$_vols_rc"
 }
 
 

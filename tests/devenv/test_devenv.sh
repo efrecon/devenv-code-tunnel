@@ -60,6 +60,10 @@ case "$1" in
   ps) [ -n "${FAKE_EXISTING:-}" ] && echo "$FAKE_EXISTING"; exit 0;;
   volume)
     [ "$2" = ls ] || exit 0
+    if [ -n "${FAKE_VOLUMES_FAIL:-}" ]; then
+      echo "cannot list volumes" >&2
+      exit 1
+    fi
     if [ "${3:-}" != --format ]; then
       echo "${FAKE_VOLUMES:-}"
       exit 0
@@ -400,6 +404,17 @@ test_msb_dockerd_options_no_glob() {
   : > "$TEST_TMPDIR/--data-root=globbed"
   (cd "$TEST_TMPDIR" && TUNNEL_DOCKERD_OPTIONS="--data-root*" _devenv -i - -T - myvolume)
   assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--data-root* $VFS_OPTS|"
+}
+
+test_msb_volume_listing_failure() {
+  _only msb
+  rc=0
+  FAKE_VOLUMES_FAIL=1 FAKE_EXISTING=myvolume _devenv -i - -T - -s 10G myvolume || rc=$?
+  assert_eq 1 "$rc" "exit code when volumes cannot be listed"
+  assert_contains "$(cat "$OUT")" "Cannot list msb volumes"
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[rm]" "existing sandbox kept"
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[volume] [create]"
+  assert_no_file "$FAKE_RUN"
 }
 
 test_msb_disk_volume() {
