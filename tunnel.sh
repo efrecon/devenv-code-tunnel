@@ -177,11 +177,15 @@ verbose "Running tunnel starter as %s" "$(id -un)"
 # Volumes that carry their own ownership, e.g. msb disk volumes, are mounted
 # owned by root at first. Ensure the user owns these directories. Only take
 # over directories owned by root: others may be shared from the host, and
-# belong to a host user.
+# belong to a host user. Best effort: as_root would exit without sudo.
 for _d in "$HOME" "$HOME/.ssh" "$HOME/.local" "$HOME/.local/share"; do
   if [ -d "$_d" ] && [ "$(id -u)" != "0" ] && [ "$(stat -c %u "$_d")" = "0" ]; then
-    verbose "Giving %s to %s" "$_d" "$(id -un)"
-    as_root chown "$(id -u):$(id -g)" "$_d" || warn "Could not give %s to %s" "$_d" "$(id -un)"
+    if command_present sudo; then
+      verbose "Giving %s to %s" "$_d" "$(id -un)"
+      as_root chown "$(id -u):$(id -g)" "$_d" || warn "Could not give %s to %s" "$_d" "$(id -un)"
+    else
+      warn "%s is owned by root, cannot give it to %s without sudo" "$_d" "$(id -un)"
+    fi
   fi
 done
 unset _d
