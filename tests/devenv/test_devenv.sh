@@ -7,6 +7,9 @@
 
 IMAGE=ghcr.io/efrecon/devenv-code-tunnel-alpine:main
 
+# Options passed to dockerd in msb sandboxes, when not using a disk volume.
+VFS_OPTS="--storage-driver=vfs --feature containerd-snapshotter=false --data-root=/home/coder/.local/share/docker"
+
 # Commands that change what devenv.sh does when found: never resolve them on
 # the host, only as fakes. msb, podman and docker are orchestrators, krun is a
 # runtime picked by default, gh provides a GitHub token.
@@ -55,7 +58,24 @@ setup() {
 { printf '%s' "$(basename "$0")"; printf ' [%s]' "$@"; printf '\n'; } >> "$FAKE_CALLS"
 case "$1" in
   ps) [ -n "${FAKE_EXISTING:-}" ] && echo "$FAKE_EXISTING"; exit 0;;
-  volume) [ "$2" = ls ] && echo "${FAKE_VOLUMES:-}"; exit 0;;
+  volume)
+    [ "$2" = ls ] || exit 0
+    if [ "${3:-}" != --format ]; then
+      echo "${FAKE_VOLUMES:-}"
+      exit 0
+    fi
+    # JSON listing, as msb: FAKE_VOLUMES entries are name[:kind[:bytes]].
+    printf '['
+    sep=
+    for v in ${FAKE_VOLUMES:-}; do
+      n=${v%%:*}; r=${v#"$n"}; r=${r#:}
+      k=${r%%:*}; c=${r#"$k"}; c=${c#:}
+      printf '%s\n  {\n    "capacity_bytes": %s,\n    "kind": "%s",\n    "name": "%s",\n    "used_bytes": 0\n  }' \
+        "$sep" "${c:-null}" "${k:-dir}" "$n"
+      sep=,
+    done
+    printf '\n]\n'
+    exit 0;;
   image) exit 0;;
   container|sandbox)
     if [ "$2" = run ]; then
@@ -335,7 +355,109 @@ test_msb_sandbox() {
   _only msb
   _devenv -i - -T - "$WORK" -- -v
   assert_contains "$(cat "$FAKE_CALLS")" "msb [sandbox] [run]"
-  assert_eq "|-t|--name|work|--hostname|myhost-work|-v|$WORK:/home/coder:uid=1000,gid=1000|$IMAGE|--|-v|" "$(_run_args)"
+  assert_eq "|-e|TUNNEL_DOCKERD_OPTIONS=$VFS_OPTS|-t|--name|work|--hostname|myhost-work|-v|$WORK:/home/coder:uid=1000,gid=1000|$IMAGE|--|-v|" "$(_run_args)"
+}
+
+test_msb_vfs_appended_to_dockerd_options() {
+  _only msb
+  TUNNEL_DOCKERD_OPTIONS="--debug" _devenv -i - -T - myvolume
+  assert_contains "$(cat "$FAKE_CALLS")" "msb [volume] [create] [myvolume]"
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--debug $VFS_OPTS|"
+  assert_not_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS|" "passed once, with its value"
+  assert_contains "$(_run_args)" "|-v|myvolume:/home/coder:uid=1000,gid=1000|"
+}
+
+test_msb_dockerd_options_from_env_file() {
+  _only msb
+  printf 'TUNNEL_DOCKERD_OPTIONS="--debug --log-level=warn"\n' > "$CONF1/devenv.env"
+  _devenv -i - -T - myvolume
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--debug --log-level=warn $VFS_OPTS|"
+  assert_not_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS|" "passed once, with its value"
+}
+
+test_msb_disk_volume() {
+  _only msb
+  TUNNEL_DOCKERD_OPTIONS="--debug" _devenv -i - -T - -s 200G myvolume
+  assert_contains "$(cat "$FAKE_CALLS")" "msb [volume] [create] [--kind] [disk] [--size] [200G] [myvolume]"
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--debug --data-root=/home/coder/.local/share/docker|"
+  assert_contains "$(_run_args)" "|--mount-named|myvolume:/home/coder:kind=disk,size=200G|"
+}
+
+test_msb_existing_volume_is_not_matched_by_substring() {
+  _only msb
+  FAKE_VOLUMES="myvolume-old:disk:1073741824" _devenv -i - -T - myvolume
+  assert_contains "$(cat "$FAKE_CALLS")" "msb [volume] [create] [myvolume]"
+}
+
+test_msb_existing_disk_volume_keeps_its_size() {
+  _only msb
+  # 200 GiB, while the environment asks for 10G.
+  DEVENV_VOLUME_SIZE=10G FAKE_VOLUMES="other myvolume:disk:214748364800" _devenv -v -i - -T - myvolume
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[volume] [create]"
+  assert_contains "$(cat "$OUT")" "using its size: 204800M"
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--data-root=/home/coder/.local/share/docker|"
+  assert_contains "$(_run_args)" "|--mount-named|myvolume:/home/coder:kind=disk,size=204800M|"
+}
+
+test_msb_existing_disk_volume_without_size() {
+  _only msb
+  FAKE_VOLUMES="myvolume:disk:1073741824" _devenv -i - -T - myvolume
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[volume] [create]"
+  assert_contains "$(_run_args)" "|--mount-named|myvolume:/home/coder:kind=disk,size=1024M|"
+  assert_not_contains "$(_run_args)" "vfs"
+}
+
+test_msb_existing_disk_volume_without_capacity() {
+  _only msb
+  rc=0
+  FAKE_VOLUMES="myvolume:disk" _devenv -i - -T - myvolume || rc=$?
+  assert_eq 1 "$rc" "exit code on unknown capacity"
+  assert_contains "$(cat "$OUT")" "Cannot find the size of existing disk volume: myvolume"
+  assert_no_file "$FAKE_RUN"
+}
+
+test_msb_existing_dir_volume_ignores_size() {
+  _only msb
+  FAKE_VOLUMES="myvolume:dir" _devenv -i - -T - -s 10G myvolume
+  assert_not_contains "$(cat "$FAKE_CALLS")" "[volume] [create]"
+  assert_contains "$(cat "$OUT")" "Volume size ignored, myvolume already exists as a dir volume"
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=$VFS_OPTS|"
+  assert_contains "$(_run_args)" "|-v|myvolume:/home/coder:uid=1000,gid=1000|"
+}
+
+test_msb_disk_volume_ignored_for_directory() {
+  _only msb
+  _devenv -i - -T - -s 10G "$WORK"
+  assert_contains "$(cat "$OUT")" "Volume size ignored"
+  assert_contains "$(cat "$OUT")" "Docker data, if any, will be stored under $WORK/.local/share/docker"
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=$VFS_OPTS|"
+  assert_contains "$(_run_args)" "|-v|$WORK:/home/coder:uid=1000,gid=1000|"
+}
+
+test_msb_volume_size_lowercase() {
+  _only msb
+  _devenv -i - -T - -s 30g myvolume
+  assert_contains "$(cat "$FAKE_CALLS")" "msb [volume] [create] [--kind] [disk] [--size] [30g] [myvolume]"
+}
+
+test_msb_invalid_volume_size() {
+  _only msb
+  for size in lots 0 30GiB; do
+    rc=0
+    rm -f "$FAKE_RUN"
+    _devenv -i - -T - -s "$size" myvolume || rc=$?
+    assert_eq 1 "$rc" "exit code on invalid size $size"
+    assert_contains "$(cat "$OUT")" "Invalid volume size: $size"
+    assert_no_file "$FAKE_RUN"
+  done
+}
+
+test_docker_volume_size_ignored() {
+  _only docker
+  _devenv -i - -T - -s 10G myvolume
+  assert_contains "$(cat "$FAKE_CALLS")" "docker [volume] [create] [myvolume]"
+  assert_not_contains "$(_run_args)" "TUNNEL_DOCKERD_OPTIONS"
+  assert_contains "$(cat "$OUT")" "Volume size ignored with docker"
 }
 
 test_msb_foreground_sandbox_is_removed() {
@@ -356,7 +478,7 @@ test_msb_foreground_exit_code() {
 test_msb_detached_sandbox_is_kept() {
   _only msb
   _devenv -d -i - -T - "$WORK"
-  assert_match "$(tail -n 1 "$FAKE_CALLS")" '^msb \[sandbox\] \[run\] \[-d\] '
+  assert_match "$(tail -n 1 "$FAKE_CALLS")" '^msb \[sandbox\] \[run\] (\[-e\] \[[^]]*\] )*\[-d\] \[--name\] \[work\] '
   assert_not_contains "$(cat "$FAKE_CALLS")" "[remove]"
 }
 
@@ -375,6 +497,17 @@ test_msb_dry_run() {
   assert_match "$(cat "$OUT")" '^msb sandbox run '
   assert_contains "$(cat "$TEST_TMPDIR/err")" "Dry-run mode, would run: msb remove -f work"
   assert_not_contains "$(cat "$FAKE_CALLS")" "[remove]"
+}
+
+test_msb_dry_run_output_is_runnable() {
+  _only msb
+  TUNNEL_DOCKERD_OPTIONS="--debug" run_script devenv.sh -n -i - -T - "$WORK" > "$OUT" 2>/dev/null < /dev/null
+  cmd=$(cat "$OUT")
+  assert_contains "$cmd" "'TUNNEL_DOCKERD_OPTIONS=--debug $VFS_OPTS'"
+  # The printed command carries the options, even without them in the
+  # environment.
+  env -u TUNNEL_DOCKERD_OPTIONS sh -c "$cmd"
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--debug $VFS_OPTS|"
 }
 
 test_msb_signal_does_not_prevent_removal() {

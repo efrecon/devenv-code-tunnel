@@ -99,6 +99,15 @@ Restarting after a reboot depends on the orchestrator:
 - `msb` has no restart policy: the sandbox is restarted neither when it stops nor after a reboot.
   Restart it by hand.
 
+Docker inside `msb` sandboxes cannot stack its overlays on the sandbox's own root overlay.
+Docker keeps its data under `.local/share/docker` in the home, as the root of the sandbox is too small.
+When sharing a directory, this is inside that directory: prefer a volume.
+By default, it uses the slower and space-hungry `vfs` storage driver.
+Use `-s 30G` (or `DEVENV_VOLUME_SIZE=30G`) to create new volumes as ext4 disks of that size instead.
+Docker then uses overlayfs.
+Existing volumes are used as they are: an existing disk volume keeps its size and Docker uses overlayfs on it,
+even without `-s`, while `-s` is ignored for an existing directory volume.
+
 [image]: https://github.com/users/efrecon/packages/container/devenv-code-tunnel-alpine/421321230?tag=main
 [gh]: https://cli.github.com/
 
