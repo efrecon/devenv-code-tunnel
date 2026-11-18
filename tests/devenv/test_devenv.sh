@@ -442,7 +442,7 @@ test_msb_volume_size_lowercase() {
 
 test_msb_invalid_volume_size() {
   _only msb
-  for size in lots 0 30GiB; do
+  for size in lots 0 30GiB 512K 1T; do
     rc=0
     rm -f "$FAKE_RUN"
     _devenv -i - -T - -s "$size" myvolume || rc=$?
