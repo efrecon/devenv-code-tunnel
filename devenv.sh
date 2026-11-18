@@ -282,8 +282,8 @@ main() {
     if [ "$DEVENV_ORCHESTRATOR" != "msb" ]; then
       warn "Volume size ignored with %s, only supported with msb" "$DEVENV_ORCHESTRATOR"
       DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
-    elif ! printf '%s\n' "$DEVENV_VOLUME_SIZE" | grep -qE '^[1-9][0-9]*[KkMmGgTt]?$'; then
-      error "Invalid volume size: %s, e.g. 512M or 200G" "$DEVENV_VOLUME_SIZE"
+    elif ! printf '%s\n' "$DEVENV_VOLUME_SIZE" | grep -qE '^[1-9][0-9]*[MmGg]?$'; then
+      error "Invalid volume size: %s, a number of MiB, optionally followed by M or G, e.g. 2048, 512M or 200G" "$DEVENV_VOLUME_SIZE"
     elif [ -d "$root" ]; then
       warn "Volume size ignored when sharing a directory: %s" "$root"
       DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
