@@ -86,7 +86,7 @@ Options:
   -N <name>   Name of the container to use. Default based on volume or directory name mounted.
   -o <name>   Container orchestrator to use. Default picks first of msb, podman or docker.
   -r <name>   Container runtime to use, default is to prefer krun on podman, when possible.
-  -s <size>   msb only: create new volumes as disks of that size, e.g. 30G (MiB when no unit), so Docker can use overlayfs. Default: none, Docker uses vfs.
+  -s <size>   (msb only) Size of volume to create. Empty (default): directory and Docker uses vfs.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
   -T <token>  GitHub token, or path to file with token, to pass to container. Default: from gh CLI, when logged in. For no token, use "-".
   -v          Increase verbosity level. Can be used multiple times.
