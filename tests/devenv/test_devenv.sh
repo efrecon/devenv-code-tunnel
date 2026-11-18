@@ -445,10 +445,11 @@ test_msb_invalid_volume_size() {
   for size in lots 0 30GiB 512K 1T; do
     rc=0
     rm -f "$FAKE_RUN"
-    _devenv -i - -T - -s "$size" myvolume || rc=$?
+    FAKE_EXISTING=myvolume _devenv -i - -T - -s "$size" myvolume || rc=$?
     assert_eq 1 "$rc" "exit code on invalid size $size"
     assert_contains "$(cat "$OUT")" "Invalid volume size: $size"
     assert_no_file "$FAKE_RUN"
+    assert_not_contains "$(cat "$FAKE_CALLS" 2>/dev/null)" "[rm]" "existing sandbox kept on invalid size $size"
   done
 }
 

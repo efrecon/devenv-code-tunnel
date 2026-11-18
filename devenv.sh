@@ -261,6 +261,22 @@ main() {
   name_pick "$root";  # Sets DEVENV_NAME
   tunnel_pick;        # Sets DEVENV_TUNNEL
 
+  # Docker inside msb sandboxes cannot stack overlays on top of the sandbox's
+  # own root overlay. Docker keeps its data on a disk volume when a size is
+  # given and a volume is used, otherwise it uses the vfs driver. Validate before
+  # anything is pulled or removed.
+  if [ -n "$DEVENV_VOLUME_SIZE" ]; then
+    if [ "$DEVENV_ORCHESTRATOR" != "msb" ]; then
+      warn "Volume size ignored with %s, only supported with msb" "$DEVENV_ORCHESTRATOR"
+      DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
+    elif ! printf '%s\n' "$DEVENV_VOLUME_SIZE" | grep -qE '^[1-9][0-9]*[MmGg]?$'; then
+      error "Invalid volume size: %s, a number of MiB, optionally followed by M or G, e.g. 2048, 512M or 200G" "$DEVENV_VOLUME_SIZE"
+    elif [ -d "$root" ]; then
+      warn "Volume size ignored when sharing a directory: %s" "$root"
+      DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
+    fi
+  fi
+
   # Force pulling of the image, do this early so we can fail fast if the image
   # cannot be pulled.
   if ! printf %s\\n "$DEVENV_IMAGE" | grep -qE '^localhost/'; then
@@ -273,21 +289,6 @@ main() {
     info "%s '%s' already exists, removing it." "$DEVENV_SANDBOXING" "$DEVENV_NAME"
     runif "$DEVENV_ORCHESTRATOR" "$DEVENV_SANDBOXING_LCASE" rm -f "$DEVENV_NAME" || \
       error "Failed to remove %s: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
-  fi
-
-  # Docker inside msb sandboxes cannot stack overlays on top of the sandbox's
-  # own root overlay. Docker keeps its data on a disk volume when a size is
-  # given and a volume is used, otherwise it uses the vfs driver.
-  if [ -n "$DEVENV_VOLUME_SIZE" ]; then
-    if [ "$DEVENV_ORCHESTRATOR" != "msb" ]; then
-      warn "Volume size ignored with %s, only supported with msb" "$DEVENV_ORCHESTRATOR"
-      DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
-    elif ! printf '%s\n' "$DEVENV_VOLUME_SIZE" | grep -qE '^[1-9][0-9]*[MmGg]?$'; then
-      error "Invalid volume size: %s, a number of MiB, optionally followed by M or G, e.g. 2048, 512M or 200G" "$DEVENV_VOLUME_SIZE"
-    elif [ -d "$root" ]; then
-      warn "Volume size ignored when sharing a directory: %s" "$root"
-      DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
-    fi
   fi
 
   # When using a volume, check if it exists. If not, create it. Existing msb
