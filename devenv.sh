@@ -601,18 +601,51 @@ runtime_exists() {
 
 
 # Append the options for the Docker daemon inside msb sandboxes to
-# TUNNEL_DOCKERD_OPTIONS, which may come from the environment or env files, so
-# ours prevail. Docker cannot stack overlays on top of the sandbox's root
-# overlay, so its data always goes to the home: on a disk volume when there is
-# one, otherwise with the vfs driver.
+# TUNNEL_DOCKERD_OPTIONS, which may come from the environment or env files.
+# Docker cannot stack overlays on top of the sandbox's root overlay, so its data
+# always goes to the home: on a disk volume when there is one, otherwise with the
+# vfs driver. Options already in TUNNEL_DOCKERD_OPTIONS prevail: ours are then
+# not added, with a warning.
 dockerd_options_append() {
-  _dockerd_opts="--data-root=/home/coder/.local/share/docker"
   if [ -z "$DEVENV_VOLUME_SIZE" ]; then
-    _dockerd_opts="--storage-driver=vfs --feature containerd-snapshotter=false $_dockerd_opts"
+    dockerd_option_append "--storage-driver -s" "" "--storage-driver=vfs"
+    dockerd_option_append "--feature" "containerd-snapshotter" "--feature containerd-snapshotter=false"
   fi
-  TUNNEL_DOCKERD_OPTIONS="${TUNNEL_DOCKERD_OPTIONS:+"$TUNNEL_DOCKERD_OPTIONS "}$_dockerd_opts"
+  dockerd_option_append "--data-root" "" "--data-root=/home/coder/.local/share/docker"
   trace "Docker daemon options: %s" "$TUNNEL_DOCKERD_OPTIONS"
-  unset _dockerd_opts
+}
+
+
+# Append $3 to TUNNEL_DOCKERD_OPTIONS, unless it already contains one of the
+# space-separated option names in $1. When $2 is not empty, the option only
+# counts when its value starts with $2, e.g. a given --feature. Options are
+# recognised as --name=value or --name value.
+dockerd_option_append() {
+  _dopt_found=
+  _dopt_next=
+  set -f;  # No globbing when splitting the options into words
+  for _dopt_word in ${TUNNEL_DOCKERD_OPTIONS:-}; do
+    if [ -n "$_dopt_next" ]; then
+      case "$_dopt_word" in "$2"*) _dopt_found="$_dopt_next $_dopt_word";; esac
+      _dopt_next=
+      continue
+    fi
+    for _dopt_name in $1; do
+      case "$_dopt_word" in
+        "$_dopt_name")
+          if [ -z "$2" ]; then _dopt_found=$_dopt_word; else _dopt_next=$_dopt_word; fi;;
+        "$_dopt_name="*)
+          case "${_dopt_word#*=}" in "$2"*) _dopt_found=$_dopt_word;; esac;;
+      esac
+    done
+  done
+  set +f
+  if [ -n "$_dopt_found" ]; then
+    warn "TUNNEL_DOCKERD_OPTIONS already sets %s, not adding: %s" "$_dopt_found" "$3"
+  else
+    TUNNEL_DOCKERD_OPTIONS="${TUNNEL_DOCKERD_OPTIONS:+"$TUNNEL_DOCKERD_OPTIONS "}$3"
+  fi
+  unset _dopt_found _dopt_next _dopt_word _dopt_name
 }
 
 

@@ -375,6 +375,33 @@ test_msb_dockerd_options_from_env_file() {
   assert_not_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS|" "passed once, with its value"
 }
 
+test_msb_dockerd_options_from_user_prevail() {
+  _only msb
+  TUNNEL_DOCKERD_OPTIONS="--debug -s overlay2 --feature containerd-snapshotter --data-root=/srv/docker" \
+    _devenv -i - -T - myvolume
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--debug -s overlay2 --feature containerd-snapshotter --data-root=/srv/docker|"
+  out=$(cat "$OUT")
+  assert_contains "$out" "already sets -s, not adding: --storage-driver=vfs"
+  assert_contains "$out" "already sets --feature containerd-snapshotter, not adding: --feature containerd-snapshotter=false"
+  assert_contains "$out" "already sets --data-root=/srv/docker, not adding: --data-root=/home/coder/.local/share/docker"
+}
+
+test_msb_dockerd_options_partly_from_user() {
+  _only msb
+  # Other features do not count, the storage driver is given as --name value.
+  TUNNEL_DOCKERD_OPTIONS="--feature foo=true --storage-driver overlay2" _devenv -i - -T - myvolume
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--feature foo=true --storage-driver overlay2 --feature containerd-snapshotter=false --data-root=/home/coder/.local/share/docker|"
+  assert_contains "$(cat "$OUT")" "already sets --storage-driver, not adding: --storage-driver=vfs"
+  assert_not_contains "$(cat "$OUT")" "not adding: --feature"
+}
+
+test_msb_dockerd_options_no_glob() {
+  _only msb
+  : > "$TEST_TMPDIR/--data-root=globbed"
+  (cd "$TEST_TMPDIR" && TUNNEL_DOCKERD_OPTIONS="--data-root*" _devenv -i - -T - myvolume)
+  assert_contains "$(_run_args)" "|-e|TUNNEL_DOCKERD_OPTIONS=--data-root* $VFS_OPTS|"
+}
+
 test_msb_disk_volume() {
   _only msb
   TUNNEL_DOCKERD_OPTIONS="--debug" _devenv -i - -T - -s 200G myvolume
