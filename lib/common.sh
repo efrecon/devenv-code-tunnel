@@ -44,6 +44,27 @@ is_true() {
 }
 
 
+# Print the first symbolic link found in the path $1 or its parents, walking up
+# until the directory $2, included, or the root directory. Return 1 when there
+# is none. Stops at / and . as well, in case $2 is not a canonical path.
+path_link() {
+  _pl_path=$1
+  while true; do
+    if [ -L "$_pl_path" ]; then
+      printf '%s\n' "$_pl_path"
+      unset _pl_path
+      return 0
+    fi
+    case "$_pl_path" in
+      "${2:-/}" | / | .) break;;
+    esac
+    _pl_path=$(dirname "$_pl_path")
+  done
+  unset _pl_path
+  return 1
+}
+
+
 # Find the executable passed as an argument in the PATH variable and print it if
 # it is not the second argument, typically $0. This will not work if there is a
 # directory containing a line break in the PATH (but... why?!)
