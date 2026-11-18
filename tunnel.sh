@@ -174,6 +174,20 @@ fi
 
 verbose "Running tunnel starter as %s" "$(id -un)"
 
+# Volumes that carry their own ownership, e.g. msb disk volumes, are mounted
+# owned by root at first. Ensure the user owns these directories. Only take
+# over directories owned by root: others may be shared from the host, and
+# belong to a host user.
+for _d in "$HOME" "$HOME/.ssh" "$HOME/.local" "$HOME/.local/share"; do
+  if [ -d "$_d" ] && [ "$(id -u)" != "0" ] && [ "$(stat -c %u "$_d")" = "0" ]; then
+    verbose "Giving %s to %s" "$_d" "$(id -un)"
+    as_root chown "$(id -u):$(id -g)" "$_d" || warn "Could not give %s to %s" "$_d" "$(id -un)"
+  fi
+done
+unset _d
+# Create them as the user before dockerd does it as root.
+mkdir -p "$HOME/.local/share" || warn "Could not create %s" "$HOME/.local/share"
+
 # Create the alias for the home user
 [ -n "$TUNNEL_ALIAS" ] && alias_create "$TUNNEL_ALIAS"
 

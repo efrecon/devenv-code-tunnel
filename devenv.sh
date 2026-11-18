@@ -64,6 +64,11 @@ if set -o | grep -q 'pipefail'; then set -o pipefail; fi
 # Additional options to pass to the container runner.
 : "${DEVENV_OPTIONS:=""}"
 
+# Size of the disk volume to create for the home directory, e.g. 30G, msb
+# only. When set, volumes are created as disks and Docker keeps its data
+# on them. When empty, Docker in the sandbox falls back to vfs storage driver.
+: "${DEVENV_VOLUME_SIZE:=""}"
+
 # Sanitize who we are, handle curl|(ba)sh case.
 DEVENV_BIN=$(basename "$0")
 [ -z "$DEVENV_BIN" ] && DEVENV_BIN="devenv.sh"
@@ -81,6 +86,7 @@ Options:
   -N <name>   Name of the container to use. Default based on volume or directory name mounted.
   -o <name>   Container orchestrator to use. Default picks first of msb, podman or docker.
   -r <name>   Container runtime to use, default is to prefer krun on podman, when possible.
+  -s <size>   msb only: create new volumes as disks of that size, e.g. 30G (MiB when no unit), so Docker can use overlayfs. Default: none, Docker uses vfs.
   -t <name>   Name of the tunnel to use. Default to hostname-containername.
   -T <token>  GitHub token, or path to file with token, to pass to container. Default: from gh CLI, when logged in. For no token, use "-".
   -v          Increase verbosity level. Can be used multiple times.
@@ -137,7 +143,7 @@ main() {
   # env files or environment variables.
   while [ $# -gt 0 ]; do
     OPTIND=1
-    while getopts ":di:I:N:o:t:T:r:nvh-:" opt; do
+    while getopts ":di:I:N:o:t:T:r:s:nvh-:" opt; do
       case "$opt" in
         d) # Detach mode, run the container in the background.
           DEVENV_DETACH=1;;
@@ -153,6 +159,8 @@ main() {
           DEVENV_ORCHESTRATOR="$OPTARG";;
         r) # Runtime to use for the container. Default to krun, if available.
           DEVENV_RUNTIME="$OPTARG";;
+        s) # Size of disk volume to create (msb only)
+          DEVENV_VOLUME_SIZE="$OPTARG";;
         t) # Name of the tunnel to use. Default to hostname-containername.
           DEVENV_TUNNEL="$OPTARG";;
         T) # GitHub token, or path to file with token. Default to token from gh CLI
@@ -267,9 +275,45 @@ main() {
       error "Failed to remove %s: %s" "$DEVENV_SANDBOXING_LCASE" "$DEVENV_NAME"
   fi
 
-  # When using a volume, check if it exists. If not, create it.
+  # Docker inside msb sandboxes cannot stack overlays on top of the sandbox's
+  # own root overlay. Docker keeps its data on a disk volume when a size is
+  # given and a volume is used, otherwise it uses the vfs driver.
+  if [ -n "$DEVENV_VOLUME_SIZE" ]; then
+    if [ "$DEVENV_ORCHESTRATOR" != "msb" ]; then
+      warn "Volume size ignored with %s, only supported with msb" "$DEVENV_ORCHESTRATOR"
+      DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
+    elif ! printf '%s\n' "$DEVENV_VOLUME_SIZE" | grep -qE '^[1-9][0-9]*[KkMmGgTt]?$'; then
+      error "Invalid volume size: %s, e.g. 512M or 200G" "$DEVENV_VOLUME_SIZE"
+    elif [ -d "$root" ]; then
+      warn "Volume size ignored when sharing a directory: %s" "$root"
+      DEVENV_VOLUME_SIZE=  # Clear the volume size, to use as marker
+    fi
+  fi
+
+  # When using a volume, check if it exists. If not, create it. Existing msb
+  # volumes are used as they are: their kind and size, not DEVENV_VOLUME_SIZE,
+  # decide how they are mounted. From here on, DEVENV_VOLUME_SIZE is set only
+  # when the home is an msb disk volume.
   if ! [ -d "$root" ]; then
-    if ! "$DEVENV_ORCHESTRATOR" volume ls | grep -qF "$root"; then
+    if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+      _vol_info=$(msb_volume_info "$root")
+      if [ -z "$_vol_info" ]; then
+        msb_volume_create "$root"
+      elif [ "${_vol_info%% *}" = "disk" ]; then
+        _vol_size=$(msb_volume_size "${_vol_info#* }")
+        [ -z "$_vol_size" ] && \
+          error "Cannot find the size of existing disk volume: %s" "$root"
+        if [ -n "$DEVENV_VOLUME_SIZE" ] && [ "$DEVENV_VOLUME_SIZE" != "$_vol_size" ]; then
+          info "Disk volume %s already exists, using its size: %s" "$root" "$_vol_size"
+        fi
+        DEVENV_VOLUME_SIZE=$_vol_size
+      else
+        [ -n "$DEVENV_VOLUME_SIZE" ] && \
+          warn "Volume size ignored, %s already exists as a %s volume" "$root" "${_vol_info%% *}"
+        DEVENV_VOLUME_SIZE=
+      fi
+      unset _vol_info _vol_size
+    elif ! "$DEVENV_ORCHESTRATOR" volume ls | grep -qF "$root"; then
       runif "$DEVENV_ORCHESTRATOR" volume create "$root" || \
         error "Failed to create volume: %s" "$root"
     fi
@@ -283,11 +327,22 @@ main() {
   # entrypoint.
   if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
     MOUNT_OPTS="uid=1000,gid=1000"
+    # Disk volumes are only accepted through --mount-named, with their kind and
+    # size; -v requests a directory. They do not take ownership options: they
+    # carry real ownership, the entrypoint gives the home to the user.
+    if [ -n "$DEVENV_VOLUME_SIZE" ]; then
+      _home_flag=--mount-named
+      _home_mount="$root:/home/coder:kind=disk,size=$DEVENV_VOLUME_SIZE"
+    else
+      _home_flag=-v
+      _home_mount="$root:/home/coder:$MOUNT_OPTS"
+    fi
     # msb requires an explicit -- between the image and the command arguments.
     set -- \
-        -v "$root:/home/coder:$MOUNT_OPTS" \
+        "$_home_flag" "$_home_mount" \
         "$DEVENV_IMAGE" \
           -- "$@"
+    unset _home_flag _home_mount
   else
     MOUNT_OPTS="Z"
     set -- \
@@ -364,8 +419,21 @@ main() {
 
   # Pass all variables starting with TUNNEL_ to the container.
   for _env in $(env | grep -E '^TUNNEL_' | cut -d= -f1); do
+    # Passed with its value below, in msb sandboxes.
+    [ "$DEVENV_ORCHESTRATOR" = "msb" ] && [ "$_env" = "TUNNEL_DOCKERD_OPTIONS" ] && continue
     set -- -e "$_env" "$@"
   done
+
+  # Docker in msb sandboxes needs specific options. Pass them with their value,
+  # so the command printed in dry-run mode also runs as it is.
+  if [ "$DEVENV_ORCHESTRATOR" = "msb" ]; then
+    # Docker keeps its data in the home, there is not enough room for it on the
+    # root of the sandbox. With a shared directory, it lands in the directory.
+    [ -d "$root" ] && \
+      warn "Docker data, if any, will be stored under %s/.local/share/docker. Use a volume to avoid this." "$root"
+    dockerd_options_append
+    set -- -e "TUNNEL_DOCKERD_OPTIONS=$TUNNEL_DOCKERD_OPTIONS" "$@"
+  fi
 
   # Now finalize the command to start the container.
   # shellcheck disable=SC2086 # We want word splitting for DEVENV_OPTIONS
@@ -527,6 +595,65 @@ runtime_exists() {
     "$DEVENV_ORCHESTRATOR" ps -qa | grep -qxF "$1" >/dev/null 2>&1
   else
     [ -n "$("$DEVENV_ORCHESTRATOR" ps -qa --filter "name=^/?${1}\$" 2>/dev/null)" ]
+  fi
+}
+
+
+# Append the options for the Docker daemon inside msb sandboxes to
+# TUNNEL_DOCKERD_OPTIONS, which may come from the environment or env files, so
+# ours prevail. Docker cannot stack overlays on top of the sandbox's root
+# overlay, so its data always goes to the home: on a disk volume when there is
+# one, otherwise with the vfs driver.
+dockerd_options_append() {
+  _dockerd_opts="--data-root=/home/coder/.local/share/docker"
+  if [ -z "$DEVENV_VOLUME_SIZE" ]; then
+    _dockerd_opts="--storage-driver=vfs --feature containerd-snapshotter=false $_dockerd_opts"
+  fi
+  TUNNEL_DOCKERD_OPTIONS="${TUNNEL_DOCKERD_OPTIONS:+"$TUNNEL_DOCKERD_OPTIONS "}$_dockerd_opts"
+  trace "Docker daemon options: %s" "$TUNNEL_DOCKERD_OPTIONS"
+  unset _dockerd_opts
+}
+
+
+# Print the kind and capacity in bytes of the msb volume named $1, separated by
+# a space, e.g. "disk 1073741824" or "dir null". Print nothing when there is no
+# such volume. Reads the JSON listing, one field per line, without jq.
+msb_volume_info() {
+  "$DEVENV_ORCHESTRATOR" volume ls --format json | awk -v want="$1" '
+    function val(line) {
+      sub(/^[^:]*:[[:space:]]*/, "", line)
+      sub(/,[[:space:]]*$/, "", line)
+      gsub(/"/, "", line)
+      return line
+    }
+    /^[[:space:]]*"name"[[:space:]]*:/ { name = val($0) }
+    /^[[:space:]]*"kind"[[:space:]]*:/ { kind = val($0) }
+    /^[[:space:]]*"capacity_bytes"[[:space:]]*:/ { cap = val($0) }
+    /^[[:space:]]*}/ {
+      if (name == want) { print kind, cap; exit }
+      name = kind = cap = ""
+    }'
+}
+
+
+# Print the capacity in bytes $1 as a size that msb takes, in MiB, e.g. 1024M.
+# Print nothing when $1 is not a number of bytes.
+msb_volume_size() {
+  printf '%s\n' "$1" | grep -qE '^[0-9]+$' || return 0
+  [ "$1" -ge 1048576 ] || return 0
+  printf '%sM\n' "$(( $1 / 1048576 ))"
+}
+
+
+# Create the msb volume named $1: a disk of DEVENV_VOLUME_SIZE when set,
+# otherwise a directory.
+msb_volume_create() {
+  if [ -n "$DEVENV_VOLUME_SIZE" ]; then
+    runif "$DEVENV_ORCHESTRATOR" volume create --kind disk --size "$DEVENV_VOLUME_SIZE" "$1" || \
+      error "Failed to create disk volume: %s" "$1"
+  else
+    runif "$DEVENV_ORCHESTRATOR" volume create "$1" || \
+      error "Failed to create volume: %s" "$1"
   fi
 }
 
